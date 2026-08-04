@@ -1,8 +1,8 @@
-# Stemply — Karten-Designer
+# Stampie — Karten-Designer
 
 Kartenverwaltung und Designer für digitale Wallet-Stempelkarten.
 
-**Live:** <https://stemply-xi.vercel.app/dashboard/karten>
+**Live:** <https://stampie-xi.vercel.app/dashboard/karten>
 
 > ⚠️ Das Deployment ist öffentlich erreichbar und Auth ist noch ein Stub — wer den Link
 > hat, ist als Demo-Inhaber angemeldet und kann bearbeiten, veröffentlichen und Bilder

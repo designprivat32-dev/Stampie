@@ -112,7 +112,7 @@ describe('FsStorageAdapter', () => {
   let adapter: FsStorageAdapter
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'stemply-storage-'))
+    root = await mkdtemp(path.join(tmpdir(), 'stampie-storage-'))
     adapter = new FsStorageAdapter(root)
   })
 
@@ -148,10 +148,10 @@ describe('FsStorageAdapter', () => {
 
 describe('mail', () => {
   it('composes a German test-card mail with the link in both parts', () => {
-    const mail = testCardMail('https://stemply.de/p/abc', 'Kaffeekarte')
+    const mail = testCardMail('https://stampie.de/p/abc', 'Kaffeekarte')
     expect(mail.subject).toContain('Kaffeekarte')
-    expect(mail.text).toContain('https://stemply.de/p/abc')
-    expect(mail.html).toContain('https://stemply.de/p/abc')
+    expect(mail.text).toContain('https://stampie.de/p/abc')
+    expect(mail.html).toContain('https://stampie.de/p/abc')
     expect(mail.text).toContain('30 Minuten')
   })
 

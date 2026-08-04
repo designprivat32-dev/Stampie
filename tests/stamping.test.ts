@@ -71,7 +71,7 @@ describe('decideRedeem', () => {
 
 describe('extractSerial', () => {
   it('reads a serial out of the scanned barcode URL', () => {
-    expect(extractSerial('https://stemply-xi.vercel.app/s/TEST-RH0EJNHI')).toBe('TEST-RH0EJNHI')
+    expect(extractSerial('https://stampie-xi.vercel.app/s/TEST-RH0EJNHI')).toBe('TEST-RH0EJNHI')
   })
 
   it('tolerates a trailing slash and whitespace', () => {

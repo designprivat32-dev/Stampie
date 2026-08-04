@@ -43,7 +43,7 @@ export async function issuerName(cardId: string): Promise<string> {
     where: { id: cardId },
     select: { name: true, org: { select: { name: true } } },
   })
-  return card?.org?.name ?? card?.name ?? 'Stemply'
+  return card?.org?.name ?? card?.name ?? 'Stampie'
 }
 
 export interface ListCardsOptions {

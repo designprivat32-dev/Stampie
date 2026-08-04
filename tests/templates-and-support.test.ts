@@ -133,7 +133,7 @@ describe('square logo for Google', () => {
 describe('wallet image URLs are cache-busted', () => {
   // Google caches pass images by URL and never revalidates. A stable URL means a logo the
   // shop owner can never change again.
-  const base = 'https://stemply.de'
+  const base = 'https://stampie.de'
   const loc = 'cloc1'
 
   it('a new logo produces a new URL', () => {

@@ -14,9 +14,9 @@ async function main() {
   })
 
   const user = await prisma.user.upsert({
-    where: { email: 'demo@stemply.de' },
+    where: { email: 'demo@stampie.de' },
     update: {},
-    create: { email: 'demo@stemply.de', name: 'Demo Nutzer' },
+    create: { email: 'demo@stampie.de', name: 'Demo Nutzer' },
   })
 
   await prisma.membership.upsert({
@@ -81,9 +81,9 @@ async function main() {
 
   // An agency account that sees every card but may not stamp, next to the shop owner.
   const agencyUser = await prisma.user.upsert({
-    where: { email: 'agentur@stemply.de' },
+    where: { email: 'agentur@stampie.de' },
     update: {},
-    create: { email: 'agentur@stemply.de', name: 'Agentur Team' },
+    create: { email: 'agentur@stampie.de', name: 'Agentur Team' },
   })
   await prisma.membership.upsert({
     where: { userId_orgId: { userId: agencyUser.id, orgId: org.id } },

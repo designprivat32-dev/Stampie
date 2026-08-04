@@ -25,7 +25,7 @@ export default async function KartenPage() {
     <div className="min-h-dvh bg-canvas">
       <header className="border-b border-line bg-surface px-6 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <span className="text-[14px] font-semibold text-ink">Stemply</span>
+          <span className="text-[14px] font-semibold text-ink">Stampie</span>
           <span className="text-[12px] text-ink-3">
             {agency ? 'Agentur-Zugang' : (customers[0]?.name ?? session.email)}
           </span>

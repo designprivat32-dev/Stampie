@@ -103,7 +103,7 @@ export class MockPassBuilder implements PassBuilder {
     }
 
     const payload = {
-      iss: 'mock@stemply.iam.gserviceaccount.com',
+      iss: 'mock@stampie.iam.gserviceaccount.com',
       aud: 'google',
       typ: 'savetowallet',
       iat: Math.floor(Date.now() / 1000),

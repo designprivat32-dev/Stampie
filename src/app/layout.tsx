@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Stemply — Karten-Designer',
+  title: 'Stampie — Karten-Designer',
   description: 'Digitale Stempelkarten für Apple Wallet und Google Wallet.',
 }
 

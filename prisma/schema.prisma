@@ -1,4 +1,4 @@
-// Stemply — digital wallet stamp cards.
+// Stampie — digital wallet stamp cards.
 // Scope of this schema: everything the card designer needs. Auth/billing tables are
 // stubbed here (Organization/User/Membership) and will be replaced by the real auth
 // schema later; every query in the app goes through assertLocationAccess() regardless.

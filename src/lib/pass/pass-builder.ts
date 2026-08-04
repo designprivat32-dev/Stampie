@@ -84,7 +84,7 @@ export function passSigningStatus(): PassSigningStatus {
 
 export function readPassBuilderConfig(): PassBuilderConfig {
   return {
-    passTypeIdentifier: process.env.APPLE_PASS_TYPE_ID ?? 'pass.de.stemply.stampcard',
+    passTypeIdentifier: process.env.APPLE_PASS_TYPE_ID ?? 'pass.de.stampie.stampcard',
     teamIdentifier: process.env.APPLE_TEAM_ID ?? 'DEV0000000',
     appUrl: appUrl(),
     googleIssuerId: process.env.GOOGLE_ISSUER_ID ?? '3388000000022000000',

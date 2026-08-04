@@ -8,9 +8,9 @@ const ctx: BuildPassJsonContext = {
   serial: 'SN-123',
   currentStamps: 6,
   organizationName: 'Café Nord',
-  passTypeIdentifier: 'pass.de.stemply.card',
+  passTypeIdentifier: 'pass.de.stampie.card',
   teamIdentifier: 'ABCDE12345',
-  barcodeMessage: 'https://stemply.de/s/SN-123',
+  barcodeMessage: 'https://stampie.de/s/SN-123',
 }
 
 const design = (over: Partial<CardDesignInput> = {}): CardDesignInput => ({
@@ -118,7 +118,7 @@ describe('google loyalty mapping', () => {
     issuerName: 'Café Nord',
     serial: 'SN-123',
     currentStamps: 6,
-    barcodeMessage: 'https://stemply.de/s/SN-123',
+    barcodeMessage: 'https://stampie.de/s/SN-123',
   }
 
   it('uses hex for the background, not rgb()', () => {
@@ -170,8 +170,8 @@ describe('programLogo is mandatory for Google', () => {
     issuerName: 'Café Nord',
     serial: 'SN-123',
     currentStamps: 6,
-    barcodeMessage: 'https://stemply.de/s/SN-123',
-    fallbackLogoUrl: 'https://stemply.de/api/wallet/logo/loc_1',
+    barcodeMessage: 'https://stampie.de/s/SN-123',
+    fallbackLogoUrl: 'https://stampie.de/api/wallet/logo/loc_1',
   }
 
   // Google rejects a LoyaltyClass without programLogo, and the only feedback the user
@@ -179,7 +179,7 @@ describe('programLogo is mandatory for Google', () => {
   it('falls back to the generated logo when nothing was uploaded', () => {
     const cls = buildLoyaltyClass(design(), gctx)
     expect(cls.programLogo).toBeDefined()
-    expect(cls.programLogo!.sourceUri.uri).toBe('https://stemply.de/api/wallet/logo/loc_1')
+    expect(cls.programLogo!.sourceUri.uri).toBe('https://stampie.de/api/wallet/logo/loc_1')
   })
 
   it('prefers an uploaded logo over the fallback', () => {
@@ -196,9 +196,9 @@ describe('heroImage carries the stamp row', () => {
     issuerName: 'Café Nord',
     serial: 'SN-123',
     currentStamps: 6,
-    barcodeMessage: 'https://stemply.de/s/SN-123',
-    fallbackLogoUrl: 'https://stemply.de/api/wallet/logo/loc_1',
-    heroUrl: 'https://stemply.de/api/wallet/hero/loc_1?s=6',
+    barcodeMessage: 'https://stampie.de/s/SN-123',
+    fallbackLogoUrl: 'https://stampie.de/api/wallet/logo/loc_1',
+    heroUrl: 'https://stampie.de/api/wallet/hero/loc_1?s=6',
   }
 
   // Without heroImage the Google card shows a counter but no stamps at all — the whole
@@ -212,7 +212,7 @@ describe('heroImage carries the stamp row', () => {
     const six = buildLoyaltyObject(design(), gctx).heroImage!.sourceUri.uri
     const seven = buildLoyaltyObject(design(), {
       ...gctx,
-      heroUrl: 'https://stemply.de/api/wallet/hero/loc_1?s=7',
+      heroUrl: 'https://stampie.de/api/wallet/hero/loc_1?s=7',
     }).heroImage!.sourceUri.uri
     expect(six).not.toBe(seven)
   })

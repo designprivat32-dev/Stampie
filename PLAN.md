@@ -8,7 +8,7 @@
 
 ## 0. Ausgangslage
 
-`C:\Users\ntmtk\Desktop\Computer\stemply` ist **leer** — kein `package.json`, kein Git, kein
+`C:\Users\ntmtk\Desktop\Computer\stampie` ist **leer** — kein `package.json`, kein Git, kein
 Bestandscode. Es gibt also keine „vorhandenen Konventionen", nach denen ich mich richten könnte.
 
 Der Auftrag sagt „Auth, Billing, Onboarding existieren bereits". Hier existiert nichts davon.
@@ -596,7 +596,7 @@ Nach jeder Etappe kurze Zusammenfassung, dann weiter.
 
 **Blockierend (bitte vor Etappe 0/1 beantworten):**
 
-1. **Repo wirklich leer?** Es gibt kein Bestandsprojekt unter `stemply`. Soll ich das
+1. **Repo wirklich leer?** Es gibt kein Bestandsprojekt unter `stampie`. Soll ich das
    Next-Projekt hier neu aufsetzen — oder liegt das echte Repo woanders und ich habe den
    falschen Ordner? *(Annahme sonst: neu aufsetzen, Auth/Tenancy als Stub.)*
 
