@@ -1,7 +1,7 @@
 import 'server-only'
 import { createSign } from 'node:crypto'
 import { readGoogleWalletCredentials } from '@/lib/pass/google-pass-builder'
-import { buildLoyaltyClass } from '@/lib/cards/google-loyalty'
+import { buildLoyaltyClass, stampRowText, STAMP_ROW_FIELD } from '@/lib/cards/google-loyalty'
 import { appUrl } from '@/lib/app-url'
 import { walletHeroUrl, walletLogoUrl } from './image-urls'
 import type { CardDesignInput } from '@/lib/cards/schema'
@@ -159,6 +159,15 @@ export async function syncGoogleStampCount(
       },
       body: JSON.stringify({
         loyaltyPoints: { label: design.stampLabel, balance: { int: stamps } },
+        // The row above the barcode is a text field, so it has to be rewritten too —
+        // otherwise it freezes at whatever the count was when the card was saved.
+        textModulesData: [
+          {
+            id: STAMP_ROW_FIELD,
+            header: design.stampLabel,
+            body: stampRowText(stamps, design.stampGoal),
+          },
+        ],
         // New stamp count means a new URL, so Google re-fetches instead of using its cache.
         heroImage: {
           sourceUri: { uri: walletHeroUrl(appUrl(), cardId, design, stamps) },

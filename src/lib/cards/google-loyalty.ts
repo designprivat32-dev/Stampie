@@ -88,6 +88,25 @@ export interface LoyaltyObject {
   validTimeInterval?: { end: { date: string } }
 }
 
+/**
+ * The stamp row as characters.
+ *
+ * Google renders `heroImage` in the detail area below the barcode and offers no way to
+ * move it. Text around the barcode *is* placeable, so the row that matters during a scan
+ * gets rendered with filled and empty circles right above the QR code. Grouped in fives so
+ * a count of eight is readable without counting.
+ */
+export function stampRowText(stamps: number, goal: number): string {
+  const filled = Math.max(0, Math.min(goal, Math.round(stamps)))
+  const marks = Array.from({ length: goal }, (_, i) => (i < filled ? '●' : '○'))
+  const groups: string[] = []
+  for (let i = 0; i < marks.length; i += 5) groups.push(marks.slice(i, i + 5).join(''))
+  return groups.join('  ')
+}
+
+/** Field id of the stamp row, referenced by the barcode section template. */
+export const STAMP_ROW_FIELD = 'stamprow'
+
 const BARCODE_MAP = {
   QR: 'QR_CODE',
   CODE128: 'CODE_128',
@@ -147,12 +166,12 @@ export function buildLoyaltyClass(design: CardDesignInput, ctx: BuildGoogleConte
     reviewStatus: 'UNDER_REVIEW',
     hexBackgroundColor: toGoogleHex(design.backgroundColor),
     multipleDevicesAndHoldersAllowedStatus: design.shareable ? 'MULTIPLE_HOLDERS' : 'ONE_USER_ALL_DEVICES',
-    // The stamp row sits below the barcode and cannot be moved, so at least put the
-    // counter right above it — that is where both sides look during a scan.
+    // heroImage always lands below the barcode and cannot be moved, so the row that
+    // matters during a scan is repeated as text directly above the QR code.
     classTemplateInfo: {
       cardBarcodeSectionDetails: {
         firstTopDetail: {
-          fieldSelector: { fields: [{ fieldPath: 'object.loyaltyPoints.label' }] },
+          fieldSelector: { fields: [{ fieldPath: `object.textModulesData['${STAMP_ROW_FIELD}']` }] },
         },
         secondTopDetail: {
           fieldSelector: { fields: [{ fieldPath: 'object.loyaltyPoints.balance' }] },
@@ -193,6 +212,15 @@ export function buildLoyaltyObject(design: CardDesignInput, ctx: BuildGoogleCont
       alternateText: ctx.serial,
     },
   }
+
+  // On the object, not the class: it changes with every stamp.
+  obj.textModulesData = [
+    {
+      id: STAMP_ROW_FIELD,
+      header: design.stampLabel,
+      body: stampRowText(stamps, design.stampGoal),
+    },
+  ]
 
   if (ctx.customerName) obj.accountName = ctx.customerName
   if (ctx.heroUrl) obj.heroImage = image(ctx.heroUrl, 'Stempelkarte')

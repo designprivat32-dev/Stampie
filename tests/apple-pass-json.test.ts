@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { buildPassJson, type BuildPassJsonContext } from '@/lib/cards/apple-pass-json'
-import { buildLoyaltyClass, buildLoyaltyObject } from '@/lib/cards/google-loyalty'
+import {
+  buildLoyaltyClass,
+  buildLoyaltyObject,
+  stampRowText,
+  STAMP_ROW_FIELD,
+} from '@/lib/cards/google-loyalty'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import type { BackField, CardDesignInput, GeoLocation } from '@/lib/cards/schema'
 
@@ -215,5 +220,50 @@ describe('heroImage carries the stamp row', () => {
       heroUrl: 'https://stemply.de/api/wallet/hero/loc_1?s=7',
     }).heroImage!.sourceUri.uri
     expect(six).not.toBe(seven)
+  })
+})
+
+describe('stamp row above the barcode', () => {
+  const gctx = {
+    issuerId: '3388000000023179975',
+    classSuffix: 'card_1',
+    objectSuffix: 'sn_123',
+    issuerName: 'Café Nord',
+    serial: 'SN-123',
+    currentStamps: 6,
+    barcodeMessage: 'https://stemply.de/s/SN-123',
+    fallbackLogoUrl: 'https://stemply.de/api/wallet/logo/card_1',
+  }
+
+  it.each([
+    [0, 10, '○○○○○  ○○○○○'],
+    [6, 10, '●●●●●  ●○○○○'],
+    [10, 10, '●●●●●  ●●●●●'],
+    [3, 8, '●●●○○  ○○○'],
+    [3, 3, '●●●'],
+  ])('%i of %i renders as %s', (stamps, goal, expected) => {
+    expect(stampRowText(stamps, goal)).toBe(expected)
+  })
+
+  it('clamps out-of-range counts', () => {
+    expect(stampRowText(-2, 5)).toBe('○○○○○')
+    expect(stampRowText(99, 5)).toBe('●●●●●')
+  })
+
+  // Google fixes the layout: heroImage always lands below the barcode. The text row is
+  // the only way to get the stamps above the QR code.
+  it('is referenced by the barcode section template', () => {
+    const cls = buildLoyaltyClass(design(), gctx)
+    const top = cls.classTemplateInfo?.cardBarcodeSectionDetails.firstTopDetail
+    expect(top?.fieldSelector.fields[0]?.fieldPath).toContain(STAMP_ROW_FIELD)
+  })
+
+  it('lives on the object, not the class — it changes with every stamp', () => {
+    const obj = buildLoyaltyObject(design({ stampGoal: 10 }), gctx)
+    const row = obj.textModulesData?.find((t) => t.id === STAMP_ROW_FIELD)
+    expect(row?.body).toBe('●●●●●  ●○○○○')
+
+    const cls = buildLoyaltyClass(design(), gctx)
+    expect(cls.textModulesData?.some((t) => t.id === STAMP_ROW_FIELD)).toBe(false)
   })
 })
