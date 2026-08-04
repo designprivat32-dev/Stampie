@@ -218,10 +218,10 @@ describe('renderLogoImage', () => {
     expect(meta.width).toBe(128)
   })
 
-  it('keeps the icon clear of the edges so circular cropping does not clip it', () => {
+  it('fills the circular crop without pushing the icon corners out of it', () => {
     const svg = buildLogoSvg(logoDesign, 100)
-    // 52% box centred -> 24px inset on each side.
-    expect(svg).toContain('translate(24 24)')
+    // 68% box centred -> 16px inset on each side, below the 1/√2 the ring allows.
+    expect(svg).toContain('translate(16 16)')
   })
 
   it('falls back to safe colours instead of injecting unvalidated input', () => {
@@ -266,6 +266,27 @@ describe('wallet logo framing', () => {
     const corner = await sharp(out).extract({ left: 0, top: 0, width: 4, height: 4 }).raw().toBuffer()
     expect(corner[0]).toBeGreaterThan(200)
     expect(corner[1]).toBeLessThan(60)
+  })
+
+  it('covers the circle with a near-square mark instead of insetting it', async () => {
+    // A small mark on a wide cream margin — the shape almost every logo file has. Fitting it
+    // whole can never fill more than 1/√2 of the ring, which is what left it floating.
+    const uploaded = await markOnMargin(400, 400, 80, 80, '#f5f0e6')
+    const out = await renderLogoImage(logoDesign, 200, uploaded)
+
+    // Halfway up the left edge: inside the crop circle, so it has to be the mark, not margin.
+    expect(await pixel(out, 2, 100)).toEqual([0x11, 0x11, 0x11])
+    expect(await pixel(out, 100, 100)).toEqual([0x11, 0x11, 0x11])
+  })
+
+  it('keeps a wide wordmark whole rather than cropping its ends', async () => {
+    // 4:1 — cropping to a circle would cut off letters, so this one is fitted, not covered.
+    const uploaded = await markOnMargin(800, 800, 600, 150, '#f5f0e6')
+    const out = await renderLogoImage(logoDesign, 200, uploaded)
+
+    // Ends survive: margin colour still shows beside the mark, and the centre is the mark.
+    expect(await pixel(out, 1, 100)).toEqual([0xf5, 0xf0, 0xe6])
+    expect(await pixel(out, 100, 100)).toEqual([0x11, 0x11, 0x11])
   })
 })
 
@@ -336,16 +357,6 @@ describe('frameLogo', () => {
     expect((await sharp((await frameLogo(blank)).image).metadata()).width).toBe(200)
   })
 
-  it('renders a filled logo: no bright square left inside the circle', async () => {
-    const out = await renderLogoImage(
-      { foregroundColor: '#ffffff', backgroundColor: '#3b2418', stampIcon: 'coffee' },
-      200,
-      await withMargin('#f5f0e6'),
-    )
-    // The canvas takes the margin colour, so the corner must not be the card colour.
-    const corner = await sharp(out).extract({ left: 0, top: 0, width: 4, height: 4 }).raw().toBuffer()
-    expect(corner[0]).toBeGreaterThan(200)
-  })
 })
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -354,4 +365,32 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
     g: parseInt(hex.slice(3, 5), 16),
     b: parseInt(hex.slice(5, 7), 16),
   }
+}
+
+/** A dark mark of the given size centred on a flat margin — how logo files actually look. */
+async function markOnMargin(
+  width: number,
+  height: number,
+  markWidth: number,
+  markHeight: number,
+  margin: string,
+): Promise<Buffer> {
+  const mark = await sharp({
+    create: { width: markWidth, height: markHeight, channels: 4, background: '#111111' },
+  })
+    .png()
+    .toBuffer()
+
+  return sharp({
+    create: { width, height, channels: 4, background: { ...hexToRgb(margin), alpha: 1 } },
+  })
+    .composite([{ input: mark, gravity: 'centre' }])
+    .png()
+    .toBuffer()
+}
+
+/** RGB triple at a pixel, for checking what the circular crop would actually show. */
+async function pixel(png: Buffer, x: number, y: number): Promise<[number, number, number]> {
+  const raw = await sharp(png).extract({ left: x, top: y, width: 1, height: 1 }).raw().toBuffer()
+  return [raw[0]!, raw[1]!, raw[2]!]
 }

@@ -43,8 +43,10 @@ export function GoogleLoyaltyCard({
           style={{ backgroundColor: ink === '#ffffff' ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)' }}
         >
           {logoUrl ? (
+            // Google crops programLogo to a circle with no padding — `object-contain p-1`
+            // added an inset the real card does not have, shrinking the mark twice over.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="size-full object-contain p-1" />
+            <img src={logoUrl} alt="" className="size-full object-cover" />
           ) : (
             <span className="text-[12px] font-semibold">{organizationName.slice(0, 1) || 'S'}</span>
           )}

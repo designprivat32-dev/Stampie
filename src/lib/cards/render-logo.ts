@@ -33,8 +33,10 @@ export function buildLogoSvg(design: LogoDesign, size = WALLET_LOGO_SIZE): strin
   const background = safeColor(design.backgroundColor, '#1a1a1a')
   const icon = resolveStampIcon(design.stampIcon)
 
-  // Icon occupies the middle 52% so it keeps clear of Wallet's circular cropping.
-  const iconBox = size * 0.52
+  // Google crops this square to its inscribed circle, so the icon may span up to 1/√2 of
+  // the edge before its corners leave the ring. Sitting well below that is what made the
+  // generated logo look like a dot in a saucer.
+  const iconBox = size * 0.68
   const offset = (size - iconBox) / 2
   const scale = iconBox / 24
 
@@ -53,14 +55,46 @@ function round(n: number, digits = 2): number {
 }
 
 /**
- * Fraction of the square the trimmed mark may occupy.
+ * Up to which aspect ratio a mark is cropped to fill the circle rather than fitted inside it.
  *
- * Google crops `programLogo` to a circle. A square inscribed in that circle measures
- * 1/√2 ≈ 0.707 of the edge, so anything below that keeps every corner of the mark visible
- * while still filling the ring. The earlier 0.62 left the logo floating in empty space —
- * and because the file's own margin was scaled along with it, the mark ended up tiny.
+ * Fitting *everything* inside the ring is what kept the logo small: a square mark fitted
+ * whole can never span more than 1/√2 ≈ 0.707 of the circle, so it always reads as a stamp
+ * floating in a saucer. Round avatars do not work that way — they cover, and the corners go.
+ *
+ * That is right for anything roughly square (icons, badges, monograms) and wrong for a
+ * wordmark, where cropping the ends removes letters. So near-square marks cover, wide marks
+ * fall back to fitting their diagonal in the circle.
  */
-const LOGO_INSET = 0.7
+const COVER_ASPECT_LIMIT = 1.4
+
+/** Slack on the diagonal fit, so a fitted mark does not graze the crop edge. */
+const DIAGONAL_FIT = 0.98
+
+/** Scales the trimmed mark to the placement the circular crop calls for. */
+async function placeInCircle(mark: Buffer, size: number): Promise<Buffer> {
+  const { width = size, height = size } = await sharp(mark).metadata()
+  const aspect = Math.max(width, height) / Math.min(width, height)
+
+  if (aspect <= COVER_ASPECT_LIMIT) {
+    // Cover: the shorter edge spans the full diameter, the longer one overhangs and is cut.
+    return sharp(mark)
+      .resize({ width: size, height: size, fit: 'cover', position: 'centre' })
+      .png()
+      .toBuffer()
+  }
+
+  // Fit the mark's diagonal to the diameter — the widest a wordmark can be drawn without
+  // any of it falling outside the circle.
+  const factor = (size * DIAGONAL_FIT) / Math.hypot(width, height)
+  return sharp(mark)
+    .resize({
+      width: Math.max(1, Math.round(width * factor)),
+      height: Math.max(1, Math.round(height * factor)),
+      fit: 'fill',
+    })
+    .png()
+    .toBuffer()
+}
 
 export async function renderLogoImage(
   design: LogoDesign,
@@ -84,12 +118,7 @@ export async function renderLogoImage(
   // An opaque margin becomes the canvas colour. The square edge then disappears instead
   // of showing up as a bright block inside the circular crop.
   const background = framed.backdrop ?? safeColor(design.backgroundColor, '#1a1a1a')
-  const inner = Math.round(size * LOGO_INSET)
-
-  const scaled = await sharp(framed.image)
-    .resize({ width: inner, height: inner, fit: 'inside', withoutEnlargement: false })
-    .png()
-    .toBuffer()
+  const scaled = await placeInCircle(framed.image, size)
 
   return sharp({
     create: {
