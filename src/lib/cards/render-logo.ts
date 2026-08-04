@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import { frameLogo } from '@/lib/images/logo-frame'
 import { resolveStampIcon } from './stamp-icons'
 import { HEX_COLOR_RE } from './schema'
 import type { CardDesignInput } from './schema'
@@ -52,12 +53,14 @@ function round(n: number, digits = 2): number {
 }
 
 /**
- * Fraction of the square the uploaded logo may occupy.
+ * Fraction of the square the trimmed mark may occupy.
  *
- * Google crops `programLogo` to a circle, so a logo drawn edge to edge loses its corners.
- * A wide wordmark (Apple's logo.png is 160x50) has to sit well inside that circle.
+ * Google crops `programLogo` to a circle. A square inscribed in that circle measures
+ * 1/√2 ≈ 0.707 of the edge, so anything below that keeps every corner of the mark visible
+ * while still filling the ring. The earlier 0.62 left the logo floating in empty space —
+ * and because the file's own margin was scaled along with it, the mark ended up tiny.
  */
-const LOGO_INSET = 0.62
+const LOGO_INSET = 0.7
 
 export async function renderLogoImage(
   design: LogoDesign,
@@ -74,10 +77,16 @@ export async function renderLogoImage(
     return sharp(Buffer.from(svg, 'utf8')).png({ compressionLevel: 9 }).toBuffer()
   }
 
-  const background = safeColor(design.backgroundColor, '#1a1a1a')
+  // Trim the file's own empty margin first — otherwise that margin is scaled along with
+  // the mark and the logo ends up a dot in the middle of the circle.
+  const framed = await frameLogo(logoPng)
+
+  // An opaque margin becomes the canvas colour. The square edge then disappears instead
+  // of showing up as a bright block inside the circular crop.
+  const background = framed.backdrop ?? safeColor(design.backgroundColor, '#1a1a1a')
   const inner = Math.round(size * LOGO_INSET)
 
-  const scaled = await sharp(logoPng)
+  const scaled = await sharp(framed.image)
     .resize({ width: inner, height: inner, fit: 'inside', withoutEnlargement: false })
     .png()
     .toBuffer()

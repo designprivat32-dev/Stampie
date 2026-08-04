@@ -21,10 +21,20 @@ function hash(input: string): string {
   return h.toString(36)
 }
 
+/**
+ * Bumped whenever the logo *renderer* changes.
+ *
+ * The hash below covers the design, not the code. Without this constant a rendering fix
+ * keeps the old URL, and Google — which caches pass images by URL and never revalidates —
+ * goes on serving the broken logo forever.
+ */
+const LOGO_RENDERER_VERSION = '2'
+
 /** Fields the generated logo depends on. */
 function logoVersion(design: CardDesignInput): string {
   return hash(
     [
+      LOGO_RENDERER_VERSION,
       design.squareLogoAssetId ?? '',
       design.logoAssetId ?? '',
       design.backgroundColor,

@@ -9,6 +9,7 @@ import {
 import { buildStripSvg } from '@/lib/cards/strip-svg'
 import { APPLE_STRIP_CANVAS, GOOGLE_HERO_CANVAS } from '@/lib/cards/stamp-layout'
 import { buildLogoSvg, renderLogoImage, WALLET_LOGO_SIZE } from '@/lib/cards/render-logo'
+import { frameLogo } from '@/lib/images/logo-frame'
 
 const design: StripDesign = {
   stampGoal: 10,
@@ -252,7 +253,9 @@ describe('wallet logo framing', () => {
     expect(meta.height).toBe(WALLET_LOGO_SIZE)
   })
 
-  it('keeps the uploaded logo inside the circular safe area', async () => {
+  it('adopts the logo background so no square shows inside the circular crop', async () => {
+    // A flat red sheet: the whole canvas should become red rather than leaving a red
+    // square floating on the dark card colour.
     const uploaded = await sharp({
       create: { width: 400, height: 400, channels: 4, background: '#ff0000' },
     })
@@ -260,8 +263,95 @@ describe('wallet logo framing', () => {
       .toBuffer()
 
     const out = await renderLogoImage(logoDesign, 100, uploaded)
-    // Corners must still be background, not logo, or the circular crop clips content.
     const corner = await sharp(out).extract({ left: 0, top: 0, width: 4, height: 4 }).raw().toBuffer()
-    expect(corner[0]).toBeLessThan(120)
+    expect(corner[0]).toBeGreaterThan(200)
+    expect(corner[1]).toBeLessThan(60)
   })
 })
+
+describe('frameLogo', () => {
+  /** A mark surrounded by a wide flat margin — how logo files actually look. */
+  const withMargin = async (marginColour: string, alpha = 1) =>
+    sharp({
+      create: { width: 400, height: 400, channels: 4, background: { ...hexToRgb(marginColour), alpha } },
+    })
+      .composite([
+        {
+          input: await sharp({
+            create: { width: 80, height: 80, channels: 4, background: '#111111' },
+          })
+            .png()
+            .toBuffer(),
+          gravity: 'centre',
+        },
+      ])
+      .png()
+      .toBuffer()
+
+  it('trims the empty margin so the mark can fill the circle', async () => {
+    const framed = await frameLogo(await withMargin('#f5f0e6'))
+    const meta = await sharp(framed.image).metadata()
+    // 400x400 down to roughly the 80x80 mark.
+    expect(meta.width).toBeLessThan(120)
+    expect(meta.height).toBeLessThan(120)
+  })
+
+  it('reports an opaque margin so the canvas can match it', async () => {
+    const framed = await frameLogo(await withMargin('#f5f0e6'))
+    expect(framed.backdrop).toBe('#f5f0e6')
+  })
+
+  it('reports null for a transparent margin', async () => {
+    const framed = await frameLogo(await withMargin('#000000', 0))
+    expect(framed.backdrop).toBeNull()
+  })
+
+  it('leaves artwork alone when the corners disagree', async () => {
+    const gradient = await sharp({
+      create: { width: 200, height: 200, channels: 4, background: '#ffffff' },
+    })
+      .composite([
+        {
+          input: await sharp({ create: { width: 100, height: 200, channels: 4, background: '#ff0000' } })
+            .png()
+            .toBuffer(),
+          left: 0,
+          top: 0,
+        },
+      ])
+      .png()
+      .toBuffer()
+
+    const framed = await frameLogo(gradient)
+    expect(framed.backdrop).toBeNull()
+    expect((await sharp(framed.image).metadata()).width).toBe(200)
+  })
+
+  it('keeps the original when the image is nothing but margin', async () => {
+    const blank = await sharp({
+      create: { width: 200, height: 200, channels: 4, background: '#ffffff' },
+    })
+      .png()
+      .toBuffer()
+    expect((await sharp((await frameLogo(blank)).image).metadata()).width).toBe(200)
+  })
+
+  it('renders a filled logo: no bright square left inside the circle', async () => {
+    const out = await renderLogoImage(
+      { foregroundColor: '#ffffff', backgroundColor: '#3b2418', stampIcon: 'coffee' },
+      200,
+      await withMargin('#f5f0e6'),
+    )
+    // The canvas takes the margin colour, so the corner must not be the card colour.
+    const corner = await sharp(out).extract({ left: 0, top: 0, width: 4, height: 4 }).raw().toBuffer()
+    expect(corner[0]).toBeGreaterThan(200)
+  })
+})
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  }
+}

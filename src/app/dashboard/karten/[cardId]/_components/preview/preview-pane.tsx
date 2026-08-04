@@ -9,6 +9,7 @@ import { GoogleLoyaltyCardBack } from './google-loyalty-card-back'
 import { PreviewControls } from './preview-controls'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import { useDebounced } from '@/hooks/use-debounced'
+import { walletLogoUrl } from '@/lib/wallet/image-urls'
 
 /**
  * The right-hand stage. Everything here reacts to a 150 ms debounced copy of the design,
@@ -32,10 +33,10 @@ export function PreviewPane({
 
   const cardRef = React.useRef<HTMLDivElement>(null)
   const logoUrl = design.logoAssetId ? (assetUrls[design.logoAssetId] ?? null) : null
-  // Google crops programLogo to a circle, so it uses the square upload when present.
-  const googleLogoUrl = design.squareLogoAssetId
-    ? (assetUrls[design.squareLogoAssetId] ?? logoUrl)
-    : logoUrl
+  // Google gets the *rendered* logo, not the raw upload: the renderer trims the file's
+  // empty margin and fills the circle. Showing the raw asset here would put a preview on
+  // screen that the real card never matches.
+  const googleLogoUrl = walletLogoUrl('', cardId, design)
   const stamps = Math.min(simulatedStamps, design.stampGoal)
 
   const handleExport = React.useCallback(async () => {
