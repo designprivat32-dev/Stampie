@@ -33,10 +33,8 @@ export function buildLogoSvg(design: LogoDesign, size = WALLET_LOGO_SIZE): strin
   const background = safeColor(design.backgroundColor, '#1a1a1a')
   const icon = resolveStampIcon(design.stampIcon)
 
-  // Google crops this square to its inscribed circle, so the icon may span up to 1/√2 of
-  // the edge before its corners leave the ring. Sitting well below that is what made the
-  // generated logo look like a dot in a saucer.
-  const iconBox = size * 0.68
+  // Icon occupies the middle 52% so it keeps clear of Wallet's circular cropping.
+  const iconBox = size * 0.52
   const offset = (size - iconBox) / 2
   const scale = iconBox / 24
 
@@ -49,52 +47,45 @@ export function buildLogoSvg(design: LogoDesign, size = WALLET_LOGO_SIZE): strin
   ].join('')
 }
 
+/** Below this the mark would vanish into the card colour and needs a plate behind it. */
+const MIN_MARK_CONTRAST = 1.7
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  }
+}
+
+/** WCAG contrast between a known luminance and a hex colour. */
+function contrastAgainst(luminance: number, hex: string): number {
+  const { r, g, b } = hexToRgb(hex)
+  const channel = (c: number) => {
+    const v = c / 255
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }
+  const other = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+  const lighter = Math.max(luminance, other)
+  const darker = Math.min(luminance, other)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 function round(n: number, digits = 2): number {
   const f = 10 ** digits
   return Math.round(n * f) / f
 }
 
 /**
- * Up to which aspect ratio a mark is cropped to fill the circle rather than fitted inside it.
+ * Fraction of the canvas the trimmed mark occupies.
  *
- * Fitting *everything* inside the ring is what kept the logo small: a square mark fitted
- * whole can never span more than 1/√2 ≈ 0.707 of the circle, so it always reads as a stamp
- * floating in a saucer. Round avatars do not work that way — they cover, and the corners go.
- *
- * That is right for anything roughly square (icons, badges, monograms) and wrong for a
- * wordmark, where cropping the ends removes letters. So near-square marks cover, wide marks
- * fall back to fitting their diagonal in the circle.
+ * With a transparent surround there is no square edge left to hide, so the mark can run
+ * much closer to the edge than the 0.62 it started at. Corners of a *bounding box* this
+ * size would fall outside an inscribed circle, but the corners of a logo are empty by
+ * construction — what matters is the mark's own extent along the axes, and that stays
+ * inside.
  */
-const COVER_ASPECT_LIMIT = 1.4
-
-/** Slack on the diagonal fit, so a fitted mark does not graze the crop edge. */
-const DIAGONAL_FIT = 0.98
-
-/** Scales the trimmed mark to the placement the circular crop calls for. */
-async function placeInCircle(mark: Buffer, size: number): Promise<Buffer> {
-  const { width = size, height = size } = await sharp(mark).metadata()
-  const aspect = Math.max(width, height) / Math.min(width, height)
-
-  if (aspect <= COVER_ASPECT_LIMIT) {
-    // Cover: the shorter edge spans the full diameter, the longer one overhangs and is cut.
-    return sharp(mark)
-      .resize({ width: size, height: size, fit: 'cover', position: 'centre' })
-      .png()
-      .toBuffer()
-  }
-
-  // Fit the mark's diagonal to the diameter — the widest a wordmark can be drawn without
-  // any of it falling outside the circle.
-  const factor = (size * DIAGONAL_FIT) / Math.hypot(width, height)
-  return sharp(mark)
-    .resize({
-      width: Math.max(1, Math.round(width * factor)),
-      height: Math.max(1, Math.round(height * factor)),
-      fit: 'fill',
-    })
-    .png()
-    .toBuffer()
-}
+const LOGO_INSET = 0.82
 
 export async function renderLogoImage(
   design: LogoDesign,
@@ -111,21 +102,34 @@ export async function renderLogoImage(
     return sharp(Buffer.from(svg, 'utf8')).png({ compressionLevel: 9 }).toBuffer()
   }
 
-  // Trim the file's own empty margin first — otherwise that margin is scaled along with
-  // the mark and the logo ends up a dot in the middle of the circle.
+  // Trim the file's empty margin and punch it out to transparency. Google places our
+  // square inside its own round container, so anything opaque reads as a block in a ring.
   const framed = await frameLogo(logoPng)
 
-  // An opaque margin becomes the canvas colour. The square edge then disappears instead
-  // of showing up as a bright block inside the circular crop.
-  const background = framed.backdrop ?? safeColor(design.backgroundColor, '#1a1a1a')
-  const scaled = await placeInCircle(framed.image, size)
+  // Transparent unless the mark would disappear against the card colour — a dark mark on
+  // a dark card is worse than a visible plate behind it.
+  const cardColour = safeColor(design.backgroundColor, '#1a1a1a')
+  // A plate only when *neither* the dark nor the light ink stands out from the card.
+  const inkContrast = Math.max(
+    framed.markDark === null ? 0 : contrastAgainst(framed.markDark, cardColour),
+    framed.markLight === null ? 0 : contrastAgainst(framed.markLight, cardColour),
+  )
+  const needsPlate = framed.backdrop !== null && inkContrast < MIN_MARK_CONTRAST
+
+  const inner = Math.round(size * LOGO_INSET)
+  const scaled = await sharp(framed.image)
+    .resize({ width: inner, height: inner, fit: 'inside', withoutEnlargement: false })
+    .png()
+    .toBuffer()
 
   return sharp({
     create: {
       width: size,
       height: size,
       channels: 4,
-      background,
+      background: needsPlate
+        ? { ...hexToRgb(framed.backdrop!), alpha: 1 }
+        : { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .composite([{ input: scaled, gravity: 'centre' }])
