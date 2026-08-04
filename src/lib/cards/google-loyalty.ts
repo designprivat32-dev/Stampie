@@ -9,6 +9,11 @@ import type { CardDesignInput } from './schema'
  *   programLogo            <- logo
  *   hexBackgroundColor     <- background colour, HEX here (Apple wants rgb())
  *   heroImage              <- stamp strip at 3:1
+ *
+ * Google fixes the card layout. `heroImage` renders in the detail area below the barcode
+ * and there is no field to move it — only text can be placed around the barcode, and a
+ * text stamp row next to the rendered one just showed the same thing twice. The editor
+ * preview therefore mirrors Google's real order instead of pretending otherwise.
  *   loyaltyPoints          <- stamp counter
  *   textModulesData[]      <- reward and free-text back fields
  *   linksModuleData[]      <- website, phone, menu
@@ -36,23 +41,6 @@ export interface GoogleLatLong {
   longitude: number
 }
 
-/**
- * Google fixes the card layout — `heroImage` always renders in the detail area below the
- * barcode and cannot be moved. What *can* be placed is text directly around the barcode,
- * which is where the customer actually looks while the card is being scanned.
- */
-export interface ClassTemplateInfo {
-  cardBarcodeSectionDetails: {
-    firstTopDetail?: BarcodeSectionDetail
-    secondTopDetail?: BarcodeSectionDetail
-    firstBottomDetail?: BarcodeSectionDetail
-  }
-}
-
-export interface BarcodeSectionDetail {
-  fieldSelector: { fields: Array<{ fieldPath: string }> }
-}
-
 export interface LoyaltyClass {
   id: string
   issuerName: string
@@ -65,7 +53,6 @@ export interface LoyaltyClass {
   linksModuleData?: { uris: GoogleLinkModuleUri[] }
   locations?: GoogleLatLong[]
   multipleDevicesAndHoldersAllowedStatus?: 'MULTIPLE_HOLDERS' | 'ONE_USER_ALL_DEVICES' | 'ONE_USER_ONE_DEVICE'
-  classTemplateInfo?: ClassTemplateInfo
 }
 
 export interface LoyaltyObject {
@@ -87,25 +74,6 @@ export interface LoyaltyObject {
   textModulesData?: GoogleTextModule[]
   validTimeInterval?: { end: { date: string } }
 }
-
-/**
- * The stamp row as characters.
- *
- * Google renders `heroImage` in the detail area below the barcode and offers no way to
- * move it. Text around the barcode *is* placeable, so the row that matters during a scan
- * gets rendered with filled and empty circles right above the QR code. Grouped in fives so
- * a count of eight is readable without counting.
- */
-export function stampRowText(stamps: number, goal: number): string {
-  const filled = Math.max(0, Math.min(goal, Math.round(stamps)))
-  const marks = Array.from({ length: goal }, (_, i) => (i < filled ? '●' : '○'))
-  const groups: string[] = []
-  for (let i = 0; i < marks.length; i += 5) groups.push(marks.slice(i, i + 5).join(''))
-  return groups.join('  ')
-}
-
-/** Field id of the stamp row, referenced by the barcode section template. */
-export const STAMP_ROW_FIELD = 'stamprow'
 
 const BARCODE_MAP = {
   QR: 'QR_CODE',
@@ -166,18 +134,6 @@ export function buildLoyaltyClass(design: CardDesignInput, ctx: BuildGoogleConte
     reviewStatus: 'UNDER_REVIEW',
     hexBackgroundColor: toGoogleHex(design.backgroundColor),
     multipleDevicesAndHoldersAllowedStatus: design.shareable ? 'MULTIPLE_HOLDERS' : 'ONE_USER_ALL_DEVICES',
-    // heroImage always lands below the barcode and cannot be moved, so the row that
-    // matters during a scan is repeated as text directly above the QR code.
-    classTemplateInfo: {
-      cardBarcodeSectionDetails: {
-        firstTopDetail: {
-          fieldSelector: { fields: [{ fieldPath: `object.textModulesData['${STAMP_ROW_FIELD}']` }] },
-        },
-        secondTopDetail: {
-          fieldSelector: { fields: [{ fieldPath: 'object.loyaltyPoints.balance' }] },
-        },
-      },
-    },
   }
 
   // programLogo is REQUIRED by Google — a class without it is rejected with a generic
@@ -212,15 +168,6 @@ export function buildLoyaltyObject(design: CardDesignInput, ctx: BuildGoogleCont
       alternateText: ctx.serial,
     },
   }
-
-  // On the object, not the class: it changes with every stamp.
-  obj.textModulesData = [
-    {
-      id: STAMP_ROW_FIELD,
-      header: design.stampLabel,
-      body: stampRowText(stamps, design.stampGoal),
-    },
-  ]
 
   if (ctx.customerName) obj.accountName = ctx.customerName
   if (ctx.heroUrl) obj.heroImage = image(ctx.heroUrl, 'Stempelkarte')

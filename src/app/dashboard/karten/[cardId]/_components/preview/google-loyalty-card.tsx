@@ -10,7 +10,9 @@ import type { CardDesignInput } from '@/lib/cards/schema'
  *
  * Differences from Apple that the shop owner needs to see rather than be told about:
  * Google derives the text colour itself (foreground/label colour are ignored), the hero
- * image is 3:1, and the barcode sits on a white plate at the bottom of the card.
+ * image is 3:1, and — the one that surprises everyone — the barcode comes *before* the
+ * stamp row. Google fixes that order and offers no field to change it, so the preview
+ * copies it rather than showing a nicer layout the real card will never have.
  */
 export function GoogleLoyaltyCard({
   design,
@@ -71,17 +73,7 @@ export function GoogleLoyaltyCard({
         </div>
       </div>
 
-      {/* heroImage — same renderer, 3:1 canvas */}
-      <StampStripImg src={heroSrc} alt="Stempelreihe" aspect={1032 / 336} />
 
-      {design.rewardText.trim() ? (
-        <div className="px-4 pt-3">
-          <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-            Belohnung
-          </div>
-          <div className="text-[13px] leading-snug">{design.rewardText.trim()}</div>
-        </div>
-      ) : null}
 
       <div className="p-4">
         <div className="flex flex-col items-center rounded-lg bg-white px-4 py-3">
@@ -93,6 +85,18 @@ export function GoogleLoyaltyCard({
           <span className="mt-1.5 text-[9px] tracking-widest text-black/55">SN-DEMO-0001</span>
         </div>
       </div>
+
+      {/* Below the barcode — Google's order, not ours. */}
+      <StampStripImg src={heroSrc} alt="Stempelreihe" aspect={1032 / 336} />
+
+      {design.rewardText.trim() ? (
+        <div className="px-4 pb-4 pt-3">
+          <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
+            Belohnung
+          </div>
+          <div className="text-[13px] leading-snug">{design.rewardText.trim()}</div>
+        </div>
+      ) : null}
     </div>
   )
 }
