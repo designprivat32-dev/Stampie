@@ -95,7 +95,12 @@ export function TillView({
       <QrScanner onScan={(value) => void run(value, 'stamp')} disabled={feedback.kind === 'busy'} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="manual-serial">Kartennummer von Hand</Label>
+        <Label htmlFor="manual-serial">
+          Kartennummer von Hand
+          <span className="ml-1 font-normal text-ink-3">
+            — falls die Kamera streikt, steht sie unter dem Barcode
+          </span>
+        </Label>
         <div className="flex gap-2">
           <Input
             id="manual-serial"
