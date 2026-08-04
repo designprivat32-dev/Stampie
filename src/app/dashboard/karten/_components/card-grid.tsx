@@ -1,0 +1,256 @@
+'use client'
+
+import * as React from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Archive, Building2, Plus, QrCode, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge, Spinner } from '@/components/ui/misc'
+import { NewCardDialog } from './new-card-dialog'
+import { AssignCustomerDialog } from './assign-customer-dialog'
+import { archiveCardAction } from '@/actions/cards'
+import { stripPreviewUrl } from '@/lib/cards/preview-url'
+import type { CardSummary, CustomerOption } from '@/lib/cards/card-service'
+import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
+import { cn } from '@/lib/utils'
+
+/**
+ * The card overview — the entry point to everything.
+ *
+ * Each tile previews through the real strip renderer, so the grid shows what the customer
+ * actually holds rather than an approximation.
+ */
+export function CardGrid({
+  cards,
+  customers,
+  canAssign,
+  canStamp,
+}: {
+  cards: CardSummary[]
+  customers: CustomerOption[]
+  /** Only agency members hand cards to customers. */
+  canAssign: boolean
+  /** Agency members design cards but never book stamps. */
+  canStamp: boolean
+}) {
+  const router = useRouter()
+  const [creating, setCreating] = React.useState(false)
+  const [assigning, setAssigning] = React.useState<CardSummary | null>(null)
+  const [busyId, setBusyId] = React.useState<string | null>(null)
+
+  const handleArchive = async (card: CardSummary) => {
+    setBusyId(card.id)
+    try {
+      await archiveCardAction(card.id, card.archivedAt === null)
+      router.refresh()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-[17px] font-semibold text-ink">Karten</h1>
+          <p className="text-[13px] text-ink-3">
+            {cards.length === 0
+              ? 'Noch keine Karte angelegt.'
+              : `${cards.length} ${cards.length === 1 ? 'Karte' : 'Karten'}`}
+          </p>
+        </div>
+        <Button variant="primary" onClick={() => setCreating(true)}>
+          <Plus />
+          Neue Karte
+        </Button>
+      </div>
+
+      {cards.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-line px-6 py-16 text-center transition-colors hover:border-line-strong hover:bg-surface-2"
+        >
+          <Plus className="size-6 text-ink-3" />
+          <span className="text-[14px] font-medium text-ink">Erste Karte anlegen</span>
+          <span className="max-w-sm text-[12.5px] leading-snug text-ink-3">
+            Danach öffnet sich der Designer: Farben, Stempel, Texte — und die Testkarte aufs
+            Handy.
+          </span>
+        </button>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {cards.map((card) => (
+            <CardTile
+              key={card.id}
+              card={card}
+              canAssign={canAssign}
+              canStamp={canStamp}
+              busy={busyId === card.id}
+              onAssign={() => setAssigning(card)}
+              onArchive={() => void handleArchive(card)}
+            />
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line text-ink-3 transition-colors hover:border-line-strong hover:bg-surface-2 hover:text-ink"
+          >
+            <Plus className="size-6" />
+            <span className="text-[13px] font-medium">Neue Karte</span>
+          </button>
+        </div>
+      )}
+
+      <NewCardDialog
+        open={creating}
+        onOpenChange={setCreating}
+        customers={customers}
+        canChooseCustomer={canAssign}
+      />
+      <AssignCustomerDialog
+        card={assigning}
+        customers={customers}
+        onOpenChange={(open) => !open && setAssigning(null)}
+      />
+    </div>
+  )
+}
+
+function CardTile({
+  card,
+  canAssign,
+  canStamp,
+  busy,
+  onAssign,
+  onArchive,
+}: {
+  card: CardSummary
+  canAssign: boolean
+  canStamp: boolean
+  busy: boolean
+  onAssign: () => void
+  onArchive: () => void
+}) {
+  const preview = card.preview
+  const design = preview
+    ? {
+        ...DEFAULT_CARD_DESIGN,
+        backgroundColor: preview.backgroundColor,
+        foregroundColor: preview.foregroundColor,
+        stampGoal: preview.stampGoal,
+        stampIcon: preview.stampIcon,
+        emptyStampStyle: preview.emptyStampStyle as typeof DEFAULT_CARD_DESIGN.emptyStampStyle,
+        stampIconAssetId: preview.stampIconAssetId,
+        heroAssetId: preview.heroAssetId,
+      }
+    : null
+
+  const stamps = design ? Math.ceil(design.stampGoal * 0.6) : 0
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col overflow-hidden rounded-xl border border-line bg-surface',
+        card.archivedAt && 'opacity-60',
+      )}
+    >
+      <Link href={`/dashboard/karten/${card.id}`} className="block">
+        <div style={{ backgroundColor: preview?.backgroundColor ?? '#1a1a1a' }}>
+          <div className="flex items-center justify-between gap-2 px-3 pb-1.5 pt-2.5">
+            <span
+              className="truncate text-[12px] font-semibold"
+              style={{ color: preview?.foregroundColor ?? '#ffffff' }}
+            >
+              {preview?.programName?.trim() || card.name}
+            </span>
+            {design ? (
+              <span
+                className="shrink-0 text-[11px] tabular-nums"
+                style={{ color: preview?.labelColor ?? '#cccccc' }}
+              >
+                {stamps}/{design.stampGoal}
+              </span>
+            ) : null}
+          </div>
+          {design ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={stripPreviewUrl(design, { cardId: card.id, currentStamps: stamps, scale: 2 })}
+              alt=""
+              className="block w-full"
+              style={{ aspectRatio: String(375 / 123) }}
+            />
+          ) : (
+            <div className="h-[110px]" />
+          )}
+        </div>
+      </Link>
+
+      <div className="flex flex-1 flex-col gap-2.5 px-3.5 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <Link href={`/dashboard/karten/${card.id}`} className="min-w-0">
+            <p className="truncate text-[13.5px] font-medium text-ink">{card.name}</p>
+            <p className="flex items-center gap-1 truncate text-[12px] text-ink-3">
+              <Building2 className="size-3 shrink-0" />
+              {card.orgName ?? 'Nicht zugewiesen'}
+              {card.locationName ? ` · ${card.locationName}` : ''}
+            </p>
+          </Link>
+          {card.archivedAt ? (
+            <Badge tone="neutral">Archiviert</Badge>
+          ) : card.isPublished ? (
+            <Badge tone="ok">v{card.publishedVersion}</Badge>
+          ) : (
+            <Badge tone="neutral">Entwurf</Badge>
+          )}
+        </div>
+
+        <p className="flex items-center gap-1.5 text-[12px] text-ink-3">
+          <Users className="size-3.5" />
+          {card.issuedCount === 0
+            ? 'Noch keine Karten ausgegeben'
+            : `${card.issuedCount} ${card.issuedCount === 1 ? 'Karte' : 'Karten'} im Umlauf`}
+          {card.testCount > 0 ? (
+            <span className="text-ink-3">· {card.testCount} Test</span>
+          ) : null}
+        </p>
+
+        <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/dashboard/karten/${card.id}`}>Bearbeiten</Link>
+          </Button>
+
+          {canStamp && card.orgId ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/dashboard/karten/${card.id}/stempeln`}>
+                <QrCode />
+                Stempeln
+              </Link>
+            </Button>
+          ) : null}
+
+          {canAssign ? (
+            <Button variant="ghost" size="sm" onClick={onAssign}>
+              <Building2 />
+              {card.orgId ? 'Kunde ändern' : 'Kunde zuweisen'}
+            </Button>
+          ) : null}
+
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto"
+            disabled={busy}
+            aria-label={card.archivedAt ? 'Wiederherstellen' : 'Archivieren'}
+            title={card.archivedAt ? 'Wiederherstellen' : 'Archivieren'}
+            onClick={onArchive}
+          >
+            {busy ? <Spinner /> : <Archive />}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

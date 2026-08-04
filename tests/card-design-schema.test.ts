@@ -1,0 +1,270 @@
+import { describe, expect, it } from 'vitest'
+import {
+  MAX_GEO_LOCATIONS,
+  STAMP_GOAL_MAX,
+  STAMP_GOAL_MIN,
+  buildPublishSchema,
+  cardDesignDraftSchema,
+  cardDesignPublishSchema,
+  type CardDesignInput,
+} from '@/lib/cards/schema'
+import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
+
+const draft = (over: Partial<CardDesignInput> = {}): unknown => ({ ...DEFAULT_CARD_DESIGN, ...over })
+
+const publishable = (over: Partial<CardDesignInput> = {}): unknown =>
+  draft({
+    programName: 'Kaffeekarte',
+    rewardText: 'Jeder 10. Kaffee gratis',
+    iconAssetId: 'clh0000000000000000000000',
+    backFields: [
+      { id: 'a', type: 'legal', kind: 'imprint', label: 'Impressum', value: 'https://example.de/impressum' },
+      { id: 'b', type: 'legal', kind: 'privacy', label: 'Datenschutz', value: 'https://example.de/datenschutz' },
+    ],
+    ...over,
+  })
+
+describe('cardDesignDraftSchema', () => {
+  it('accepts the default design so a fresh draft can autosave', () => {
+    expect(cardDesignDraftSchema.safeParse(draft()).success).toBe(true)
+  })
+
+  describe('stampGoal', () => {
+    it.each([STAMP_GOAL_MIN, 10, STAMP_GOAL_MAX])('accepts %i', (n) => {
+      expect(cardDesignDraftSchema.safeParse(draft({ stampGoal: n })).success).toBe(true)
+    })
+    it.each([2, 21, 0, -1, 10.5])('rejects %s', (n) => {
+      expect(cardDesignDraftSchema.safeParse(draft({ stampGoal: n as number })).success).toBe(false)
+    })
+  })
+
+  describe('colours', () => {
+    it('accepts #rrggbb and lower-cases it', () => {
+      const r = cardDesignDraftSchema.parse(draft({ backgroundColor: '#AABBCC' }))
+      expect(r.backgroundColor).toBe('#aabbcc')
+    })
+    it.each(['#abc', 'rgb(1,2,3)', 'red', '#12345', '#1234567'])('rejects %s', (c) => {
+      expect(cardDesignDraftSchema.safeParse(draft({ backgroundColor: c })).success).toBe(false)
+    })
+  })
+
+  describe('geoLocations', () => {
+    const geo = (i: number) => ({
+      id: `g${i}`,
+      label: `Standort ${i}`,
+      latitude: 52.5,
+      longitude: 13.4,
+      maxDistance: 100,
+      relevantText: 'Karte bereit',
+    })
+
+    it(`accepts ${MAX_GEO_LOCATIONS}`, () => {
+      const list = Array.from({ length: MAX_GEO_LOCATIONS }, (_, i) => geo(i))
+      expect(cardDesignDraftSchema.safeParse(draft({ geoLocations: list as never })).success).toBe(true)
+    })
+
+    it(`rejects ${MAX_GEO_LOCATIONS + 1} — PassKit hard limit`, () => {
+      const list = Array.from({ length: MAX_GEO_LOCATIONS + 1 }, (_, i) => geo(i))
+      expect(cardDesignDraftSchema.safeParse(draft({ geoLocations: list as never })).success).toBe(false)
+    })
+
+    it('rejects an out-of-range radius', () => {
+      expect(
+        cardDesignDraftSchema.safeParse(draft({ geoLocations: [{ ...geo(0), maxDistance: 9 }] as never }))
+          .success,
+      ).toBe(false)
+      expect(
+        cardDesignDraftSchema.safeParse(draft({ geoLocations: [{ ...geo(0), maxDistance: 5001 }] as never }))
+          .success,
+      ).toBe(false)
+    })
+
+    it('rejects a relevantText over 60 characters', () => {
+      expect(
+        cardDesignDraftSchema.safeParse(
+          draft({ geoLocations: [{ ...geo(0), relevantText: 'x'.repeat(61) }] as never }),
+        ).success,
+      ).toBe(false)
+    })
+  })
+
+  describe('backFields', () => {
+    it('accepts the discriminated union', () => {
+      const r = cardDesignDraftSchema.safeParse(
+        draft({
+          backFields: [
+            { id: '1', type: 'text', label: 'Hinweis', value: 'Bitte vorzeigen' },
+            { id: '2', type: 'url', label: 'Website', value: 'https://example.de' },
+            { id: '3', type: 'phone', label: 'Telefon', value: '+49 30 1234567' },
+            { id: '4', type: 'legal', kind: 'terms', label: 'AGB', value: 'https://example.de/agb' },
+          ] as never,
+        }),
+      )
+      expect(r.success).toBe(true)
+    })
+
+    it('rejects a url field that is not a URL', () => {
+      expect(
+        cardDesignDraftSchema.safeParse(
+          draft({ backFields: [{ id: '1', type: 'url', label: 'Web', value: 'example.de' }] as never }),
+        ).success,
+      ).toBe(false)
+    })
+
+    it('rejects an unknown field type', () => {
+      expect(
+        cardDesignDraftSchema.safeParse(
+          draft({ backFields: [{ id: '1', type: 'video', label: 'x', value: 'y' }] as never }),
+        ).success,
+      ).toBe(false)
+    })
+
+    it('rejects duplicate ids (drag & drop relies on them)', () => {
+      expect(
+        cardDesignDraftSchema.safeParse(
+          draft({
+            backFields: [
+              { id: 'same', type: 'text', label: 'A', value: '1' },
+              { id: 'same', type: 'text', label: 'B', value: '2' },
+            ] as never,
+          }),
+        ).success,
+      ).toBe(false)
+    })
+
+    it('rejects two imprint links', () => {
+      expect(
+        cardDesignDraftSchema.safeParse(
+          draft({
+            backFields: [
+              { id: '1', type: 'legal', kind: 'imprint', label: 'A', value: 'https://a.de' },
+              { id: '2', type: 'legal', kind: 'imprint', label: 'B', value: 'https://b.de' },
+            ] as never,
+          }),
+        ).success,
+      ).toBe(false)
+    })
+
+    it('rejects more than 50 fields', () => {
+      const many = Array.from({ length: 51 }, (_, i) => ({
+        id: `f${i}`,
+        type: 'text' as const,
+        label: 'L',
+        value: 'V',
+      }))
+      expect(cardDesignDraftSchema.safeParse(draft({ backFields: many as never })).success).toBe(false)
+    })
+  })
+
+  describe('stampIcon', () => {
+    it.each(['coffee', 'pizza'])('accepts library icon %s', (v) => {
+      expect(cardDesignDraftSchema.safeParse(draft({ stampIcon: v })).success).toBe(true)
+    })
+
+    it.each(['emoji:2615', 'emoji:1f469-200d-1f373'])(
+      'accepts %s, but only together with its rasterised asset',
+      (v) => {
+        expect(cardDesignDraftSchema.safeParse(draft({ stampIcon: v })).success).toBe(false)
+        expect(
+          cardDesignDraftSchema.safeParse(
+            draft({ stampIcon: v, stampIconAssetId: 'clh0000000000000000000000' }),
+          ).success,
+        ).toBe(true)
+      },
+    )
+
+    it.each(['banana', 'emoji:zzzz', '<script>'])('rejects %s', (v) => {
+      expect(cardDesignDraftSchema.safeParse(draft({ stampIcon: v })).success).toBe(false)
+    })
+
+    it('requires an asset for a custom icon', () => {
+      expect(cardDesignDraftSchema.safeParse(draft({ stampIcon: 'custom' })).success).toBe(false)
+      expect(
+        cardDesignDraftSchema.safeParse(
+          draft({ stampIcon: 'custom', stampIconAssetId: 'clh0000000000000000000000' }),
+        ).success,
+      ).toBe(true)
+    })
+  })
+
+  it.each(['QR', 'CODE128', 'PDF417', 'AZTEC'])('accepts barcode format %s', (f) => {
+    expect(cardDesignDraftSchema.safeParse(draft({ barcodeFormat: f as never })).success).toBe(true)
+  })
+
+  it('rejects an unknown barcode format', () => {
+    expect(cardDesignDraftSchema.safeParse(draft({ barcodeFormat: 'EAN13' as never })).success).toBe(false)
+  })
+})
+
+describe('cardDesignPublishSchema', () => {
+  it('accepts a complete design', () => {
+    const r = cardDesignPublishSchema.safeParse(publishable())
+    expect(r.success).toBe(true)
+  })
+
+  it('is strictly stronger than the draft schema', () => {
+    expect(cardDesignDraftSchema.safeParse(draft()).success).toBe(true)
+    expect(cardDesignPublishSchema.safeParse(draft()).success).toBe(false)
+  })
+
+  it.each([
+    ['programName', { programName: '   ' }],
+    ['rewardText', { rewardText: '' }],
+    ['iconAssetId', { iconAssetId: null }],
+  ] as const)('blocks publishing without %s', (_name, over) => {
+    expect(cardDesignPublishSchema.safeParse(publishable(over as Partial<CardDesignInput>)).success).toBe(
+      false,
+    )
+  })
+
+  it('blocks publishing without an imprint link', () => {
+    const r = cardDesignPublishSchema.safeParse(
+      publishable({
+        backFields: [
+          { id: 'b', type: 'legal', kind: 'privacy', label: 'Datenschutz', value: 'https://x.de/d' },
+        ] as never,
+      }),
+    )
+    expect(r.success).toBe(false)
+    expect(JSON.stringify(r)).toContain('Impressum')
+  })
+
+  it('blocks publishing without a privacy link', () => {
+    const r = cardDesignPublishSchema.safeParse(
+      publishable({
+        backFields: [
+          { id: 'a', type: 'legal', kind: 'imprint', label: 'Impressum', value: 'https://x.de/i' },
+        ] as never,
+      }),
+    )
+    expect(r.success).toBe(false)
+    expect(JSON.stringify(r)).toContain('Datenschutz')
+  })
+
+  it('blocks publishing below 3:1 contrast', () => {
+    const r = cardDesignPublishSchema.safeParse(
+      publishable({ foregroundColor: '#cccccc', backgroundColor: '#ffffff' }),
+    )
+    expect(r.success).toBe(false)
+    expect(JSON.stringify(r)).toContain('Kontrast')
+  })
+
+  it('allows publishing below 3:1 once the user has explicitly confirmed', () => {
+    const schema = buildPublishSchema({ contrastConfirmed: true })
+    const r = schema.safeParse(publishable({ foregroundColor: '#cccccc', backgroundColor: '#ffffff' }))
+    expect(r.success).toBe(true)
+  })
+
+  it('warns but does not block between 3:1 and 4.5:1', () => {
+    const r = cardDesignPublishSchema.safeParse(
+      publishable({ foregroundColor: '#ff2fb9', backgroundColor: '#ffffff' }),
+    )
+    expect(r.success).toBe(true)
+  })
+
+  it('rejects an expiry date in the past', () => {
+    expect(cardDesignPublishSchema.safeParse(publishable({ expiresAt: new Date('2020-01-01') })).success).toBe(
+      false,
+    )
+  })
+})

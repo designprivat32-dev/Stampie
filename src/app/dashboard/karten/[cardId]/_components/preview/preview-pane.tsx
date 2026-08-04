@@ -1,0 +1,93 @@
+'use client'
+
+import * as React from 'react'
+import { toPng } from 'html-to-image'
+import { AppleStoreCard } from './apple-store-card'
+import { AppleStoreCardBack } from './apple-store-card-back'
+import { GoogleLoyaltyCard } from './google-loyalty-card'
+import { GoogleLoyaltyCardBack } from './google-loyalty-card-back'
+import { PreviewControls } from './preview-controls'
+import { useCardEditor } from '@/stores/card-editor-provider'
+import { useDebounced } from '@/hooks/use-debounced'
+
+/**
+ * The right-hand stage. Everything here reacts to a 150 ms debounced copy of the design,
+ * so typing in the editor does not fire a render per keystroke.
+ */
+export function PreviewPane({
+  cardId,
+  organizationName,
+}: {
+  cardId: string
+  organizationName: string
+}) {
+  const liveDesign = useCardEditor((s) => s.design)
+  const design = useDebounced(liveDesign, 150)
+
+  const platform = useCardEditor((s) => s.previewPlatform)
+  const side = useCardEditor((s) => s.previewSide)
+  const theme = useCardEditor((s) => s.previewTheme)
+  const simulatedStamps = useCardEditor((s) => s.simulatedStamps)
+  const assetUrls = useCardEditor((s) => s.assetUrls)
+
+  const cardRef = React.useRef<HTMLDivElement>(null)
+  const logoUrl = design.logoAssetId ? (assetUrls[design.logoAssetId] ?? null) : null
+  // Google crops programLogo to a circle, so it uses the square upload when present.
+  const googleLogoUrl = design.squareLogoAssetId
+    ? (assetUrls[design.squareLogoAssetId] ?? logoUrl)
+    : logoUrl
+  const stamps = Math.min(simulatedStamps, design.stampGoal)
+
+  const handleExport = React.useCallback(async () => {
+    const node = cardRef.current
+    if (!node) throw new Error('nothing to export')
+
+    const dataUrl = await toPng(node, {
+      pixelRatio: 2,
+      cacheBust: false,
+      backgroundColor: theme === 'dark' ? '#2b2b2b' : '#ededed',
+    })
+
+    const link = document.createElement('a')
+    link.download = `stempelkarte-${platform}-${side}.png`
+    link.href = dataUrl
+    link.click()
+  }, [platform, side, theme])
+
+  return (
+    <div className="flex h-full flex-col items-center gap-6 py-8">
+      <div
+        className="preview-stage flex w-full flex-1 items-center justify-center rounded-xl border border-line p-8"
+        data-theme={theme}
+      >
+        <div ref={cardRef} className="p-2">
+          {platform === 'apple' ? (
+            side === 'front' ? (
+              <AppleStoreCard
+                design={design}
+                cardId={cardId}
+                currentStamps={stamps}
+                logoUrl={logoUrl}
+                organizationName={organizationName}
+              />
+            ) : (
+              <AppleStoreCardBack design={design} />
+            )
+          ) : side === 'front' ? (
+            <GoogleLoyaltyCard
+              design={design}
+              cardId={cardId}
+              currentStamps={stamps}
+              logoUrl={googleLogoUrl}
+              organizationName={organizationName}
+            />
+          ) : (
+            <GoogleLoyaltyCardBack design={design} />
+          )}
+        </div>
+      </div>
+
+      <PreviewControls onExport={handleExport} />
+    </div>
+  )
+}

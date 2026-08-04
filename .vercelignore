@@ -1,0 +1,17 @@
+# Local environment files must never be uploaded: they would both leak local secrets and
+# override the platform's environment variables (a local NEXT_PUBLIC_APP_URL pointing at
+# localhost silently breaks every QR code and wallet asset URL in production).
+.env
+.env.*
+!.env.example
+
+# Anchored with a leading slash on purpose: an unanchored `storage/` also matches
+# src/lib/storage/, which silently breaks the build with a module-not-found.
+/.pglite/
+/storage/
+/coverage/
+/tests/
+/scripts/
+/.next/
+/node_modules/
+*.tsbuildinfo

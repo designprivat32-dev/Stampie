@@ -1,0 +1,306 @@
+// Stemply — digital wallet stamp cards.
+// Scope of this schema: everything the card designer needs. Auth/billing tables are
+// stubbed here (Organization/User/Membership) and will be replaced by the real auth
+// schema later; every query in the app goes through assertLocationAccess() regardless.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Schema pushes and migrations cannot run through a connection pooler (pgbouncer),
+  // which is what Neon's DATABASE_URL points at. Runtime queries use the pool, DDL uses
+  // the direct connection. Locally both point at the same server.
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ---------------------------------------------------------------- tenancy (stub)
+
+model Organization {
+  id        String       @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now())
+  locations Location[]
+  members   Membership[]
+  cards     Card[]
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+}
+
+enum Role {
+  OWNER
+  MEMBER
+  AGENCY
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  role   Role   @default(MEMBER)
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+// ---------------------------------------------------------------- location
+
+model Location {
+  id    String       @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name       String
+  street     String?
+  postalCode String?
+  city       String?
+  phone      String?
+  website    String?
+  email      String?
+
+  /// OpeningHours[] — see src/types/location.ts
+  openingHours Json   @default("[]")
+  latitude     Float?
+  longitude    Float?
+
+  imprintUrl String?
+  privacyUrl String?
+
+  createdAt DateTime @default(now())
+
+  cards Card[]
+
+  @@index([orgId])
+}
+
+/// A stamp card programme. The unit the agency creates, hands to a customer and designs.
+/// A customer may own any number of these; a card without `orgId` is created but not yet
+/// assigned, and therefore cannot be stamped by anyone.
+model Card {
+  id    String        @id @default(cuid())
+  name  String
+  orgId String?
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  /// Optional branch, used to prefill address and opening hours in the designer.
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  createdBy  String
+
+  designs  CardDesign[]
+  versions CardDesignVersion[]
+  passes   IssuedPass[]
+  events   StampEvent[]
+  tokens   TestCardToken[]
+  assets   Asset[]
+
+  @@index([orgId, archivedAt])
+  @@index([locationId])
+}
+
+// ---------------------------------------------------------------- assets
+
+enum AssetKind {
+  LOGO
+  /// Square variant for Google Wallet's programLogo, which is cropped to a circle.
+  SQUARE_LOGO
+  ICON
+  HERO
+  STAMP_ICON
+}
+
+model Asset {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  kind       AssetKind
+  mimeType   String // always image/png after re-encode
+  width      Int
+  height     Int
+  bytes      Int
+  /// Base storage key; variants live at `${storageKey}@1x.png`, `@2x`, `@3x`.
+  storageKey String
+  createdAt  DateTime  @default(now())
+
+  @@index([cardId, kind])
+}
+
+/// Asset bytes stored in the database.
+///
+/// Serverless platforms have no writable filesystem, and an S3 bucket is one more thing
+/// to provision for a deployment that stores a handful of logos. Keeping the bytes next
+/// to the rows that reference them removes the dependency entirely; swap `STORAGE_DRIVER`
+/// to `s3` once volume justifies it.
+model AssetBlob {
+  /// Full storage key including the variant suffix, e.g. `locations/x/logo/y@2x.png`.
+  key         String   @id
+  data        Bytes
+  contentType String   @default("image/png")
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------- card design
+
+enum DesignStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model CardDesign {
+  id      String       @id @default(cuid())
+  cardId  String
+  card    Card         @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  status  DesignStatus @default(DRAFT)
+  version Int          @default(1)
+
+  // --- branding
+  backgroundColor   String  @default("#1a1a1a")
+  foregroundColor   String  @default("#ffffff")
+  labelColor        String  @default("#cccccc")
+  logoAssetId       String?
+  squareLogoAssetId String?
+  iconAssetId       String?
+  heroAssetId       String?
+
+  // --- stamp program
+  stampGoal        Int     @default(10)
+  stampIcon        String  @default("coffee")
+  stampIconAssetId String?
+  emptyStampStyle  String  @default("outline")
+  rewardText       String  @default("")
+
+  // --- texts
+  programName String  @default("")
+  cardTitle   String?
+  stampLabel  String  @default("Stempel")
+  /// BackField[] — discriminated union, see src/types/card-design.ts
+  backFields  Json    @default("[]")
+
+  // --- advanced
+  barcodeFormat String    @default("QR")
+  /// GeoLocation[] — max. 10 entries (PassKit limit)
+  geoLocations  Json      @default("[]")
+  expiresAt     DateTime?
+  shareable     Boolean   @default(true)
+
+  // --- audit for the "publish despite contrast < 3:1" override
+  contrastOverrideBy String?
+  contrastOverrideAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions CardDesignVersion[]
+
+  // Exactly one DRAFT and one PUBLISHED row per card. The draft is what the editor
+  // writes to; the published row is what issued passes render from.
+  @@unique([cardId, status])
+  @@index([cardId, status])
+}
+
+model CardDesignVersion {
+  id       String     @id @default(cuid())
+  designId String
+  design   CardDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  /// Denormalised so version queries can filter by card without a join.
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  version     Int
+  /// Full, schema-valid CardDesignInput snapshot.
+  snapshot    Json
+  publishedAt DateTime @default(now())
+  publishedBy String
+  note        String?
+
+  @@unique([designId, version])
+  @@index([cardId, publishedAt])
+}
+
+// ---------------------------------------------------------------- issued passes
+
+model IssuedPass {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  serial        String  @unique
+  isTest        Boolean @default(false)
+  stamps        Int     @default(0)
+  designVersion Int
+
+  /// Stamp goal at issue time — the card keeps its own goal even if the design changes.
+  stampGoal    Int       @default(10)
+  /// Set when a full card was cashed in; the counter restarts from zero.
+  lastRewardAt DateTime?
+  rewardCount  Int       @default(0)
+
+  createdAt DateTime @default(now())
+
+  events StampEvent[]
+
+  @@index([cardId, isTest])
+}
+
+enum StampEventKind {
+  STAMP
+  REDEEM
+}
+
+/// Audit trail. Every stamp is attributable — who booked it, on which card, when.
+/// Without this a disputed stamp is unresolvable, and a dishonest employee is invisible.
+model StampEvent {
+  id     String     @id @default(cuid())
+  passId String
+  pass   IssuedPass @relation(fields: [passId], references: [id], onDelete: Cascade)
+
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  kind      StampEventKind @default(STAMP)
+  /// +1 for a stamp, negative for a redemption.
+  delta     Int            @default(1)
+  /// Counter after this event, so history reads without replaying everything.
+  balance   Int
+  stampedBy String
+  createdAt DateTime       @default(now())
+
+  @@index([passId, createdAt])
+  @@index([cardId, createdAt])
+}
+
+// ---------------------------------------------------------------- test cards
+
+model TestCardToken {
+  id       String @id @default(cuid())
+  /// 32 random bytes, base64url. Public — the QR code has to work on a foreign phone.
+  token    String @unique
+  cardId   String
+  card     Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  designId String
+
+  /// Design snapshot at click time, so a DRAFT can be test-driven without publishing.
+  snapshot  Json
+  expiresAt DateTime
+  usedCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([cardId])
+}
