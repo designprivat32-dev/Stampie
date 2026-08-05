@@ -6,6 +6,16 @@
  * which is why @2x/@3x are guaranteed to be pixel-identical layouts, just sharper.
  */
 
+/**
+ * Bumped whenever this geometry changes.
+ *
+ * Both strip URLs hash the *design*, not the code, and both are served immutable — the
+ * browser preview to itself, the Google hero to Google, which never revalidates. Without
+ * this constant a layout change keeps the old URL and every existing card goes on showing
+ * the old grid forever.
+ */
+export const STRIP_RENDERER_VERSION = '2'
+
 export interface StripCanvas {
   readonly width: number
   readonly height: number

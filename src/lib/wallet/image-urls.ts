@@ -1,4 +1,5 @@
 import type { CardDesignInput } from '@/lib/cards/schema'
+import { STRIP_RENDERER_VERSION } from '@/lib/cards/stamp-layout'
 
 /**
  * URLs for the images Google fetches.
@@ -44,10 +45,17 @@ function logoVersion(design: CardDesignInput): string {
   )
 }
 
-/** Fields the stamp row depends on, stamp count excluded — that travels separately. */
+/**
+ * Fields the stamp row depends on, stamp count excluded — that travels separately.
+ *
+ * `STRIP_RENDERER_VERSION` is the same argument as `LOGO_RENDERER_VERSION` above, for the
+ * grid geometry: change how stamps are arranged and the design is untouched, so without it
+ * Google keeps serving the previous arrangement.
+ */
 function heroVersion(design: CardDesignInput): string {
   return hash(
     [
+      STRIP_RENDERER_VERSION,
       design.stampGoal,
       design.foregroundColor,
       design.backgroundColor,
