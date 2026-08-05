@@ -28,7 +28,6 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
     <div>
       <PanelSection
         title="Barcode"
-        description="Wird beim Stempeln im Laden gescannt."
         action={<PlatformSupportBadge field={design.barcodeFormat === 'QR' ? 'barcodeQr' : 'barcodeOther'} />}
       >
         <Field label="Format" htmlFor="barcode-format">
@@ -52,7 +51,7 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
 
       <PanelSection
         title="Standort-Benachrichtigung"
-        description="Die Karte erscheint automatisch auf dem Sperrbildschirm, wenn der Kunde in der Nähe ist."
+        description="Karte erscheint am Sperrbildschirm, wenn der Kunde in der Nähe ist."
         action={<PlatformSupportBadge field="geoLocations" />}
       >
         <GeoLocationsEditor location={location} />
@@ -62,7 +61,7 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
         <Field
           label="Gültig bis"
           htmlFor="expires-at"
-          hint="Leer lassen für unbegrenzte Gültigkeit."
+          hint="Leer = unbegrenzt"
         >
           <Input
             id="expires-at"
@@ -81,8 +80,7 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
           <div className="min-w-0">
             <Label htmlFor="shareable">Karte teilbar</Label>
             <p className="mt-0.5 text-[12px] leading-snug text-ink-3">
-              Erlaubt es Kunden, die Karte an andere weiterzugeben. Für Treueprogramme meist
-              unerwünscht.
+              Kunden dürfen die Karte weitergeben.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

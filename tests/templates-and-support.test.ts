@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { CARD_TEMPLATES, applyTemplate, getTemplate, templateAsDesign } from '@/lib/cards/templates'
-import { PLATFORM_SUPPORT, isPlatformLimited, supportFor } from '@/lib/cards/platform-support'
+import {
+  PLATFORM_SUPPORT,
+  isPlatformLimited,
+  isSupportedOn,
+  supportFor,
+} from '@/lib/cards/platform-support'
 import { cardDesignDraftSchema, contrastRatioForDesign } from '@/lib/cards/schema'
 import { DEFAULT_CARD_DESIGN, newFieldId } from '@/lib/cards/defaults'
 import { computeStampLayout } from '@/lib/cards/stamp-layout'
@@ -166,5 +171,32 @@ describe('wallet image URLs are cache-busted', () => {
     expect(walletLogoUrl(base, loc, DEFAULT_CARD_DESIGN)).toBe(
       walletLogoUrl(base, loc, { ...DEFAULT_CARD_DESIGN, programName: 'anders' }),
     )
+  })
+})
+
+describe('isSupportedOn — which controls the editor shows per wallet', () => {
+  it('hides the Apple-only controls while Google is previewed', () => {
+    // Google derives text and label colour itself and ignores the 29x29 icon entirely.
+    expect(isSupportedOn('foregroundColor', 'google')).toBe(false)
+    expect(isSupportedOn('labelColor', 'google')).toBe(false)
+    expect(isSupportedOn('icon', 'google')).toBe(false)
+  })
+
+  it('hides the Google-only control while Apple is previewed', () => {
+    expect(isSupportedOn('squareLogo', 'apple')).toBe(false)
+  })
+
+  it('keeps each of those on its own platform', () => {
+    expect(isSupportedOn('foregroundColor', 'apple')).toBe(true)
+    expect(isSupportedOn('labelColor', 'apple')).toBe(true)
+    expect(isSupportedOn('icon', 'apple')).toBe(true)
+    expect(isSupportedOn('squareLogo', 'google')).toBe(true)
+  })
+
+  it('never hides a merely partial field — those keep their badge instead', () => {
+    for (const [field, support] of Object.entries(PLATFORM_SUPPORT)) {
+      if (support.apple === 'partial') expect(isSupportedOn(field as never, 'apple')).toBe(true)
+      if (support.google === 'partial') expect(isSupportedOn(field as never, 'google')).toBe(true)
+    }
   })
 })

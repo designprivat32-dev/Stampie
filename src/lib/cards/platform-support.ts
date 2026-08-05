@@ -105,3 +105,14 @@ export function isPlatformLimited(field: SupportedField): boolean {
   const s = PLATFORM_SUPPORT[field]
   return s.apple !== 'full' || s.google !== 'full'
 }
+
+/**
+ * Whether the control belongs on screen while the given wallet is being previewed.
+ *
+ * A field the selected wallet ignores outright is not a warning worth reading, it is
+ * clutter: the editor shows an Apple card and asks for a Google-only image right next to it.
+ * The preview switch decides which half of the settings is relevant.
+ */
+export function isSupportedOn(field: SupportedField, platform: Platform): boolean {
+  return PLATFORM_SUPPORT[field][platform] !== 'none'
+}

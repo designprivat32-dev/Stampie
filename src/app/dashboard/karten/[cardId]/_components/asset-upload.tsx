@@ -144,9 +144,12 @@ export function AssetUpload({
           )}
         </div>
 
+        {/* One line each. A wrapping hint turned every upload into a three-line block. */}
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-ink">{label}</p>
-          <p className="text-[11.5px] leading-snug text-ink-3">{hint}</p>
+          <p className="truncate text-[13px] font-medium text-ink">{label}</p>
+          <p className="truncate text-[11.5px] text-ink-3" title={hint}>
+            {hint}
+          </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">

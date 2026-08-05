@@ -9,6 +9,7 @@ import { ColorField, PaletteRow } from '../color-field'
 import { ContrastWarning } from '../contrast-warning'
 import { PlatformSupportBadge } from '../platform-support-badge'
 import { deriveIconAction } from '@/actions/assets'
+import { isSupportedOn } from '@/lib/cards/platform-support'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import type { PaletteSuggestion } from '@/lib/color/extract-palette'
 
@@ -17,6 +18,8 @@ export function BrandingTab() {
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
   const setAssetUrl = useCardEditor((s) => s.setAssetUrl)
+  // The preview switch decides which wallet's settings are on screen.
+  const platform = useCardEditor((s) => s.previewPlatform)
 
   const [palette, setPalette] = React.useState<PaletteSuggestion | null>(null)
   const [derivingIcon, setDerivingIcon] = React.useState(false)
@@ -43,16 +46,13 @@ export function BrandingTab() {
 
   return (
     <div>
-      <PanelSection
-        title="Logo & Icon"
-        description="Beides wird serverseitig in die von Apple geforderten Größen gerechnet."
-      >
+      <PanelSection title="Logo & Icon">
         <div className="space-y-3">
           <AssetUpload
             kind="LOGO"
             assetId={design.logoAssetId}
             label="Logo"
-            hint="PNG, JPG oder SVG · max. 5 MB · wird auf 160 × 50 zugeschnitten"
+            hint="PNG, JPG, SVG · max. 5 MB · 160 × 50"
             aspect={160 / 50}
             cropTitle="Logo zuschneiden"
             cropDescription="Apple Wallet zeigt das Logo in maximal 160 × 50 Punkten. @2x und @3x werden automatisch erzeugt."
@@ -66,21 +66,16 @@ export function BrandingTab() {
             }}
           />
 
-          <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[13px] font-medium text-ink">Logo für Google Wallet</p>
-              <PlatformSupportBadge field="squareLogo" />
-            </div>
-            <p className="text-[11.5px] leading-snug text-ink-3">
-              Optional. Google beschneidet das Logo <strong>rund</strong> — ein breites Logo
-              wird dabei zum schmalen Streifen. Ohne eigenes Bild wird das obige Logo mittig
-              auf die Hintergrundfarbe gesetzt.
-            </p>
+          {/*
+            Only what the previewed wallet actually uses. Google ignores the icon, Apple
+            ignores the square logo — showing both at once next to one card was half clutter.
+          */}
+          {isSupportedOn('squareLogo', platform) ? (
             <AssetUpload
               kind="SQUARE_LOGO"
               assetId={design.squareLogoAssetId}
               label="Quadratisches Logo"
-              hint="660 × 660 · am besten mit transparentem Hintergrund"
+              hint="660 × 660 · rund beschnitten · am besten transparent"
               aspect={1}
               previewClassName="size-12"
               cropTitle="Quadratisches Logo zuschneiden"
@@ -88,20 +83,22 @@ export function BrandingTab() {
               onUploaded={(asset) => patch({ squareLogoAssetId: asset.id })}
               onCleared={() => patch({ squareLogoAssetId: null })}
             />
-          </div>
+          ) : null}
 
-          <AssetUpload
-            kind="ICON"
-            assetId={design.iconAssetId}
-            label="Icon (29 × 29)"
-            hint="Pflicht — ohne Icon ist der Pass ungültig."
-            aspect={1}
-            previewClassName="size-12"
-            cropTitle="Icon zuschneiden"
-            cropDescription="Quadratisch. Erscheint in Benachrichtigungen und auf dem Sperrbildschirm."
-            onUploaded={(asset) => patch({ iconAssetId: asset.id })}
-            onCleared={() => patch({ iconAssetId: null })}
-          />
+          {isSupportedOn('icon', platform) ? (
+            <AssetUpload
+              kind="ICON"
+              assetId={design.iconAssetId}
+              label="Icon (29 × 29)"
+              hint="Pflicht für Apple Wallet"
+              aspect={1}
+              previewClassName="size-12"
+              cropTitle="Icon zuschneiden"
+              cropDescription="Quadratisch. Erscheint in Benachrichtigungen und auf dem Sperrbildschirm."
+              onUploaded={(asset) => patch({ iconAssetId: asset.id })}
+              onCleared={() => patch({ iconAssetId: null })}
+            />
+          ) : null}
 
           {design.logoAssetId ? (
             <div className="space-y-1">
@@ -123,20 +120,16 @@ export function BrandingTab() {
             </div>
           ) : null}
 
-          {!design.iconAssetId ? (
+          {!design.iconAssetId && isSupportedOn('icon', platform) ? (
             <p className="rounded-md border border-warn/40 bg-warn-soft px-3 py-2 text-[12px] leading-snug text-warn-ink">
-              Ohne Icon kann die Karte nicht veröffentlicht werden — Apple Wallet lehnt Pässe ohne{' '}
-              <code className="font-mono">icon.png</code> ab.
+              Ohne Icon ist Veröffentlichen gesperrt.
             </p>
           ) : null}
         </div>
       </PanelSection>
 
-      <PanelSection
-        title="Farben"
-        description="Die Karte ist das einzige farbige Element — der Rest der Oberfläche bleibt neutral."
-      >
-        <div className="space-y-4">
+      <PanelSection title="Farben">
+        <div className="space-y-3">
           {palette && palette.colors.length > 0 ? (
             <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
               <p className="text-[12px] font-medium text-ink">Farben aus dem Logo</p>
@@ -160,38 +153,35 @@ export function BrandingTab() {
             label="Hintergrundfarbe"
             value={design.backgroundColor}
             onChange={(backgroundColor) => patch({ backgroundColor })}
-            badge={<PlatformSupportBadge field="backgroundColor" />}
           />
-          <ColorField
-            id="foreground-color"
-            label="Textfarbe"
-            value={design.foregroundColor}
-            onChange={(foregroundColor) => patch({ foregroundColor })}
-            badge={<PlatformSupportBadge field="foregroundColor" />}
-          />
-          <ColorField
-            id="label-color"
-            label="Labelfarbe"
-            value={design.labelColor}
-            onChange={(labelColor) => patch({ labelColor })}
-            badge={<PlatformSupportBadge field="labelColor" />}
-            hint="Die kleinen Beschriftungen über den Werten."
-          />
+          {/* Google derives both from the background — nothing to set while it is previewed. */}
+          {isSupportedOn('foregroundColor', platform) ? (
+            <ColorField
+              id="foreground-color"
+              label="Textfarbe"
+              value={design.foregroundColor}
+              onChange={(foregroundColor) => patch({ foregroundColor })}
+            />
+          ) : null}
+          {isSupportedOn('labelColor', platform) ? (
+            <ColorField
+              id="label-color"
+              label="Labelfarbe"
+              value={design.labelColor}
+              onChange={(labelColor) => patch({ labelColor })}
+            />
+          ) : null}
 
-          <ContrastWarning />
+          {isSupportedOn('foregroundColor', platform) ? <ContrastWarning /> : null}
         </div>
       </PanelSection>
 
-      <PanelSection
-        title="Hintergrundbild"
-        description="Optional. Liegt hinter der Stempelreihe."
-        action={<PlatformSupportBadge field="hero" />}
-      >
+      <PanelSection title="Hintergrundbild" action={<PlatformSupportBadge field="hero" />}>
         <AssetUpload
           kind="HERO"
           assetId={design.heroAssetId}
           label="Hintergrundbild"
-          hint="Wird auf 1032 × 336 (3:1) zugeschnitten · leicht abgedunkelt, damit Stempel lesbar bleiben"
+          hint="Optional · 1032 × 336 (3:1) · hinter der Stempelreihe"
           aspect={1032 / 336}
           previewClassName="h-12 w-24"
           cropTitle="Hintergrundbild zuschneiden"

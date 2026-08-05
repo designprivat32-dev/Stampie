@@ -63,12 +63,63 @@ export function TextsTab({ location }: { location: LocationSummary }) {
 
   return (
     <div>
+      {/*
+        First, not last. These two links block publishing, and at the bottom of the tab they
+        needed scrolling to find — the one thing standing between a finished card and going
+        live was the thing hardest to see.
+      */}
+      <PanelSection
+        title="Pflichtangaben"
+        description="Ohne diese Links ist Veröffentlichen gesperrt."
+      >
+        {missingLegal.length === 0 ? (
+          <p className="rounded-md border border-ok/30 bg-ok-soft px-3 py-2 text-[12px] text-ok">
+            Impressum und Datenschutz sind hinterlegt.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="flex items-start gap-1.5 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-[12px] leading-snug text-danger">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              Es {missingLegal.length === 1 ? 'fehlt' : 'fehlen'}:{' '}
+              {missingLegal.map((k) => LEGAL_LABELS[k]).join(' und ')}.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {missingLegal.map((kind) => {
+                const suggested = kind === 'imprint' ? location.imprintUrl : location.privacyUrl
+                return (
+                  // Short label so both fit on one row; the full wording stays for screen
+                  // readers, where "Impressum" alone would not say what the button does.
+                  <Button
+                    key={kind}
+                    variant="outline"
+                    size="sm"
+                    aria-label={`${LEGAL_LABELS[kind]}-Link hinzufügen`}
+                    onClick={() =>
+                      addBackField({
+                        id: newFieldId(),
+                        type: 'legal',
+                        kind,
+                        label: LEGAL_LABELS[kind],
+                        value: suggested ?? '',
+                      })
+                    }
+                  >
+                    <Plus />
+                    {LEGAL_LABELS[kind]}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </PanelSection>
+
       <PanelSection title="Kartentexte">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <Field
             label="Programmname"
             htmlFor="program-name"
-            hint="Erscheint als Titel der Karte. Pflichtfeld zum Veröffentlichen."
+            hint="Pflichtfeld zum Veröffentlichen."
           >
             <Input
               id="program-name"
@@ -82,7 +133,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
           <Field
             label="Kartenüberschrift"
             htmlFor="card-title"
-            hint="Optional. Kleine Zeile neben dem Logo."
+            hint="Optional · Zeile neben dem Logo"
             action={<PlatformSupportBadge field="cardTitle" />}
           >
             <Input
@@ -97,7 +148,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
           <Field
             label="Label für den Stempelstand"
             htmlFor="stamp-label"
-            hint={'Steht über der Zahl, z. B. „Kaffee“ oder „Besuche“.'}
+            hint={'Steht über der Zahl, z. B. „Besuche“.'}
           >
             <Input
               id="stamp-label"
@@ -112,13 +163,13 @@ export function TextsTab({ location }: { location: LocationSummary }) {
 
       <PanelSection
         title="Rückseite"
-        description="Reihenfolge per Drag & Drop oder mit der Tastatur (Leertaste, dann Pfeiltasten)."
+        description="Reihenfolge per Drag & Drop."
         action={<PlatformSupportBadge field="backFields" />}
       >
         <div className="space-y-3">
           {prefills.length > 0 ? (
             <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
-              <p className="text-[12px] font-medium text-ink">Aus den Stammdaten übernehmen</p>
+              <p className="text-[12px] font-medium text-ink">Aus den Stammdaten</p>
               <div className="flex flex-wrap gap-1.5">
                 {prefills.map((item) => (
                   <Button
@@ -142,49 +193,6 @@ export function TextsTab({ location }: { location: LocationSummary }) {
 
           <BackFieldsEditor />
         </div>
-      </PanelSection>
-
-      <PanelSection
-        title="Pflichtangaben"
-        description="Deutsche Rechtslage — ohne diese Links ist Veröffentlichen gesperrt."
-      >
-        {missingLegal.length === 0 ? (
-          <p className="rounded-md border border-ok/30 bg-ok-soft px-3 py-2 text-[12px] text-ok">
-            Impressum und Datenschutz sind hinterlegt.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            <p className="flex items-start gap-1.5 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-[12px] leading-snug text-danger">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-              Es {missingLegal.length === 1 ? 'fehlt' : 'fehlen'}:{' '}
-              {missingLegal.map((k) => LEGAL_LABELS[k]).join(' und ')}.
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {missingLegal.map((kind) => {
-                const suggested = kind === 'imprint' ? location.imprintUrl : location.privacyUrl
-                return (
-                  <Button
-                    key={kind}
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      addBackField({
-                        id: newFieldId(),
-                        type: 'legal',
-                        kind,
-                        label: LEGAL_LABELS[kind],
-                        value: suggested ?? '',
-                      })
-                    }
-                  >
-                    <Plus />
-                    {LEGAL_LABELS[kind]}-Link hinzufügen
-                  </Button>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </PanelSection>
     </div>
   )

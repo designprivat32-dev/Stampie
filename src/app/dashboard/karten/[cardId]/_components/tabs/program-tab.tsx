@@ -6,11 +6,8 @@ import { PanelSection, RadioCard, RadioGroup } from '@/components/ui/misc'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
 import { StampIconPicker } from '../stamp-icon-picker'
-import { StampStripImg } from '../preview/stamp-strip-img'
-import { stripPreviewUrl } from '@/lib/cards/preview-url'
 import { EMPTY_STAMP_STYLES, STAMP_GOAL_MAX, STAMP_GOAL_MIN } from '@/lib/cards/schema'
 import { useCardEditor } from '@/stores/card-editor-provider'
-import { useDebounced } from '@/hooks/use-debounced'
 
 const EMPTY_STYLE_LABELS: Record<(typeof EMPTY_STAMP_STYLES)[number], { label: string; hint: string }> =
   {
@@ -20,19 +17,15 @@ const EMPTY_STYLE_LABELS: Record<(typeof EMPTY_STAMP_STYLES)[number], { label: s
   }
 
 export function ProgramTab() {
-  const cardId = useCardEditor((s) => s.cardId)
   const liveDesign = useCardEditor((s) => s.design)
-  const design = useDebounced(liveDesign, 150)
   const patch = useCardEditor((s) => s.patch)
   const setSimulatedStamps = useCardEditor((s) => s.setSimulatedStamps)
   const simulatedStamps = useCardEditor((s) => s.simulatedStamps)
 
-  // Panel preview always shows a partially filled card — an empty grid tells you nothing.
-  const panelStamps = Math.min(design.stampGoal, Math.max(1, Math.ceil(design.stampGoal * 0.6)))
-
   return (
     <div>
-      <PanelSection title="Anzahl Stempel" description="Wie oft muss der Kunde kommen?">
+      {/* The card on the right is the preview. A second grid below said the same thing twice. */}
+      <PanelSection title="Anzahl Stempel">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="stamp-goal">Stempel bis zur Belohnung</Label>
@@ -60,7 +53,7 @@ export function ProgramTab() {
         </div>
       </PanelSection>
 
-      <PanelSection title="Belohnung" description="Erscheint auf der Karte und auf der Rückseite.">
+      <PanelSection title="Belohnung">
         <Field label="Belohnungstext" htmlFor="reward-text">
           <Input
             id="reward-text"
@@ -76,7 +69,7 @@ export function ProgramTab() {
         <StampIconPicker />
       </PanelSection>
 
-      <PanelSection title="Offene Stempel" description="Wie leere Felder dargestellt werden.">
+      <PanelSection title="Offene Stempel">
         <RadioGroup
           className="grid-cols-3"
           value={liveDesign.emptyStampStyle}
@@ -93,21 +86,6 @@ export function ProgramTab() {
             />
           ))}
         </RadioGroup>
-      </PanelSection>
-
-      <PanelSection title="Raster-Vorschau" description="Exakt das Bild, das in die Karte wandert.">
-        <div className="overflow-hidden rounded-lg border border-line">
-          <StampStripImg
-            src={stripPreviewUrl(design, {
-              cardId,
-              currentStamps: panelStamps,
-              target: 'apple',
-              scale: 2,
-            })}
-            alt={`Stempelraster mit ${design.stampGoal} Feldern`}
-            aspect={375 / 123}
-          />
-        </div>
       </PanelSection>
     </div>
   )

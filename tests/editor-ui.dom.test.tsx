@@ -38,15 +38,16 @@ function Capture({ storeRef }: { storeRef?: { current: CardEditorStore | null } 
 }
 
 describe('ContrastWarning', () => {
-  it('reports the ratio for the default dark card as fine', () => {
+  it('collapses to a single line when both pairs pass', () => {
     render(
       <Harness>
         <ContrastWarning />
       </Harness>,
     )
-    // #ffffff on #1a1a1a
-    expect(screen.getByText(/17\.\d\d:1/)).toBeTruthy()
-    expect(screen.getAllByText('Gut lesbar.').length).toBeGreaterThan(0)
+    // #ffffff on #1a1a1a — nothing to act on, so no rows and no ratios.
+    expect(screen.getByText('Kontrast in Ordnung')).toBeTruthy()
+    expect(screen.queryByText(/:1$/)).toBeNull()
+    expect(screen.queryByText('Text auf Hintergrund')).toBeNull()
   })
 
   it('warns on neon pink over white and offers the fix', () => {
@@ -56,7 +57,7 @@ describe('ContrastWarning', () => {
       </Harness>,
     )
     expect(screen.getByText('3.30:1')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /Automatisch korrigieren/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Korrigieren/ }).length).toBeGreaterThan(0)
   })
 
   it('blocks-level message appears below 3:1', () => {
@@ -65,7 +66,7 @@ describe('ContrastWarning', () => {
         <ContrastWarning />
       </Harness>,
     )
-    expect(screen.getByText(/Veröffentlichen nur mit ausdrücklicher Bestätigung/)).toBeTruthy()
+    expect(screen.getByText(/Veröffentlichen nur mit Bestätigung/)).toBeTruthy()
   })
 
   it('"Automatisch korrigieren" actually reaches 4.5:1', () => {
@@ -76,7 +77,7 @@ describe('ContrastWarning', () => {
       </Harness>,
     )
 
-    const buttons = screen.getAllByRole('button', { name: /Automatisch korrigieren/ })
+    const buttons = screen.getAllByRole('button', { name: /Korrigieren/ })
     fireEvent.click(buttons[0]!)
 
     const design = storeRef.current!.getState().design
@@ -94,7 +95,7 @@ describe('ContrastWarning', () => {
     )
     expect(screen.getByText('Label auf Hintergrund')).toBeTruthy()
     // Label problems warn, they never block.
-    expect(screen.queryByText(/Veröffentlichen nur mit ausdrücklicher Bestätigung/)).toBeNull()
+    expect(screen.queryByText(/Veröffentlichen nur mit Bestätigung/)).toBeNull()
   })
 })
 

@@ -23,25 +23,40 @@ export function ContrastWarning() {
 
   const text = evaluateContrast(foregroundColor, backgroundColor)
   const label = evaluateContrast(labelColor, backgroundColor)
+  const labelLevel = label.level === 'block' ? 'warn' : label.level
+
+  // Nothing to report is worth one line, not two green boxes standing there permanently.
+  if (text.level === 'ok' && labelLevel === 'ok') {
+    return (
+      <p className="flex items-center gap-1.5 text-[12px] text-ok">
+        <Check className="size-3.5 shrink-0" />
+        Kontrast in Ordnung
+      </p>
+    )
+  }
 
   return (
     <div className="space-y-2">
-      <ContrastRow
-        title="Text auf Hintergrund"
-        ratio={text.ratio}
-        level={text.level}
-        blocking
-        onFix={() =>
-          patch({ foregroundColor: autoFixForeground(foregroundColor, backgroundColor, 4.5) })
-        }
-      />
-      <ContrastRow
-        title="Label auf Hintergrund"
-        ratio={label.ratio}
-        level={label.level === 'block' ? 'warn' : label.level}
-        blocking={false}
-        onFix={() => patch({ labelColor: autoFixForeground(labelColor, backgroundColor, 4.5) })}
-      />
+      {text.level === 'ok' ? null : (
+        <ContrastRow
+          title="Text auf Hintergrund"
+          ratio={text.ratio}
+          level={text.level}
+          blocking
+          onFix={() =>
+            patch({ foregroundColor: autoFixForeground(foregroundColor, backgroundColor, 4.5) })
+          }
+        />
+      )}
+      {labelLevel === 'ok' ? null : (
+        <ContrastRow
+          title="Label auf Hintergrund"
+          ratio={label.ratio}
+          level={labelLevel}
+          blocking={false}
+          onFix={() => patch({ labelColor: autoFixForeground(labelColor, backgroundColor, 4.5) })}
+        />
+      )}
     </div>
   )
 }
@@ -55,31 +70,23 @@ function ContrastRow({
 }: {
   title: string
   ratio: number
-  level: 'ok' | 'warn' | 'block'
+  level: 'warn' | 'block'
   blocking: boolean
   onFix: () => void
 }) {
   const tone = {
-    ok: 'border-ok/30 bg-ok-soft text-ok',
     warn: 'border-warn/40 bg-warn-soft text-warn-ink',
     block: 'border-danger/30 bg-danger-soft text-danger',
   }[level]
 
   const message = {
-    ok: 'Gut lesbar.',
-    warn: 'Grenzwertig — auf hellen Displays schwer lesbar.',
-    block: blocking
-      ? 'Zu gering. Veröffentlichen nur mit ausdrücklicher Bestätigung.'
-      : 'Zu gering.',
+    warn: 'Grenzwertig.',
+    block: blocking ? 'Zu gering — Veröffentlichen nur mit Bestätigung.' : 'Zu gering.',
   }[level]
 
   return (
     <div className={cn('flex items-start gap-3 rounded-lg border px-3 py-2.5', tone)}>
-      {level === 'ok' ? (
-        <Check className="mt-0.5 size-4 shrink-0" />
-      ) : (
-        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-      )}
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
@@ -89,12 +96,10 @@ function ContrastRow({
         <p className="text-[11.5px] leading-snug opacity-90">{message}</p>
       </div>
 
-      {level !== 'ok' ? (
-        <Button variant="outline" size="sm" onClick={onFix} className="shrink-0 bg-surface">
-          <Wand2 />
-          Automatisch korrigieren
-        </Button>
-      ) : null}
+      <Button variant="outline" size="sm" onClick={onFix} className="shrink-0 bg-surface">
+        <Wand2 />
+        Korrigieren
+      </Button>
     </div>
   )
 }
