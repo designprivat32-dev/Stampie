@@ -29,30 +29,23 @@ import type { LocationSummary } from '@/types/location'
 import { cn } from '@/lib/utils'
 
 /**
- * Two-column workspace: editor left, preview right.
+ * Two-column workspace: editor left (~420px, scrolls), preview right (sticky, centred on
+ * a neutral grey stage).
  *
- * The editor takes the room and the preview gets a fixed lane, not the other way round. The
- * card itself is 336px wide however big the screen is, so a flexible preview column just
- * grew its grey backdrop while the settings stayed in a 420px canyon that had to be
- * scrolled. Wide editor + multi-column sections is what puts a whole tab on screen at once.
- *
- * Below 1280px — the agency's iPad, and any smaller laptop — the preview collapses into a bar
- * at the top of the header that expands on tap, so the editor keeps the full width.
+ * Below 1024px — the agency's iPad in portrait — the preview collapses into a sticky bar
+ * at the top that expands on tap, so the editor keeps the full width.
  */
 export function CardEditorShell({
   cardName,
   location,
   userEmail,
   publishedVersion,
-  suggestTemplate,
   canStamp,
 }: {
   cardName: string
   location: LocationSummary
   userEmail: string
   publishedVersion: number | null
-  /** Whether the template picker should greet the owner — true only on an untouched card. */
-  suggestTemplate: boolean
   /** Agency accounts design but never book stamps, so they get no till link. */
   canStamp: boolean
 }) {
@@ -63,7 +56,7 @@ export function CardEditorShell({
 
   const { canUndo, canRedo, undo, redo } = useTemporal()
 
-  const [templateOpen, setTemplateOpen] = React.useState(suggestTemplate)
+  const [templateOpen, setTemplateOpen] = React.useState(publishedVersion === null)
   const [testCardOpen, setTestCardOpen] = React.useState(false)
   const [publishOpen, setPublishOpen] = React.useState(false)
   const [versionsOpen, setVersionsOpen] = React.useState(false)
@@ -72,13 +65,8 @@ export function CardEditorShell({
 
   return (
     <TooltipProvider>
-      {/*
-        The window never scrolls; the columns do. A sticky header plus a hardcoded
-        `top-[57px]` used to leave the page a few pixels too tall whenever the real header
-        measured anything other than 57 — which it does as soon as the toolbar wraps.
-      */}
-      <div className="flex h-dvh flex-col overflow-hidden bg-canvas">
-        <header className="z-30 shrink-0 border-b border-line bg-surface/95 backdrop-blur">
+      <div className="flex min-h-dvh flex-col bg-canvas">
+        <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
             <div className="flex min-w-0 items-center gap-2">
               <Link
@@ -129,68 +117,40 @@ export function CardEditorShell({
                 <Redo2 />
               </Button>
 
-              {/*
-                Below 1280px the labels go and the icons stay. A wrapped toolbar costs a whole
-                row of height, and that row comes straight out of the editor below it.
-              */}
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Vorlagen"
-                onClick={() => setTemplateOpen(true)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(true)}>
                 <LayoutTemplate />
-                <span className="hidden xl:inline">Vorlagen</span>
+                Vorlagen
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Versionen"
-                onClick={() => setVersionsOpen(true)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setVersionsOpen(true)}>
                 <History />
-                <span className="hidden xl:inline">Versionen</span>
+                Versionen
               </Button>
 
               {canStamp ? (
-                <Button variant="ghost" size="sm" title="Stempeln" asChild>
+                <Button variant="ghost" size="sm" asChild>
                   <Link href={`/dashboard/karten/${cardId}/stempeln`}>
                     <QrCode />
-                    <span className="hidden xl:inline">Stempeln</span>
+                    Stempeln
                   </Link>
                 </Button>
               ) : null}
 
-              <Button
-                variant="secondary"
-                size="sm"
-                title="Testkarte aufs Handy"
-                onClick={() => setTestCardOpen(true)}
-              >
+              <Button variant="secondary" size="sm" onClick={() => setTestCardOpen(true)}>
                 <Smartphone />
-                <span className="hidden xl:inline">Testkarte aufs Handy</span>
+                Testkarte aufs Handy
               </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                title="Veröffentlichen"
-                onClick={() => setPublishOpen(true)}
-              >
+              <Button variant="primary" size="sm" onClick={() => setPublishOpen(true)}>
                 <Rocket />
-                <span className="hidden xl:inline">Veröffentlichen</span>
+                Veröffentlichen
               </Button>
             </div>
           </div>
 
-          {/*
-            Collapsed preview below 1280px. It used to switch at 1024, which left the editor
-            620px next to the preview lane — one column, and back to scrolling. Under 1280 the
-            editor takes the whole width and the preview lives here instead.
-          */}
+          {/* collapsed preview, < 1024px */}
           <button
             type="button"
             data-slot="control"
-            className="flex w-full items-center justify-between border-t border-line px-4 py-2 text-[13px] text-ink-2 xl:hidden"
+            className="flex w-full items-center justify-between border-t border-line px-4 py-2 text-[13px] text-ink-2 lg:hidden"
             aria-expanded={mobilePreviewOpen}
             onClick={() => setMobilePreviewOpen((open) => !open)}
           >
@@ -200,7 +160,7 @@ export function CardEditorShell({
             />
           </button>
           {mobilePreviewOpen ? (
-            <div className="max-h-[70vh] overflow-y-auto border-t border-line bg-canvas px-4 xl:hidden">
+            <div className="max-h-[70vh] overflow-y-auto border-t border-line bg-canvas px-4 lg:hidden">
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}
@@ -209,13 +169,13 @@ export function CardEditorShell({
           ) : null}
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden">
-          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col bg-canvas">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="flex min-h-0 w-full flex-col border-line bg-surface lg:w-[420px] lg:shrink-0 lg:border-r">
             <EditorTabs location={location} />
           </div>
 
-          <main className="hidden w-[404px] shrink-0 border-l border-line px-4 xl:block">
-            <div className="h-full">
+          <main className="hidden min-w-0 flex-1 px-8 lg:block">
+            <div className="sticky top-[57px] h-[calc(100dvh-57px)]">
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}

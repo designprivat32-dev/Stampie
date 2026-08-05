@@ -108,20 +108,6 @@ export function Separator({ className }: { className?: string }) {
   return <div role="separator" className={cn('h-px w-full bg-line', className)} />
 }
 
-/**
- * Column shell for an editor tab.
- *
- * CSS multi-column, not a grid: the sections differ wildly in height, and columns balance
- * them, where grid rows would all be as tall as their tallest cell. Column count follows the
- * width on its own — one on a phone, three on a wide desktop — so the settings fill the
- * screen instead of running off the bottom of it.
- */
-export function TabPanel({ children }: { children: React.ReactNode }) {
-  // 20rem is a floor, not a preference: below roughly 19rem the upload rows and colour fields
-  // start wrapping, and a section that wraps is taller than the column it saved.
-  return <div className="columns-[20rem] gap-2.5 [column-fill:balance]">{children}</div>
-}
-
 export function PanelSection({
   title,
   description,
@@ -134,8 +120,7 @@ export function PanelSection({
   action?: React.ReactNode
 }) {
   return (
-    // A self-contained card: full-bleed dividers cannot work once sections sit side by side.
-    <section className="mb-2.5 space-y-2.5 break-inside-avoid rounded-xl border border-line bg-surface p-3.5">
+    <section className="space-y-3 border-b border-line px-5 py-5 last:border-b-0">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-0.5">
           <h3 className="text-[13px] font-semibold uppercase tracking-wide text-ink-2">{title}</h3>

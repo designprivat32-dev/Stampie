@@ -56,9 +56,9 @@ export function PreviewPane({
   }, [platform, side, theme])
 
   return (
-    <div className="flex h-full flex-col items-center gap-3 py-4">
+    <div className="flex h-full flex-col items-center gap-6 py-8">
       <div
-        className="preview-stage scrollbar-slim flex w-full flex-1 items-center justify-center overflow-y-auto rounded-xl border border-line p-3"
+        className="preview-stage flex w-full flex-1 items-center justify-center rounded-xl border border-line p-8"
         data-theme={theme}
       >
         <div ref={cardRef} className="p-2">

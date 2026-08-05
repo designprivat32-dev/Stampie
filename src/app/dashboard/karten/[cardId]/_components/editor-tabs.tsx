@@ -17,13 +17,7 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
         <TabsTrigger value="advanced">Erweitert</TabsTrigger>
       </TabsList>
 
-      {/*
-        Sections flow into as many columns as the width allows (see the `columns-*` classes on
-        each tab), so a tab uses the screen's height instead of running off the bottom of a
-        narrow strip. `overflow-y-auto` stays as the safety net for short windows — it is not
-        the layout.
-      */}
-      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto p-2.5">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
         <TabsContent value="branding">
           <BrandingTab />
         </TabsContent>

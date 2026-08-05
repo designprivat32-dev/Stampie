@@ -73,21 +73,13 @@ function ContrastRow({
       : 'Zu gering.',
   }[level]
 
-  // A pass needs one line, not a paragraph. Two full-size green boxes explaining that nothing
-  // is wrong pushed the rest of the tab off the screen for no information at all.
-  if (level === 'ok') {
-    return (
-      <div className={cn('flex items-center gap-2 rounded-lg border px-3 py-1.5', tone)}>
-        <Check className="size-3.5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-[12px]">{title}</span>
-        <span className="text-[12px] font-semibold tabular-nums">{ratio.toFixed(2)}:1</span>
-      </div>
-    )
-  }
-
   return (
     <div className={cn('flex items-start gap-3 rounded-lg border px-3 py-2.5', tone)}>
-      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      {level === 'ok' ? (
+        <Check className="mt-0.5 size-4 shrink-0" />
+      ) : (
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
@@ -97,10 +89,12 @@ function ContrastRow({
         <p className="text-[11.5px] leading-snug opacity-90">{message}</p>
       </div>
 
-      <Button variant="outline" size="sm" onClick={onFix} className="shrink-0 bg-surface">
-        <Wand2 />
-        Automatisch korrigieren
-      </Button>
+      {level !== 'ok' ? (
+        <Button variant="outline" size="sm" onClick={onFix} className="shrink-0 bg-surface">
+          <Wand2 />
+          Automatisch korrigieren
+        </Button>
+      ) : null}
     </div>
   )
 }

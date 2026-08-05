@@ -46,9 +46,7 @@ describe('ContrastWarning', () => {
     )
     // #ffffff on #1a1a1a
     expect(screen.getByText(/17\.\d\d:1/)).toBeTruthy()
-    // A pass is a one-line row: title and ratio, no explanatory paragraph.
-    expect(screen.getAllByText('Text auf Hintergrund').length).toBeGreaterThan(0)
-    expect(screen.queryByText(/Automatisch korrigieren/)).toBeNull()
+    expect(screen.getAllByText('Gut lesbar.').length).toBeGreaterThan(0)
   })
 
   it('warns on neon pink over white and offers the fix', () => {

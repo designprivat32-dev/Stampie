@@ -8,7 +8,7 @@ import {
   cardDesignPublishSchema,
   type CardDesignInput,
 } from '@/lib/cards/schema'
-import { DEFAULT_CARD_DESIGN, isPristineDesign } from '@/lib/cards/defaults'
+import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 
 const draft = (over: Partial<CardDesignInput> = {}): unknown => ({ ...DEFAULT_CARD_DESIGN, ...over })
 
@@ -266,30 +266,5 @@ describe('cardDesignPublishSchema', () => {
     expect(cardDesignPublishSchema.safeParse(publishable({ expiresAt: new Date('2020-01-01') })).success).toBe(
       false,
     )
-  })
-})
-
-describe('isPristineDesign', () => {
-  it('holds for a freshly created draft', () => {
-    expect(isPristineDesign(DEFAULT_CARD_DESIGN)).toBe(true)
-    expect(isPristineDesign({ ...DEFAULT_CARD_DESIGN })).toBe(true)
-  })
-
-  it.each([
-    ['a colour', { backgroundColor: '#ff0000' }],
-    ['a programme name', { programName: 'Kaffeekarte' }],
-    ['an uploaded logo', { logoAssetId: 'asset_1' }],
-    ['the stamp goal', { stampGoal: 8 }],
-    ['an expiry date', { expiresAt: new Date('2030-01-01') }],
-  ] as const)('breaks once the owner has set %s', (_what, over) => {
-    expect(isPristineDesign({ ...DEFAULT_CARD_DESIGN, ...over })).toBe(false)
-  })
-
-  it('counts a back field as a touch — otherwise the picker greets a designed card', () => {
-    const design = {
-      ...DEFAULT_CARD_DESIGN,
-      backFields: [{ id: 'f_1', type: 'text', label: 'Hinweis', value: 'Bitte vorzeigen' }],
-    } satisfies CardDesignInput
-    expect(isPristineDesign(design)).toBe(false)
   })
 })

@@ -2,7 +2,7 @@
 
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/label'
-import { PanelSection, RadioCard, RadioGroup, TabPanel } from '@/components/ui/misc'
+import { PanelSection, RadioCard, RadioGroup } from '@/components/ui/misc'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
 import { StampIconPicker } from '../stamp-icon-picker'
@@ -31,7 +31,7 @@ export function ProgramTab() {
   const panelStamps = Math.min(design.stampGoal, Math.max(1, Math.ceil(design.stampGoal * 0.6)))
 
   return (
-    <TabPanel>
+    <div>
       <PanelSection title="Anzahl Stempel" description="Wie oft muss der Kunde kommen?">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -109,6 +109,6 @@ export function ProgramTab() {
           />
         </div>
       </PanelSection>
-    </TabPanel>
+    </div>
   )
 }
