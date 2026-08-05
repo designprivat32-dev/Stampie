@@ -50,9 +50,11 @@ export interface StampLayout {
 /**
  * Arranges `count` stamps inside `canvas`.
  *
- * Row count is the only tiered rule (<=5 -> one row, otherwise two). Icon size falls out
- * of the available space, which is why 13..20 automatically get smaller icons than 6..12
- * without a second hardcoded tier.
+ * Neither the row count nor the icon size is tiered: both fall out of one rule — take the
+ * arrangement whose cells come out largest. On a 3:1 strip that puts up to 6 stamps in a
+ * single row (a row of 6 is width-bound at a larger cell than two rows of 3, which are
+ * height-bound), and everything above that into two rows, which is also why 13..20 end up
+ * smaller than 7..12 without a second hardcoded rule.
  */
 export function computeStampLayout(count: number, canvas: StripCanvas = APPLE_STRIP_CANVAS): StampLayout {
   const n = Math.max(1, Math.floor(count))
@@ -62,14 +64,18 @@ export function computeStampLayout(count: number, canvas: StripCanvas = APPLE_ST
   const availableWidth = canvas.width - 2 * padX
   const availableHeight = canvas.height - 2 * padY
 
-  const rows = n <= 5 ? 1 : 2
+  const cellFor = (rowCount: number) =>
+    Math.min(
+      availableWidth / Math.ceil(n / rowCount),
+      availableHeight / rowCount,
+      canvas.height * MAX_CELL_RATIO,
+    )
+
+  // Ties go to the single row: same size, fewer lines to read.
+  const rows = cellFor(1) >= cellFor(2) ? 1 : 2
   const cols = Math.ceil(n / rows)
 
-  const cell = Math.min(
-    availableWidth / cols,
-    availableHeight / rows,
-    canvas.height * MAX_CELL_RATIO,
-  )
+  const cell = cellFor(rows)
   const gap = cell * GAP_RATIO
   const icon = cell - gap
 
