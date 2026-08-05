@@ -26,6 +26,24 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
   shareable: true,
 }
 
+/**
+ * True while the draft is still exactly as it was created.
+ *
+ * The template picker used to open for every *unpublished* card, which meant it greeted the
+ * owner on every single visit until they published — long after they had designed the card.
+ * "Never published" is the wrong question; "never touched" is the right one.
+ */
+export function isPristineDesign(design: CardDesignInput): boolean {
+  const keys = Object.keys(DEFAULT_CARD_DESIGN) as Array<keyof CardDesignInput>
+  return keys.every((key) => {
+    const value = design[key]
+    const fallback = DEFAULT_CARD_DESIGN[key]
+    // Every array default is empty, so length alone settles it.
+    if (Array.isArray(fallback)) return Array.isArray(value) && value.length === 0
+    return value === fallback
+  })
+}
+
 /** Stable-ish id generator for back fields and geo entries (client and server safe). */
 export function newFieldId(): string {
   return `f_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`

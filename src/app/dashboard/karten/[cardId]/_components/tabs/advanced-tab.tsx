@@ -2,7 +2,7 @@
 
 import { Input } from '@/components/ui/input'
 import { Field, Label } from '@/components/ui/label'
-import { PanelSection } from '@/components/ui/misc'
+import { PanelSection, TabPanel } from '@/components/ui/misc'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { GeoLocationsEditor } from '../geo-locations-editor'
@@ -25,7 +25,7 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
   const expiresValue = design.expiresAt ? toDateInputValue(design.expiresAt) : ''
 
   return (
-    <div>
+    <TabPanel>
       <PanelSection
         title="Barcode"
         description="Wird beim Stempeln im Laden gescannt."
@@ -95,7 +95,7 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
           </div>
         </div>
       </PanelSection>
-    </div>
+    </TabPanel>
   )
 }
 

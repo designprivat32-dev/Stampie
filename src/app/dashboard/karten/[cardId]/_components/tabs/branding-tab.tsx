@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { PanelSection, Spinner } from '@/components/ui/misc'
+import { PanelSection, Spinner, TabPanel } from '@/components/ui/misc'
 import { AssetUpload } from '../asset-upload'
 import { ColorField, PaletteRow } from '../color-field'
 import { ContrastWarning } from '../contrast-warning'
@@ -42,17 +42,23 @@ export function BrandingTab() {
   }
 
   return (
-    <div>
+    <TabPanel>
+      {/*
+        Logo and icon are two sections, not one. Together they made a single block taller than
+        anything else in the editor, and a block that cannot be split is exactly what stops the
+        columns from balancing — one column ran past the bottom of the screen while the other
+        had room to spare.
+      */}
       <PanelSection
-        title="Logo & Icon"
-        description="Beides wird serverseitig in die von Apple geforderten Größen gerechnet."
+        title="Logo"
+        description="Wird serverseitig in die von Apple geforderten Größen gerechnet."
       >
         <div className="space-y-3">
           <AssetUpload
             kind="LOGO"
             assetId={design.logoAssetId}
             label="Logo"
-            hint="PNG, JPG oder SVG · max. 5 MB · wird auf 160 × 50 zugeschnitten"
+            hint="PNG, JPG, SVG · max. 5 MB · Zuschnitt 160 × 50"
             aspect={160 / 50}
             cropTitle="Logo zuschneiden"
             cropDescription="Apple Wallet zeigt das Logo in maximal 160 × 50 Punkten. @2x und @3x werden automatisch erzeugt."
@@ -72,15 +78,14 @@ export function BrandingTab() {
               <PlatformSupportBadge field="squareLogo" />
             </div>
             <p className="text-[11.5px] leading-snug text-ink-3">
-              Optional. Google beschneidet das Logo <strong>rund</strong> — ein breites Logo
-              wird dabei zum schmalen Streifen. Ohne eigenes Bild wird das obige Logo mittig
-              auf die Hintergrundfarbe gesetzt.
+              Optional. Google beschneidet <strong>rund</strong> — ein breites Logo wird zum
+              Streifen. Ohne eigenes Bild wird das obige verwendet.
             </p>
             <AssetUpload
               kind="SQUARE_LOGO"
               assetId={design.squareLogoAssetId}
               label="Quadratisches Logo"
-              hint="660 × 660 · am besten mit transparentem Hintergrund"
+              hint="660 × 660 · am besten transparent"
               aspect={1}
               previewClassName="size-12"
               cropTitle="Quadratisches Logo zuschneiden"
@@ -89,12 +94,16 @@ export function BrandingTab() {
               onCleared={() => patch({ squareLogoAssetId: null })}
             />
           </div>
+        </div>
+      </PanelSection>
 
+      <PanelSection title="Icon" description="Pflicht — ohne Icon ist der Pass ungültig.">
+        <div className="space-y-3">
           <AssetUpload
             kind="ICON"
             assetId={design.iconAssetId}
             label="Icon (29 × 29)"
-            hint="Pflicht — ohne Icon ist der Pass ungültig."
+            hint="Erscheint in Benachrichtigungen und auf dem Sperrbildschirm."
             aspect={1}
             previewClassName="size-12"
             cropTitle="Icon zuschneiden"
@@ -136,7 +145,7 @@ export function BrandingTab() {
         title="Farben"
         description="Die Karte ist das einzige farbige Element — der Rest der Oberfläche bleibt neutral."
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           {palette && palette.colors.length > 0 ? (
             <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
               <p className="text-[12px] font-medium text-ink">Farben aus dem Logo</p>
@@ -191,7 +200,7 @@ export function BrandingTab() {
           kind="HERO"
           assetId={design.heroAssetId}
           label="Hintergrundbild"
-          hint="Wird auf 1032 × 336 (3:1) zugeschnitten · leicht abgedunkelt, damit Stempel lesbar bleiben"
+          hint="Zuschnitt 1032 × 336 (3:1) · leicht abgedunkelt"
           aspect={1032 / 336}
           previewClassName="h-12 w-24"
           cropTitle="Hintergrundbild zuschneiden"
@@ -200,6 +209,6 @@ export function BrandingTab() {
           onCleared={() => patch({ heroAssetId: null })}
         />
       </PanelSection>
-    </div>
+    </TabPanel>
   )
 }

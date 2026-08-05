@@ -5,7 +5,7 @@ import { AlertTriangle, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/label'
-import { PanelSection } from '@/components/ui/misc'
+import { PanelSection, TabPanel } from '@/components/ui/misc'
 import { BackFieldsEditor } from '../back-fields-editor'
 import { PlatformSupportBadge } from '../platform-support-badge'
 import { newFieldId } from '@/lib/cards/defaults'
@@ -62,7 +62,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
   const missingLegal = (['imprint', 'privacy'] as const).filter((k) => !legalKinds.has(k))
 
   return (
-    <div>
+    <TabPanel>
       <PanelSection title="Kartentexte">
         <div className="space-y-4">
           <Field
@@ -186,6 +186,6 @@ export function TextsTab({ location }: { location: LocationSummary }) {
           </div>
         )}
       </PanelSection>
-    </div>
+    </TabPanel>
   )
 }
