@@ -178,7 +178,7 @@ export function CardEditorShell({
           </div>
 
           <main className="hidden min-w-0 flex-1 px-8 lg:block">
-            <div className="sticky top-[57px] h-[calc(100dvh-57px)]">
+            <div className="scrollbar-slim sticky top-[57px] h-[calc(100dvh-57px)] overflow-y-auto">
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}

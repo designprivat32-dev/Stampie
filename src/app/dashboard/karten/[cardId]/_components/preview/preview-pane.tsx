@@ -56,9 +56,12 @@ export function PreviewPane({
   }, [platform, side, theme])
 
   return (
-    <div className="flex h-full flex-col items-center gap-6 py-8">
+    // `min-h-full`, not `h-full`: the column may grow past the viewport. It used to be pinned
+    // to exactly one screen, so a tall card pushed the controls below it out of reach with
+    // nothing to scroll — the platform switch and the stamp slider were simply gone.
+    <div className="flex min-h-full flex-col items-center gap-6 py-8">
       <div
-        className="preview-stage flex w-full flex-1 items-center justify-center rounded-xl border border-line p-8"
+        className="preview-stage flex w-full flex-1 shrink-0 items-center justify-center rounded-xl border border-line p-8"
         data-theme={theme}
       >
         <div ref={cardRef} className="p-2">

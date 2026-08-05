@@ -74,7 +74,8 @@ export function PreviewControls({ onExport }: { onExport: () => Promise<void> })
   }
 
   return (
-    <div className="w-full max-w-[420px] space-y-4">
+    // Never compressed by the stage above it — these are the controls, not decoration.
+    <div className="w-full max-w-[420px] shrink-0 space-y-4">
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Segmented
           label="Plattform"
