@@ -6,7 +6,7 @@ import {
 } from '@/lib/cards/stamp-layout'
 
 describe('computeStampLayout', () => {
-  describe('rows follow whichever arrangement gives the larger cell', () => {
+  describe('one row whenever the stamps fit across', () => {
     it.each([
       [3, 1],
       [4, 1],
@@ -21,18 +21,18 @@ describe('computeStampLayout', () => {
       expect(computeStampLayout(n).rows).toBe(rows)
     })
 
-    it('never picks a row count that shrinks the icons', () => {
+    it('uses one row exactly when the stamps fit across at their size', () => {
+      const availableWidth =
+        APPLE_STRIP_CANVAS.width - 2 * Math.round(APPLE_STRIP_CANVAS.width * 0.032)
       for (let n = 1; n <= 20; n++) {
-        const chosen = computeStampLayout(n)
-        const rows = chosen.rows === 1 ? 2 : 1
-        const cols = Math.ceil(n / rows)
-        const alternative = Math.min(
-          (APPLE_STRIP_CANVAS.width - 2 * Math.round(APPLE_STRIP_CANVAS.width * 0.032)) / cols,
-          (APPLE_STRIP_CANVAS.height - 2 * Math.round(APPLE_STRIP_CANVAS.height * 0.081)) / rows,
-          APPLE_STRIP_CANVAS.height * 0.52,
-        )
-        expect(chosen.cell).toBeGreaterThanOrEqual(alternative - 0.001)
+        const l = computeStampLayout(n)
+        expect(l.rows).toBe(n * l.cell <= availableWidth + 0.001 ? 1 : 2)
       }
+    })
+
+    it('horizontal slack spreads the stamps out, it does not enlarge them', () => {
+      // Six in a row have width to spare; the stamp stays the size it had as two rows of 3.
+      expect(computeStampLayout(6).icon).toBeCloseTo(computeStampLayout(10).icon, 5)
     })
   })
 
@@ -41,7 +41,7 @@ describe('computeStampLayout', () => {
       // n, rows, cols, cell, icon
       [3, 1, 3, 63.96, 52.45],
       [5, 1, 5, 63.96, 52.45],
-      [6, 1, 6, 58.5, 47.97],
+      [6, 1, 6, 51.5, 42.23],
       [10, 2, 5, 51.5, 42.23],
       [12, 2, 6, 51.5, 42.23],
       [20, 2, 10, 35.1, 28.78],

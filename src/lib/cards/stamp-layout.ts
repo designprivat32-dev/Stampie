@@ -14,7 +14,7 @@
  * this constant a layout change keeps the old URL and every existing card goes on showing
  * the old grid forever.
  */
-export const STRIP_RENDERER_VERSION = '2'
+export const STRIP_RENDERER_VERSION = '3'
 
 export interface StripCanvas {
   readonly width: number
@@ -60,11 +60,16 @@ export interface StampLayout {
 /**
  * Arranges `count` stamps inside `canvas`.
  *
- * Neither the row count nor the icon size is tiered: both fall out of one rule — take the
- * arrangement whose cells come out largest. On a 3:1 strip that puts up to 6 stamps in a
- * single row (a row of 6 is width-bound at a larger cell than two rows of 3, which are
- * height-bound), and everything above that into two rows, which is also why 13..20 end up
- * smaller than 7..12 without a second hardcoded rule.
+ * Size and arrangement are two separate questions:
+ *
+ *   - How big is a stamp? That comes from the *vertical* budget. Up to 5 stamps get the
+ *     full strip height (capped, so a 3-stamp card does not get giant icons), above that
+ *     they share it between two rows. Horizontal slack never makes a stamp bigger — it
+ *     only spreads the stamps out.
+ *   - How many rows? One, whenever the stamps fit across at that size; otherwise two.
+ *
+ * So 6 stamps sit in a single row at the same size they had as two rows of 3, and 13..20
+ * automatically come out smaller than 7..12 without a second hardcoded tier.
  */
 export function computeStampLayout(count: number, canvas: StripCanvas = APPLE_STRIP_CANVAS): StampLayout {
   const n = Math.max(1, Math.floor(count))
@@ -74,18 +79,16 @@ export function computeStampLayout(count: number, canvas: StripCanvas = APPLE_ST
   const availableWidth = canvas.width - 2 * padX
   const availableHeight = canvas.height - 2 * padY
 
-  const cellFor = (rowCount: number) =>
-    Math.min(
-      availableWidth / Math.ceil(n / rowCount),
-      availableHeight / rowCount,
-      canvas.height * MAX_CELL_RATIO,
-    )
+  const heightBudgetRows = n <= 5 ? 1 : 2
+  const cell = Math.min(
+    availableWidth / Math.ceil(n / heightBudgetRows),
+    availableHeight / heightBudgetRows,
+    canvas.height * MAX_CELL_RATIO,
+  )
 
-  // Ties go to the single row: same size, fewer lines to read.
-  const rows = cellFor(1) >= cellFor(2) ? 1 : 2
+  const rows = n * cell <= availableWidth ? 1 : 2
   const cols = Math.ceil(n / rows)
 
-  const cell = cellFor(rows)
   const gap = cell * GAP_RATIO
   const icon = cell - gap
 
