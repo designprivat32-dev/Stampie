@@ -40,12 +40,15 @@ export function CardEditorShell({
   location,
   userEmail,
   publishedVersion,
+  suggestTemplate,
   canStamp,
 }: {
   cardName: string
   location: LocationSummary
   userEmail: string
   publishedVersion: number | null
+  /** Whether the template picker should greet the owner — true only on an untouched card. */
+  suggestTemplate: boolean
   /** Agency accounts design but never book stamps, so they get no till link. */
   canStamp: boolean
 }) {
@@ -56,7 +59,7 @@ export function CardEditorShell({
 
   const { canUndo, canRedo, undo, redo } = useTemporal()
 
-  const [templateOpen, setTemplateOpen] = React.useState(publishedVersion === null)
+  const [templateOpen, setTemplateOpen] = React.useState(suggestTemplate)
   const [testCardOpen, setTestCardOpen] = React.useState(false)
   const [publishOpen, setPublishOpen] = React.useState(false)
   const [versionsOpen, setVersionsOpen] = React.useState(false)

@@ -4,6 +4,7 @@ import { CardEditorProvider } from '@/stores/card-editor-provider'
 import { assertCardAccess, LocationAccessError, UnauthorizedError } from '@/lib/auth/session'
 import { prisma } from '@/lib/db'
 import { loadOrCreateDraft } from '@/lib/cards/repository'
+import { isPristineDesign } from '@/lib/cards/defaults'
 import { getStorage, variantKey } from '@/lib/storage'
 import type { LocationSummary, OpeningHours } from '@/types/location'
 
@@ -79,6 +80,8 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
         location={location}
         userEmail={access.session.email}
         publishedVersion={draft.publishedVersion}
+        // Only on a card nobody has touched yet — see isPristineDesign.
+        suggestTemplate={draft.publishedVersion === null && isPristineDesign(draft.design)}
         canStamp={access.canStamp}
       />
     </CardEditorProvider>
