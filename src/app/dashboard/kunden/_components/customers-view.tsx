@@ -2,12 +2,26 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Building2, Mail, MapPin, Pencil, Phone, Plus, Search } from 'lucide-react'
+import { Building2, KeyRound, Mail, MapPin, Pencil, Phone, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/misc'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Badge, Spinner } from '@/components/ui/misc'
 import { CustomerDialog } from './customer-dialog'
+import { createBusinessLoginAction } from '@/actions/business-login'
 import type { CustomerRecord } from '@/lib/customers/customer-service'
+
+interface BusinessLogin {
+  username: string
+  password: string
+}
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; customer: CustomerRecord } | null
 
@@ -24,6 +38,26 @@ export function CustomersView({
 }) {
   const [query, setQuery] = React.useState('')
   const [dialog, setDialog] = React.useState<DialogState>(null)
+  const [loginBusyId, setLoginBusyId] = React.useState<string | null>(null)
+  const [login, setLogin] = React.useState<(BusinessLogin & { orgName: string }) | null>(null)
+  const [loginError, setLoginError] = React.useState<string | null>(null)
+
+  const createLogin = async (c: CustomerRecord) => {
+    setLoginBusyId(c.id)
+    setLoginError(null)
+    try {
+      const result = await createBusinessLoginAction(c.id)
+      if (!result.success) {
+        setLoginError(result.error.message)
+        return
+      }
+      setLogin({ ...result.data, orgName: c.name })
+    } catch {
+      setLoginError('Der Login konnte nicht erzeugt werden. Bitte erneut versuchen.')
+    } finally {
+      setLoginBusyId(null)
+    }
+  }
 
   const term = query.trim().toLowerCase()
   const filtered = term
@@ -151,16 +185,28 @@ export function CustomersView({
                     )}
                   </td>
                   {canManage ? (
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`${c.name} bearbeiten`}
-                        title="Bearbeiten"
-                        onClick={() => setDialog({ mode: 'edit', customer: c })}
-                      >
-                        <Pencil />
-                      </Button>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${c.name}: App-Login erzeugen`}
+                          title="App-Login erzeugen"
+                          disabled={loginBusyId === c.id}
+                          onClick={() => void createLogin(c)}
+                        >
+                          {loginBusyId === c.id ? <Spinner /> : <KeyRound />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${c.name} bearbeiten`}
+                          title="Bearbeiten"
+                          onClick={() => setDialog({ mode: 'edit', customer: c })}
+                        >
+                          <Pencil />
+                        </Button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -170,7 +216,43 @@ export function CustomersView({
         </div>
       )}
 
+      {loginError ? (
+        <p role="alert" className="text-[13px] text-danger">
+          {loginError}
+        </p>
+      ) : null}
+
       <CustomerDialog state={dialog} onOpenChange={(open) => !open && setDialog(null)} />
+
+      <Dialog open={login !== null} onOpenChange={(open) => !open && setLogin(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>App-Login erstellt</DialogTitle>
+            <DialogDescription>
+              Zugangsdaten für {login?.orgName}. Das Passwort wird{' '}
+              <strong>nur jetzt</strong> angezeigt — bitte notieren und der Firma geben. Beim
+              ersten Anmelden in der App muss sie es ändern.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface-2 px-3 py-2">
+              <span className="text-[12px] text-ink-3">Benutzername</span>
+              <code className="text-[13px] font-medium text-ink">{login?.username}</code>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface-2 px-3 py-2">
+              <span className="text-[12px] text-ink-3">Start-Passwort</span>
+              <code className="text-[13px] font-medium text-ink">{login?.password}</code>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="primary" onClick={() => setLogin(null)}>
+              Notiert, schließen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

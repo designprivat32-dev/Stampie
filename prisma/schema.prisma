@@ -38,8 +38,26 @@ model User {
   id          String       @id @default(cuid())
   email       String       @unique
   name        String?
+  // --- App-Login (Betriebs-App). Nullable, weil bestehende/Agentur-Nutzer keins brauchen.
+  username          String?  @unique
+  passwordHash      String?
+  /// Beim ersten Login muss das von uns vergebene Start-Passwort geändert werden.
+  mustChangePassword Boolean @default(false)
   createdAt   DateTime     @default(now())
   memberships Membership[]
+  appSessions AppSession[]
+}
+
+/// Anmelde-Token der Betriebs-App. Die App schickt den Token im Authorization-Header.
+model AppSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 enum Role {
