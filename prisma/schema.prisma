@@ -21,6 +21,13 @@ datasource db {
 model Organization {
   id        String       @id @default(cuid())
   name      String
+  // Contact details of the customer (Firma). All optional so an org can exist before the
+  // agency has captured them.
+  phone      String?
+  email      String?
+  street     String?
+  postalCode String?
+  city       String?
   createdAt DateTime     @default(now())
   locations Location[]
   members   Membership[]

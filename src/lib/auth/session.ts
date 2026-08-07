@@ -107,7 +107,9 @@ export async function assertCardAccess(cardId: string): Promise<CardAccess> {
 
   const agency = await isAgency(session.userId)
   if (agency) {
-    return { session, cardId: card.id, orgId: card.orgId, role: 'AGENCY', canStamp: false }
+    // Single-operator setup: the agency login also runs the till, so it may stamp assigned
+    // cards. (Unassigned cards still cannot be stamped — assertStampAccess checks orgId.)
+    return { session, cardId: card.id, orgId: card.orgId, role: 'AGENCY', canStamp: card.orgId !== null }
   }
 
   if (!card.orgId) throw new LocationAccessError('Karte nicht gefunden.')
