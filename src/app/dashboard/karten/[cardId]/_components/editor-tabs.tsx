@@ -3,6 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AdvancedTab } from './tabs/advanced-tab'
 import { BrandingTab } from './tabs/branding-tab'
+import { GoogleWalletTab } from './tabs/google-wallet-tab'
 import { ProgramTab } from './tabs/program-tab'
 import { TextsTab } from './tabs/texts-tab'
 import type { LocationSummary } from '@/types/location'
@@ -14,6 +15,7 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
         <TabsTrigger value="branding">Branding</TabsTrigger>
         <TabsTrigger value="program">Stempel</TabsTrigger>
         <TabsTrigger value="texts">Texte</TabsTrigger>
+        <TabsTrigger value="google">Google Wallet</TabsTrigger>
         <TabsTrigger value="advanced">Erweitert</TabsTrigger>
       </TabsList>
 
@@ -26,6 +28,9 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
         </TabsContent>
         <TabsContent value="texts">
           <TextsTab location={location} />
+        </TabsContent>
+        <TabsContent value="google">
+          <GoogleWalletTab />
         </TabsContent>
         <TabsContent value="advanced">
           <AdvancedTab location={location} />

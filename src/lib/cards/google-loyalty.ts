@@ -53,6 +53,11 @@ export interface LoyaltyClass {
   linksModuleData?: { uris: GoogleLinkModuleUri[] }
   locations?: GoogleLatLong[]
   multipleDevicesAndHoldersAllowedStatus?: 'MULTIPLE_HOLDERS' | 'ONE_USER_ALL_DEVICES' | 'ONE_USER_ONE_DEVICE'
+  // Google Wallet optional labels
+  accountNameLabel?: string
+  accountIdLabel?: string
+  rewardsTierLabel?: string
+  rewardsTier?: string
 }
 
 export interface LoyaltyObject {
@@ -147,6 +152,14 @@ export function buildLoyaltyClass(design: CardDesignInput, ctx: BuildGoogleConte
     cls.locations = design.geoLocations.map((l) => ({ latitude: l.latitude, longitude: l.longitude }))
   }
 
+  // Google Wallet optional labels
+  if (design.accountNameLabel) cls.accountNameLabel = design.accountNameLabel
+  if (design.accountIdLabel) cls.accountIdLabel = design.accountIdLabel
+  if (design.rewardsTierLabel) cls.rewardsTierLabel = design.rewardsTierLabel
+  if (design.googleRewardsTierEnabled && design.rewardsTier) {
+    cls.rewardsTier = design.rewardsTier
+  }
+
   return cls
 }
 
@@ -169,7 +182,7 @@ export function buildLoyaltyObject(design: CardDesignInput, ctx: BuildGoogleCont
     },
   }
 
-  if (ctx.customerName) obj.accountName = ctx.customerName
+  if (ctx.customerName && design.googleAccountNameEnabled) obj.accountName = ctx.customerName
   if (ctx.heroUrl) obj.heroImage = image(ctx.heroUrl, 'Stempelkarte')
   if (design.expiresAt) {
     obj.validTimeInterval = { end: { date: design.expiresAt.toISOString() } }

@@ -198,6 +198,16 @@ model CardDesign {
   /// BackField[] — discriminated union, see src/types/card-design.ts
   backFields  Json    @default("[]")
 
+  // --- Google Wallet optional labels
+  accountNameLabel String?
+  accountIdLabel   String?
+  rewardsTierLabel String?
+  rewardsTier      String?
+
+  // --- Google Wallet optional features (disabled by default)
+  googleAccountNameEnabled Boolean @default(false)
+  googleRewardsTierEnabled Boolean @default(false)
+
   // --- advanced
   barcodeFormat String    @default("QR")
   /// GeoLocation[] — max. 10 entries (PassKit limit)

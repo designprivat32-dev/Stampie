@@ -62,6 +62,22 @@ export function GoogleLoyaltyCard({
         </div>
       </div>
 
+      {/* Google Wallet optional: rewards tier */}
+      {design.googleRewardsTierEnabled && design.rewardsTier ? (
+        <div className="px-4 pb-2">
+          <div className="flex items-center gap-2">
+            {design.rewardsTierLabel ? (
+              <span className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
+                {design.rewardsTierLabel}
+              </span>
+            ) : null}
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[12px] font-medium">
+              {design.rewardsTier}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="px-4 pb-3">
         <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
           {design.stampLabel}
@@ -75,7 +91,27 @@ export function GoogleLoyaltyCard({
         </div>
       </div>
 
-
+      {/* Google Wallet optional: account name labels */}
+      {(design.accountNameLabel || design.accountIdLabel) ? (
+        <div className="flex gap-4 px-4 pb-3">
+          {design.accountNameLabel ? (
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
+                {design.accountNameLabel}
+              </div>
+              <div className="text-[13px]">—</div>
+            </div>
+          ) : null}
+          {design.accountIdLabel ? (
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
+                {design.accountIdLabel}
+              </div>
+              <div className="text-[13px]">—</div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="p-4">
         <div className="flex flex-col items-center rounded-lg bg-white px-4 py-3">

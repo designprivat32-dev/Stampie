@@ -20,6 +20,16 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
   stampLabel: 'Stempel',
   backFields: [],
 
+  // Google Wallet optional labels
+  accountNameLabel: null,
+  accountIdLabel: null,
+  rewardsTierLabel: null,
+  rewardsTier: null,
+
+  // Google Wallet optional features (disabled by default)
+  googleAccountNameEnabled: false,
+  googleRewardsTierEnabled: false,
+
   barcodeFormat: 'QR',
   geoLocations: [],
   expiresAt: null,

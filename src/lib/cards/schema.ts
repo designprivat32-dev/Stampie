@@ -158,6 +158,16 @@ export const cardDesignDraftSchema = z
       .array(backFieldSchema)
       .max(MAX_BACK_FIELDS, `Höchstens ${MAX_BACK_FIELDS} Rückseiten-Felder.`),
 
+    // Google Wallet optional labels
+    accountNameLabel: z.string().max(15, 'Label ist zu lang (max. 15 Zeichen).').nullable().default(null),
+    accountIdLabel: z.string().max(15, 'Label ist zu lang (max. 15 Zeichen).').nullable().default(null),
+    rewardsTierLabel: z.string().max(9, 'Label ist zu lang (max. 9 Zeichen).').nullable().default(null),
+    rewardsTier: z.string().max(7, 'Stufen-Name ist zu lang (max. 7 Zeichen).').nullable().default(null),
+
+    // Google Wallet optional features (disabled by default)
+    googleAccountNameEnabled: z.boolean().default(false),
+    googleRewardsTierEnabled: z.boolean().default(false),
+
     // advanced
     barcodeFormat: barcodeFormatSchema,
     geoLocations: z
