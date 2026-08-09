@@ -119,7 +119,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
           <Field
             label="Programmname"
             htmlFor="program-name"
-            hint="Pflichtfeld zum Veröffentlichen."
+            hint="Pflichtfeld · Apple: Überschrift, Google: Name in der Wallet-Liste"
           >
             <Input
               id="program-name"

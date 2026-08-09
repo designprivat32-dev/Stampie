@@ -40,24 +40,19 @@ function Capture({ storeRef }: { storeRef: { current: CardEditorStore | null } }
 }
 
 describe('GoogleLoyaltyCard inline edit', () => {
-  it('clicking the program name turns it into an input and typing patches the store', () => {
+  it('shows the issuer name as the header and keeps the program name off the face', () => {
     const storeRef = { current: null as CardEditorStore | null }
     render(<Harness design={{ programName: 'Kaffee Stempelkarte' }} storeRef={storeRef} />)
 
-    const nameButton = screen.getByRole('button', { name: 'Programmname' })
-    expect(nameButton.textContent).toBe('Kaffee Stempelkarte')
+    expect(screen.getByText('Testladen')).toBeTruthy()
+    expect(screen.queryByText('Kaffee Stempelkarte')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Programmname' })).toBeNull()
+  })
 
-    fireEvent.click(nameButton)
-    const input = screen.getByRole('textbox', { name: 'Programmname' }) as HTMLInputElement
-    expect(input.value).toBe('Kaffee Stempelkarte')
-
-    fireEvent.change(input, { target: { value: 'Bäckerei Stempelkarte' } })
-    expect(storeRef.current?.getState().design.programName).toBe('Bäckerei Stempelkarte')
-
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(screen.getByRole('button', { name: 'Programmname' }).textContent).toBe(
-      'Bäckerei Stempelkarte',
-    )
+  it('prints the barcode alternateText under the code', () => {
+    const storeRef = { current: null as CardEditorStore | null }
+    render(<Harness storeRef={storeRef} />)
+    expect(screen.getByText('SN-DEMO-0001')).toBeTruthy()
   })
 
   it('clicking the stamp label edits it live', () => {

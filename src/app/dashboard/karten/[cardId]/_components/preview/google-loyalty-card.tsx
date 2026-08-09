@@ -8,17 +8,26 @@ import type { CardDesignInput } from '@/lib/cards/schema'
 import { useCardEditor } from '@/stores/card-editor-provider'
 
 /**
- * Pixel-near rebuild of a Google Wallet loyalty card.
+ * Rebuild of a Google Wallet loyalty card *face*, checked field by field against an
+ * installed pass rather than against the layout docs — the two disagree, and the device
+ * wins. What actually renders here, in order:
  *
- * Differences from Apple that the shop owner needs to see rather than be told about:
- * Google derives the text colour itself (foreground/label colour are ignored), the hero
- * image is 3:1, and — the one that surprises everyone — the barcode comes *before* the
- * stamp row. Google fixes that order and offers no field to change it, so the preview
- * copies it rather than showing a nicer layout the real card will never have.
+ *   programLogo · issuerName · loyaltyPoints (label + balance) · barcode + alternateText ·
+ *   heroImage
  *
- * Text fields are click-to-edit directly on the card, the same way Google's own Pass
- * Builder works — no detour through the sidebar. They read and write the store live
- * (not the debounced `design` prop) so a keystroke lands on the card immediately.
+ * Everything else the class carries — `programName`, `accountName`, `accountId`,
+ * `rewardsTier`, `textModulesData`, `linksModuleData` — only appears once the customer
+ * expands the card, so it lives in `GoogleLoyaltyCardBack`. Putting any of it here would
+ * promise the shop owner something their customers never see, which is exactly the bug
+ * this layout was rewritten to fix.
+ *
+ * Two more Google quirks the preview copies rather than improves on: the text colour is
+ * derived from the background (foreground/label colour are ignored), and the barcode sits
+ * *above* the hero image with no field to reorder it.
+ *
+ * Text is click-to-edit directly on the card, like Google's own Pass Builder — no detour
+ * through the sidebar. Editable fields read and write the store live (not the debounced
+ * `design` prop) so a keystroke lands immediately.
  */
 export function GoogleLoyaltyCard({
   design,
@@ -61,20 +70,14 @@ export function GoogleLoyaltyCard({
           )}
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px]" style={{ color: muted }}>
-            {organizationName}
-          </div>
-          <div className="text-[14px] font-medium leading-tight">
-            <EditableField
-              value={live.programName}
-              onCommit={(v) => patch({ programName: v })}
-              placeholder="Stempelkarte"
-              maxLength={30}
-              tone={tone}
-              ariaLabel="Programmname"
-            />
-          </div>
+        {/*
+          Header is `issuerName` and nothing else. Google's template docs list `programName`
+          here too, but on a real device it never shows up on the card face — verified
+          against an installed pass. `programName` still matters: it names the pass in the
+          Wallet list and in search, so it stays in the editor, just not on this face.
+        */}
+        <div className="min-w-0 flex-1 self-center">
+          <div className="truncate text-[14px] font-medium leading-tight">{organizationName}</div>
         </div>
       </div>
 
@@ -104,19 +107,19 @@ export function GoogleLoyaltyCard({
       */}
 
       {/*
-        Google renders the barcode in a white box sized close to the code itself — not the
-        padded card-with-caption we had before. It also does not print the serial number
-        next to it on the front face; that only shows up if the scan fails and staff needs
-        to key the code in by hand, which is what `barcode.alternateText` is for, not a
-        front-of-card label.
+        White box hugs the code — Google leaves only a quiet-zone margin, not the padded
+        card we had before. The line underneath is `barcode.alternateText`, which
+        `buildLoyaltyObject` fills with the serial so staff can key it in when a scan fails;
+        Google prints it, so the preview does too.
       */}
       <div className="flex justify-center px-4 pb-4">
-        <div className="flex items-center justify-center rounded-md bg-white p-3">
+        <div className="flex flex-col items-center rounded-md bg-white p-3">
           <svg viewBox="0 0 21 21" className="size-[152px]" aria-hidden="true">
             {GOOGLE_QR_CELLS.map(([x, y]) => (
               <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="black" />
             ))}
           </svg>
+          <span className="mt-1 text-[10px] text-black/60">SN-DEMO-0001</span>
         </div>
       </div>
 
