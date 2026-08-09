@@ -45,19 +45,24 @@ export class MockPassBuilder implements PassBuilder {
       kind: design.kind,
     })
 
-    // The stamp row is regenerated for this exact stamp count — this is the whole reason
-    // the renderer is server-side.
-    const strip = await renderStripImageSet(design, design.currentStamps, {
-      customIconPng: design.assets.stampIcon,
-      backgroundPng: design.assets.hero,
-    })
-
     const files: ZipEntry[] = [
       { name: 'pass.json', data: Buffer.from(JSON.stringify(passJson, null, 2), 'utf8') },
-      { name: 'strip.png', data: strip['1x'] },
-      { name: 'strip@2x.png', data: strip['2x'] },
-      { name: 'strip@3x.png', data: strip['3x'] },
     ]
+
+    // A coupon has no stamp row. Bundling one would not just waste three renders — Wallet
+    // would draw an empty grid across a pass that never counts anything.
+    if (design.kind !== 'COUPON') {
+      // Regenerated for this exact stamp count — the whole reason the renderer is server-side.
+      const strip = await renderStripImageSet(design, design.currentStamps, {
+        customIconPng: design.assets.stampIcon,
+        backgroundPng: design.assets.hero,
+      })
+      files.push(
+        { name: 'strip.png', data: strip['1x'] },
+        { name: 'strip@2x.png', data: strip['2x'] },
+        { name: 'strip@3x.png', data: strip['3x'] },
+      )
+    }
 
     const icon = design.assets.icon
     if (icon) {

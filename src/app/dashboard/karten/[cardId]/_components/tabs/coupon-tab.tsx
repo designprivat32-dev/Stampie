@@ -7,7 +7,7 @@ import { PanelSection } from '@/components/ui/misc'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCardEditor } from '@/stores/card-editor-provider'
-import type { CardKind, RedemptionChannel } from '@/lib/cards/schema'
+import type { RedemptionChannel } from '@/lib/cards/schema'
 
 /**
  * The coupon editor, used by both card kinds.
@@ -16,7 +16,8 @@ import type { CardKind, RedemptionChannel } from '@/lib/cards/schema'
  * a full card hands out, which is why they sit behind a switch there — a shop that just
  * wants a line of reward text should not be asked to fill them in.
  */
-export function CouponTab({ kind }: { kind: CardKind }) {
+export function CouponTab() {
+  const kind = useCardEditor((s) => s.kind)
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
 

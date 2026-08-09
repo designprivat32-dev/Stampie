@@ -7,14 +7,15 @@ import { CouponTab } from './tabs/coupon-tab'
 import { GoogleWalletTab } from './tabs/google-wallet-tab'
 import { ProgramTab } from './tabs/program-tab'
 import { TextsTab } from './tabs/texts-tab'
-import type { CardKind } from '@/lib/cards/schema'
+import { useCardEditor } from '@/stores/card-editor-provider'
 import type { LocationSummary } from '@/types/location'
 
 /**
  * A coupon has no stamps, so that tab is not merely empty for it — it is absent. Both kinds
  * reach the coupon editor, because a stamp card can hand one out as its reward.
  */
-export function EditorTabs({ location, kind }: { location: LocationSummary; kind: CardKind }) {
+export function EditorTabs({ location }: { location: LocationSummary }) {
+  const kind = useCardEditor((s) => s.kind)
   const isStamp = kind === 'STAMP'
 
   return (
@@ -38,7 +39,7 @@ export function EditorTabs({ location, kind }: { location: LocationSummary; kind
           </TabsContent>
         ) : null}
         <TabsContent value="coupon">
-          <CouponTab kind={kind} />
+          <CouponTab />
         </TabsContent>
         <TabsContent value="texts">
           <TextsTab location={location} />

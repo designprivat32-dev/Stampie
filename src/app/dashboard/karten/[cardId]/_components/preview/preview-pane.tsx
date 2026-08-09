@@ -13,7 +13,6 @@ import { PreviewControls } from './preview-controls'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import { useDebounced } from '@/hooks/use-debounced'
 import { walletLogoUrl } from '@/lib/wallet/image-urls'
-import type { CardKind } from '@/lib/cards/schema'
 
 /**
  * The right-hand stage. Everything here reacts to a 150 ms debounced copy of the design,
@@ -22,13 +21,11 @@ import type { CardKind } from '@/lib/cards/schema'
 export function PreviewPane({
   cardId,
   organizationName,
-  kind,
 }: {
   cardId: string
   organizationName: string
-  /** A coupon is a different pass type, so it gets its own four preview faces. */
-  kind: CardKind
 }) {
+  const kind = useCardEditor((s) => s.kind)
   const liveDesign = useCardEditor((s) => s.design)
   const design = useDebounced(liveDesign, 150)
 

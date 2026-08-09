@@ -25,7 +25,6 @@ import { VersionHistoryDialog } from './dialogs/version-history-dialog'
 import { useAutosave } from '@/hooks/use-autosave'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { useCardEditor, useTemporal } from '@/stores/card-editor-provider'
-import type { CardKind } from '@/lib/cards/schema'
 import type { LocationSummary } from '@/types/location'
 import { cn } from '@/lib/utils'
 
@@ -38,7 +37,6 @@ import { cn } from '@/lib/utils'
  */
 export function CardEditorShell({
   cardName,
-  cardKind,
   location,
   userEmail,
   publishedVersion,
@@ -46,8 +44,6 @@ export function CardEditorShell({
   canStamp,
 }: {
   cardName: string
-  /** Decides which tabs exist and which pass type the preview shows. */
-  cardKind: CardKind
   location: LocationSummary
   userEmail: string
   publishedVersion: number | null
@@ -60,6 +56,8 @@ export function CardEditorShell({
   useUndoShortcuts()
 
   const cardId = useCardEditor((state) => state.cardId)
+  const kind = useCardEditor((state) => state.kind)
+  const isStamp = kind === 'STAMP'
 
   const { canUndo, canRedo, undo, redo } = useTemporal()
 
@@ -124,10 +122,13 @@ export function CardEditorShell({
                 <Redo2 />
               </Button>
 
-              <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(true)}>
-                <LayoutTemplate />
-                Vorlagen
-              </Button>
+              {/* Templates set stamp goal, icon and reward text — a coupon has none. */}
+              {isStamp ? (
+                <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(true)}>
+                  <LayoutTemplate />
+                  Vorlagen
+                </Button>
+              ) : null}
               <Button variant="ghost" size="sm" onClick={() => setVersionsOpen(true)}>
                 <History />
                 Versionen
@@ -171,7 +172,7 @@ export function CardEditorShell({
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}
-                kind={cardKind}
+
               />
             </div>
           ) : null}
@@ -179,7 +180,7 @@ export function CardEditorShell({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="flex min-h-0 w-full flex-col border-line bg-surface lg:w-[420px] lg:shrink-0 lg:border-r">
-            <EditorTabs location={location} kind={cardKind} />
+            <EditorTabs location={location} />
           </div>
 
           <main className="hidden min-w-0 flex-1 px-8 lg:block">
@@ -187,7 +188,7 @@ export function CardEditorShell({
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}
-                kind={cardKind}
+
               />
             </div>
           </main>

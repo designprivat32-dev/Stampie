@@ -107,7 +107,8 @@ export function buildOfferClass(design: CardDesignInput, ctx: BuildGoogleContext
   // programLogo is required for loyalty and expected here too — same fallback rule.
   const logoUrl = ctx.logoUrl ?? ctx.fallbackLogoUrl
   if (logoUrl) cls.programLogo = image(logoUrl, 'Logo')
-  if (ctx.heroUrl) cls.heroImage = image(ctx.heroUrl, 'Gutschein')
+  // Deliberately no heroImage: `ctx.heroUrl` points at the stamp-strip renderer, which
+  // would paint a row of empty stamps across a pass that has no stamps at all.
   if (textModules.length > 0) cls.textModulesData = textModules
   if (links.length > 0) cls.linksModuleData = { uris: links }
   if (design.geoLocations.length > 0) {
@@ -138,7 +139,7 @@ export function buildOfferObject(
     },
   }
 
-  if (ctx.heroUrl) obj.heroImage = image(ctx.heroUrl, 'Gutschein')
+  // No heroImage here either — see `buildOfferClass`.
   if (design.expiresAt) {
     obj.validTimeInterval = { end: { date: design.expiresAt.toISOString() } }
   }
