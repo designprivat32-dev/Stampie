@@ -15,7 +15,7 @@ export function GoogleWalletTab() {
     <div>
       <PanelSection
         title="Labels"
-        description="Bezeichnungen auf der Karte (optional)."
+        description="Bezeichnungen in der Detailansicht der Karte (optional)."
       >
         <div className="space-y-3">
           <Field
@@ -64,14 +64,14 @@ export function GoogleWalletTab() {
 
       <PanelSection
         title="Stufen-System"
-        description="Zeigt eine Stufe auf der Karte an (z. B. Gold, Silber)."
+        description="Zeigt eine Stufe in der Detailansicht an (z. B. Gold, Silber)."
       >
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4 rounded-lg border border-line bg-surface p-3">
             <div className="min-w-0">
               <Label htmlFor="rewards-tier-enabled">Stufe anzeigen</Label>
               <p className="mt-0.5 text-[12px] leading-snug text-ink-3">
-                Zeigt den Stufen-Namen auf der Karte.
+                Zeigt den Stufen-Namen in der Detailansicht.
               </p>
             </div>
             <Switch
@@ -129,6 +129,10 @@ export function GoogleWalletTab() {
               </p>
               <p className="mt-1">
                 Labels sind optional — ohne Eingabe wird nichts angezeigt.
+              </p>
+              <p className="mt-1">
+                Google zeigt diese Felder erst, wenn der Kunde die Karte aufklappt — nicht auf
+                der Kartenvorderseite. In der Vorschau stehen sie deshalb unter „Rückseite".
               </p>
             </div>
           </div>

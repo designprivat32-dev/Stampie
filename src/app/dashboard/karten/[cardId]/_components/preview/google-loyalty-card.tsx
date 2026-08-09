@@ -78,38 +78,11 @@ export function GoogleLoyaltyCard({
         </div>
       </div>
 
-      {/* Google Wallet optional: rewards tier. Gated on the live value, not the debounced
-          `design` prop, so the input does not vanish mid-edit while the user is typing it
-          out from empty. */}
-      {live.googleRewardsTierEnabled && live.rewardsTier ? (
-        <div className="px-4 pb-2">
-          <div className="flex items-center gap-2">
-            {live.rewardsTierLabel ? (
-              <span className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-                <EditableField
-                  value={live.rewardsTierLabel ?? ''}
-                  onCommit={(v) => patch({ rewardsTierLabel: v || null })}
-                  placeholder="Stufe"
-                  maxLength={9}
-                  tone={tone}
-                  ariaLabel="Label für Stufe"
-                />
-              </span>
-            ) : null}
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[12px] font-medium">
-              <EditableField
-                value={live.rewardsTier ?? ''}
-                onCommit={(v) => patch({ rewardsTier: v || null })}
-                placeholder="Gold"
-                maxLength={7}
-                tone={tone}
-                ariaLabel="Stufen-Name"
-              />
-            </span>
-          </div>
-        </div>
-      ) : null}
-
+      {/*
+        `loyaltyPoints`: label plus balance, nothing else. The goal is deliberately absent —
+        `buildLoyaltyObject` sends `balance: { int: stamps }`, so the phone prints "6", never
+        "6 / 10". The goal is only visible through the filled/empty stamps in the hero image.
+      */}
       <div className="px-4 pb-3">
         <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
           <EditableField
@@ -121,50 +94,14 @@ export function GoogleLoyaltyCard({
             ariaLabel="Stempel-Bezeichnung"
           />
         </div>
-        <div className="text-[26px] font-normal leading-tight tabular-nums">
-          {currentStamps}
-          <span className="text-[16px]" style={{ color: muted }}>
-            {' '}
-            / {design.stampGoal}
-          </span>
-        </div>
+        <div className="text-[26px] font-normal leading-tight tabular-nums">{currentStamps}</div>
       </div>
 
-      {/* Google Wallet optional: account name labels — gated on the live value, see above. */}
-      {(live.accountNameLabel || live.accountIdLabel) ? (
-        <div className="flex gap-4 px-4 pb-3">
-          {live.accountNameLabel ? (
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-                <EditableField
-                  value={live.accountNameLabel ?? ''}
-                  onCommit={(v) => patch({ accountNameLabel: v || null })}
-                  placeholder="Mitglied"
-                  maxLength={15}
-                  tone={tone}
-                  ariaLabel="Label für Kontoinhaber"
-                />
-              </div>
-              <div className="text-[13px]">—</div>
-            </div>
-          ) : null}
-          {live.accountIdLabel ? (
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-                <EditableField
-                  value={live.accountIdLabel ?? ''}
-                  onCommit={(v) => patch({ accountIdLabel: v || null })}
-                  placeholder="Nr."
-                  maxLength={15}
-                  tone={tone}
-                  ariaLabel="Label für ID"
-                />
-              </div>
-              <div className="text-[13px]">—</div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      {/*
+        No rewards tier and no account name/id here: Google's default loyalty template puts
+        `rewardsTier`, `accountName` and `accountId` in the expanded details view, not on the
+        card face. They live in `GoogleLoyaltyCardBack`.
+      */}
 
       {/*
         Google renders the barcode in a white box sized close to the code itself — not the

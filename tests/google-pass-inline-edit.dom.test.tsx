@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import * as React from 'react'
 import { GoogleLoyaltyCard } from '@/app/dashboard/karten/[cardId]/_components/preview/google-loyalty-card'
+import { GoogleLoyaltyCardBack } from '@/app/dashboard/karten/[cardId]/_components/preview/google-loyalty-card-back'
 import { CardEditorProvider, useCardEditorStore } from '@/stores/card-editor-provider'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import type { CardDesignInput } from '@/lib/cards/schema'
@@ -79,5 +80,89 @@ describe('GoogleLoyaltyCard inline edit', () => {
     })
     expect(screen.queryByText('Belohnung')).toBeNull()
     expect(screen.queryByText('Gratis Kaffee')).toBeNull()
+  })
+
+  it('shows the stamp balance alone — the goal is not part of loyaltyPoints', () => {
+    const storeRef = { current: null as CardEditorStore | null }
+    render(<Harness design={{ stampGoal: 10 }} storeRef={storeRef} />)
+    expect(screen.getByText('2')).toBeTruthy()
+    expect(screen.queryByText(/\/\s*10/)).toBeNull()
+  })
+
+  it('keeps tier and account labels off the card face', () => {
+    const storeRef = { current: null as CardEditorStore | null }
+    render(
+      <Harness
+        design={{
+          googleRewardsTierEnabled: true,
+          rewardsTier: 'Gold',
+          rewardsTierLabel: 'Stufe',
+          accountNameLabel: 'Mitglied',
+          accountIdLabel: 'Nr.',
+        }}
+        storeRef={storeRef}
+      />,
+    )
+    expect(screen.queryByText('Gold')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Stufen-Name' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Label für Kontoinhaber' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Label für ID' })).toBeNull()
+  })
+})
+
+describe('GoogleLoyaltyCardBack details view', () => {
+  function BackHarness({
+    design,
+    storeRef,
+  }: {
+    design?: Partial<CardDesignInput>
+    storeRef: { current: CardEditorStore | null }
+  }) {
+    const merged = { ...DEFAULT_CARD_DESIGN, ...design }
+    return (
+      <CardEditorProvider init={{ cardId: 'cloc00000000000000000001', design: merged }}>
+        <Capture storeRef={storeRef} />
+        <GoogleLoyaltyCardBack design={merged} />
+      </CardEditorProvider>
+    )
+  }
+
+  it('carries the fields Google moved off the card face', () => {
+    const storeRef = { current: null as CardEditorStore | null }
+    render(
+      <BackHarness
+        design={{
+          rewardText: 'Jeder 10. Kaffee gratis',
+          googleRewardsTierEnabled: true,
+          rewardsTier: 'Gold',
+          rewardsTierLabel: 'Stufe',
+          accountNameLabel: 'Mitglied',
+        }}
+        storeRef={storeRef}
+      />,
+    )
+    expect(screen.getByText('Jeder 10. Kaffee gratis')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stufen-Name' }).textContent).toBe('Gold')
+    expect(screen.getByRole('button', { name: 'Label für Kontoinhaber' }).textContent).toBe(
+      'Mitglied',
+    )
+  })
+
+  it('reward text alone is enough to fill the details view', () => {
+    const storeRef = { current: null as CardEditorStore | null }
+    render(<BackHarness design={{ rewardText: 'Gratis Kaffee', backFields: [] }} storeRef={storeRef} />)
+    expect(screen.queryByText('Noch keine Felder auf der Rückseite.')).toBeNull()
+    expect(screen.getByText('Belohnung')).toBeTruthy()
+  })
+
+  it('reward text is editable in place', () => {
+    const storeRef = { current: null as CardEditorStore | null }
+    render(<BackHarness design={{ rewardText: 'Gratis Kaffee' }} storeRef={storeRef} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Belohnungstext' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Belohnungstext' }), {
+      target: { value: 'Gratis Tee' },
+    })
+    expect(storeRef.current?.getState().design.rewardText).toBe('Gratis Tee')
   })
 })
