@@ -53,7 +53,7 @@ export default async function StempelnPage({
 
   const card = await prisma.card.findFirst({
     where: { id: access.cardId },
-    select: { name: true, org: { select: { name: true } } },
+    select: { name: true, kind: true, org: { select: { name: true } } },
   })
   if (!card) notFound()
 
@@ -62,7 +62,9 @@ export default async function StempelnPage({
       <header className="sticky top-0 z-20 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-[15px] font-semibold text-ink">Stempeln</h1>
+            <h1 className="truncate text-[15px] font-semibold text-ink">
+              {card.kind === 'COUPON' ? 'Gutschein einlösen' : 'Stempeln'}
+            </h1>
             <p className="truncate text-[12px] text-ink-3">{card.org?.name ?? card.name}</p>
           </div>
           <Link
@@ -75,7 +77,7 @@ export default async function StempelnPage({
         </div>
       </header>
 
-      <TillView cardId={access.cardId} initialSerial={serial ?? null} />
+      <TillView cardId={access.cardId} cardKind={card.kind} initialSerial={serial ?? null} />
     </div>
   )
 }

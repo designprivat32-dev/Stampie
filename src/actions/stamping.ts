@@ -5,7 +5,7 @@ import { assertStampAccess, assertCardAccess } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { decideRedeem, decideStamp, extractSerial, formatCooldown } from '@/lib/cards/stamping'
-import { syncGoogleStampCount } from '@/lib/wallet/google-sync'
+import { expireGoogleOffer, syncGoogleStampCount } from '@/lib/wallet/google-sync'
 import { loadOrCreateDraft, loadPublishedDesign } from '@/lib/cards/repository'
 import type { CardDesignInput } from '@/lib/cards/schema'
 import { rateLimit } from '@/lib/rate-limit'
@@ -30,10 +30,22 @@ export interface PassSummary {
   /** German label from the design, e.g. "Kaffee". */
   stampLabel: string
   rewardText: string
+  /** COUPON passes are single-use; non-null means it is spent. */
+  redeemedAt: string | null
+  /** The offer, so the till can show what it is handing out. */
+  offerTitle: string | null
 }
 
-function toLabels(design: CardDesignInput): { stampLabel: string; rewardText: string } {
-  return { stampLabel: design.stampLabel, rewardText: design.rewardText }
+function toLabels(design: CardDesignInput): {
+  stampLabel: string
+  rewardText: string
+  offerTitle: string | null
+} {
+  return {
+    stampLabel: design.stampLabel,
+    rewardText: design.rewardText,
+    offerTitle: design.offerTitle,
+  }
 }
 
 export interface StampResult {
@@ -54,9 +66,16 @@ async function currentDesign(cardId: string): Promise<CardDesignInput> {
 }
 
 function toSummary(
-  pass: { serial: string; stamps: number; stampGoal: number; isTest: boolean; rewardCount: number },
+  pass: {
+    serial: string
+    stamps: number
+    stampGoal: number
+    isTest: boolean
+    rewardCount: number
+    redeemedAt?: Date | null
+  },
   lastStampAt: Date | null,
-  labels: { stampLabel: string; rewardText: string },
+  labels: { stampLabel: string; rewardText: string; offerTitle: string | null },
 ): PassSummary {
   return {
     serial: pass.serial,
@@ -65,6 +84,7 @@ function toSummary(
     isTest: pass.isTest,
     rewardCount: pass.rewardCount,
     lastStampAt: lastStampAt ? lastStampAt.toISOString() : null,
+    redeemedAt: pass.redeemedAt ? pass.redeemedAt.toISOString() : null,
     ...labels,
   }
 }
@@ -110,6 +130,13 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
 
     const serial = extractSerial(parsed.data.scanned)
     if (!serial) return fail('Dieser Code enthält keine gültige Kartennummer.', 'validation')
+
+    // The till hides the button for coupons, but the action is reachable on its own and a
+    // stamped coupon would be a pass whose counter nothing ever displays.
+    const card = await prisma.card.findFirst({ where: { id: cardId }, select: { kind: true } })
+    if (card?.kind === 'COUPON') {
+      return fail('Ein Gutschein wird eingelöst, nicht gestempelt.', 'validation')
+    }
 
     const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId } })
     if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Stempelkarte.`, 'not_found')
@@ -220,6 +247,81 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
       walletSync: sync.status,
     })
   })
+}
+
+/**
+ * Cashes in a coupon. Single-use, and the latch is the database, not the UI.
+ *
+ * A coupon is worth money, and the two ways to spend one twice are a double tap at the till
+ * and the same code presented at two registers at once. Both are closed by the conditional
+ * update below: only the request that finds `redeemedAt` still null gets to set it, so the
+ * second one changes nothing and is told so.
+ *
+ * Google is told afterwards and on a best-effort basis — the pass being retired in the
+ * customer's wallet is cosmetic. Our record is what decides whether it may be used again,
+ * because the Offers API has no redemption flag to read back.
+ */
+export async function redeemCouponAction(input: unknown): Promise<ActionResult<PassSummary>> {
+  return guarded(async () => {
+    const parsed = scanInputSchema.safeParse(input)
+    if (!parsed.success) return fromZodError(parsed.error)
+
+    const { session, cardId } = await assertStampAccess(parsed.data.cardId)
+
+    if (!rateLimit(`redeem:${cardId}`, 600, 60 * 60 * 1000).allowed) {
+      return fail('Zu viele Buchungen in kurzer Zeit. Bitte kurz warten.', 'rate_limited')
+    }
+
+    const serial = extractSerial(parsed.data.scanned)
+    if (!serial) return fail('Dieser Code enthält keine gültige Kartennummer.', 'validation')
+
+    const card = await prisma.card.findFirst({ where: { id: cardId }, select: { kind: true } })
+    if (card?.kind !== 'COUPON') {
+      return fail('Diese Karte ist kein Gutschein.', 'validation')
+    }
+
+    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId } })
+    if (!pass) return fail(`Gutschein ${serial} gehört nicht zu dieser Aktion.`, 'not_found')
+
+    if (pass.redeemedAt) {
+      return fail(
+        `Dieser Gutschein wurde bereits am ${formatGermanDateTime(pass.redeemedAt)} eingelöst.`,
+        'validation',
+      )
+    }
+
+    const claimed = await prisma.issuedPass.updateMany({
+      where: { id: pass.id, redeemedAt: null },
+      data: { redeemedAt: new Date() },
+    })
+    if (claimed.count === 0) {
+      return fail('Dieser Gutschein wurde gerade eben schon eingelöst.', 'validation')
+    }
+
+    await prisma.stampEvent.create({
+      data: {
+        passId: pass.id,
+        cardId,
+        kind: 'REDEEM',
+        delta: 0,
+        balance: 0,
+        stampedBy: session.userId,
+      },
+    })
+
+    // Cosmetic and allowed to fail: the coupon is already spent in our books.
+    await expireGoogleOffer(serial)
+
+    const updated = await prisma.issuedPass.findFirst({ where: { id: pass.id } })
+    return ok(
+      toSummary(updated ?? pass, null, toLabels(await currentDesign(cardId))),
+    )
+  })
+}
+
+function formatGermanDateTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} um ${pad(d.getHours())}:${pad(d.getMinutes())} Uhr`
 }
 
 /** Recent activity for the till view. */
