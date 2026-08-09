@@ -209,7 +209,10 @@ model CardDesign {
   /// BackField[] — discriminated union, see src/types/card-design.ts
   backFields  Json    @default("[]")
 
-  // --- coupon (CardKind.COUPON); ignored for stamp cards
+  // --- coupon fields. Used twice: as the card itself when Card.kind is COUPON, and as
+  //     the reward a full stamp card hands out when rewardCouponEnabled is set.
+  /// STAMP only: a full card issues a coupon pass instead of just a line of reward text.
+  rewardCouponEnabled Boolean @default(false)
   /// Google OfferClass.title — required for a coupon, e.g. "20 % auf alles".
   offerTitle       String?
   offerDetails     String?

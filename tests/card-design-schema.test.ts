@@ -319,6 +319,40 @@ describe('publish schema for a coupon', () => {
   })
 })
 
+describe('stamp card that hands out a coupon as its reward', () => {
+  it('publishes fine while the reward coupon is switched off', () => {
+    expect(cardDesignPublishSchema.safeParse(publishable({ rewardCouponEnabled: false })).success).toBe(
+      true,
+    )
+  })
+
+  // Google rejects an OfferClass without a title, so a card promising a coupon it cannot
+  // describe would fail at the moment a customer fills it — far too late.
+  it('blocks publishing once the coupon is switched on but has no title', () => {
+    const r = cardDesignPublishSchema.safeParse(
+      publishable({ rewardCouponEnabled: true, offerTitle: null }),
+    )
+    expect(r.success).toBe(false)
+    expect(JSON.stringify(r)).toContain('Gutschein-Titel')
+  })
+
+  it('publishes with the coupon switched on and a title set', () => {
+    expect(
+      cardDesignPublishSchema.safeParse(
+        publishable({ rewardCouponEnabled: true, offerTitle: '20 % auf alles' }),
+      ).success,
+    ).toBe(true)
+  })
+
+  it('still demands the reward text — the coupon replaces the pass, not the promise', () => {
+    expect(
+      cardDesignPublishSchema.safeParse(
+        publishable({ rewardCouponEnabled: true, offerTitle: '20 % auf alles', rewardText: '' }),
+      ).success,
+    ).toBe(false)
+  })
+})
+
 describe('isPristineDesign', () => {
   it('holds for a freshly created draft', () => {
     expect(isPristineDesign(DEFAULT_CARD_DESIGN)).toBe(true)

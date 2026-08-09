@@ -21,7 +21,8 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
   stampLabel: 'Stempel',
   backFields: [],
 
-  // Coupon (CardKind.COUPON) — untouched by stamp cards
+  // Coupon fields — the card itself for COUPON, the reward for a STAMP card
+  rewardCouponEnabled: false,
   offerTitle: null,
   offerDetails: null,
   offerFinePrint: null,

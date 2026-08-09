@@ -25,6 +25,7 @@ const FILLED_DESIGN: CardDesignInput = {
   cardTitle: 'Kaffee sammeln',
   issuerDisplayName: 'Café Nordstadt',
   stampLabel: 'Kaffee',
+  rewardCouponEnabled: true,
   offerTitle: '20 % auf alles',
   offerDetails: 'Gilt auf das gesamte Sortiment.',
   offerFinePrint: 'Nicht mit anderen Aktionen kombinierbar.',

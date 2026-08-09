@@ -182,10 +182,12 @@ export const cardDesignDraftSchema = z
       .max(MAX_BACK_FIELDS, `Höchstens ${MAX_BACK_FIELDS} Rückseiten-Felder.`),
 
     /**
-     * Coupon fields. Nullable at draft level for the same reason `programName` may be
-     * empty: a freshly created draft has none of them yet and autosave must still persist.
-     * `buildCouponPublishSchema` is where they become mandatory.
+     * Coupon fields, used by both kinds: they *are* the card when `Card.kind` is COUPON,
+     * and they describe the reward a full stamp card hands out when `rewardCouponEnabled`
+     * is on. Nullable at draft level for the same reason `programName` may be empty — a
+     * fresh draft has none of them yet and autosave must still persist.
      */
+    rewardCouponEnabled: z.boolean().default(false),
     offerTitle: z.string().max(60, 'Gutschein-Titel ist zu lang (max. 60 Zeichen).').nullable().default(null),
     offerDetails: z.string().max(500, 'Beschreibung ist zu lang (max. 500 Zeichen).').nullable().default(null),
     offerFinePrint: z
@@ -306,6 +308,16 @@ export function buildPublishSchema(ctxInput: PublishContext) {
           code: z.ZodIssueCode.custom,
           path: ['rewardText'],
           message: 'Bitte eintragen, was der Kunde für eine volle Karte bekommt.',
+        })
+      }
+      // A full card that hands out a coupon needs that coupon to be describable — Google
+      // rejects an OfferClass without a title, so publishing must not defer this.
+      if (design.rewardCouponEnabled && !design.offerTitle?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['offerTitle'],
+          message:
+            'Die volle Karte soll einen Gutschein ausgeben — dafür fehlt noch der Gutschein-Titel.',
         })
       }
     } else {

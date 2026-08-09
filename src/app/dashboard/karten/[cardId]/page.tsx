@@ -77,6 +77,7 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
     <CardEditorProvider init={{ cardId: card.id, design: draft.design, assetUrls }}>
       <CardEditorShell
         cardName={card.name}
+        cardKind={card.kind}
         location={location}
         userEmail={access.session.email}
         publishedVersion={draft.publishedVersion}

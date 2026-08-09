@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
+import { Stamp, Ticket, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,11 +18,33 @@ import { Spinner } from '@/components/ui/misc'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createCardAction } from '@/actions/cards'
 import { CARD_TEMPLATES } from '@/lib/cards/templates'
+import { cn } from '@/lib/utils'
+import type { CardKind } from '@/lib/cards/schema'
 import type { CustomerOption } from '@/lib/cards/card-service'
 
 const NO_CUSTOMER = '__none__'
 const NO_LOCATION = '__none__'
 const NO_TEMPLATE = '__none__'
+
+const CARD_KIND_OPTIONS: ReadonlyArray<{
+  value: CardKind
+  label: string
+  description: string
+  icon: LucideIcon
+}> = [
+  {
+    value: 'STAMP',
+    label: 'Stempelkarte',
+    description: 'Kunde sammelt Stempel und bekommt eine Belohnung.',
+    icon: Stamp,
+  },
+  {
+    value: 'COUPON',
+    label: 'Gutscheinkarte',
+    description: 'Einmaliger Rabatt, wird an der Kasse eingelöst.',
+    icon: Ticket,
+  },
+]
 
 /**
  * Creates the card, then goes straight into the designer — "erst Übersicht, dann das Tool".
@@ -41,6 +64,7 @@ export function NewCardDialog({
 }) {
   const router = useRouter()
   const [name, setName] = React.useState('')
+  const [kind, setKind] = React.useState<CardKind>('STAMP')
   const [orgId, setOrgId] = React.useState<string>(NO_CUSTOMER)
   const [locationId, setLocationId] = React.useState<string>(NO_LOCATION)
   const [templateId, setTemplateId] = React.useState<string>(NO_TEMPLATE)
@@ -50,6 +74,7 @@ export function NewCardDialog({
   React.useEffect(() => {
     if (!open) return
     setName('')
+    setKind('STAMP')
     setOrgId(canChooseCustomer ? NO_CUSTOMER : (customers[0]?.id ?? NO_CUSTOMER))
     setLocationId(NO_LOCATION)
     setTemplateId(NO_TEMPLATE)
@@ -64,6 +89,7 @@ export function NewCardDialog({
     try {
       const result = await createCardAction({
         name: name.trim(),
+        kind,
         orgId: orgId === NO_CUSTOMER ? null : orgId,
         locationId: locationId === NO_LOCATION ? null : locationId,
         templateId: templateId === NO_TEMPLATE ? null : templateId,
@@ -93,12 +119,51 @@ export function NewCardDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/*
+            First choice, and a one-way door: the wallet pass type follows from it and is
+            baked into every pass a customer saves, so there is no way back afterwards.
+            Saying so here is cheaper than an error message later.
+          */}
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-medium">Was für eine Karte?</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {CARD_KIND_OPTIONS.map((option) => {
+                const selected = kind === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setKind(option.value)}
+                    className={cn(
+                      'rounded-lg border p-3 text-left transition-colors',
+                      selected
+                        ? 'border-accent bg-accent/10'
+                        : 'border-line bg-surface hover:border-ink-3',
+                    )}
+                  >
+                    <span className="flex items-center gap-2 text-[13px] font-medium">
+                      <option.icon className="size-4 shrink-0" />
+                      {option.label}
+                    </span>
+                    <span className="mt-1 block text-[12px] leading-snug text-ink-3">
+                      {option.description}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-[12px] leading-snug text-ink-3">
+              Lässt sich später nicht mehr ändern — der Typ steckt in jedem ausgegebenen Pass.
+            </p>
+          </fieldset>
+
           <Field label="Name der Karte" htmlFor="card-name" hint="Nur intern sichtbar.">
             <Input
               id="card-name"
               value={name}
               maxLength={60}
-              placeholder="Kaffeekarte Café Nord"
+              placeholder={kind === 'COUPON' ? 'Sommeraktion Café Nord' : 'Kaffeekarte Café Nord'}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && name.trim()) void submit()
@@ -152,21 +217,24 @@ export function NewCardDialog({
             </Field>
           ) : null}
 
-          <Field label="Vorlage" htmlFor="card-template" hint="Setzt Farben, Symbol und Texte.">
-            <Select value={templateId} onValueChange={setTemplateId}>
-              <SelectTrigger id="card-template">
-                <SelectValue placeholder="Ohne Vorlage" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_TEMPLATE}>Ohne Vorlage</SelectItem>
-                {CARD_TEMPLATES.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.badge} {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          {/* Templates carry stamp goals, icons and reward texts — nothing a coupon uses. */}
+          {kind === 'STAMP' ? (
+            <Field label="Vorlage" htmlFor="card-template" hint="Setzt Farben, Symbol und Texte.">
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger id="card-template">
+                  <SelectValue placeholder="Ohne Vorlage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_TEMPLATE}>Ohne Vorlage</SelectItem>
+                  {CARD_TEMPLATES.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.badge} {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
         </div>
 
         {error ? (
