@@ -26,6 +26,12 @@ export interface CardDesign extends CardDesignInput {
   organizationName: string
   /** COUPON only: a redeemed coupon is issued in its retired state, not as a fresh one. */
   redeemed?: boolean
+  /**
+   * Google class id suffix. Defaults to `card_<cardId>`. A stamp card that hands out
+   * coupons needs a second one — the same id cannot name both a loyaltyClass and an
+   * offerClass without becoming a puzzle to debug.
+   */
+  classSuffix?: string
   /** Stamps to render into the strip for this specific pass. */
   currentStamps: number
   /** Resolved asset bytes — the builder must not reach into storage itself. */

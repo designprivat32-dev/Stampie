@@ -292,6 +292,34 @@ function ResultPanel({ feedback, isCoupon }: { feedback: Feedback; isCoupon: boo
       ) : null}
 
       {feedback.kind === 'ok' ? <WalletSyncNote status={feedback.result.walletSync} /> : null}
+
+      {feedback.kind === 'ok' && feedback.result.coupon ? (
+        <CouponHandout coupon={feedback.result.coupon} />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The coupon a just-emptied card earned, as a code the customer scans right there.
+ *
+ * Shown at the counter while they still have their phone in hand — no e-mail, no app, no
+ * second visit. The link stays printed underneath for the case where the camera fails.
+ */
+function CouponHandout({ coupon }: { coupon: NonNullable<StampResult['coupon']> }) {
+  return (
+    <div className="space-y-2 rounded-lg border border-ok/40 bg-surface p-3 text-center">
+      <p className="text-[13px] font-medium text-ink">Gutschein für den Kunden</p>
+      <p className="text-[12px] leading-snug text-ink-3">
+        Kunde scannt diesen Code und legt den Gutschein in seine Wallet.
+      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={coupon.qrDataUrl}
+        alt={`QR-Code für Gutschein ${coupon.serial}`}
+        className="mx-auto size-44 rounded-md bg-white p-2"
+      />
+      <p className="break-all font-mono text-[11px] text-ink-3">{coupon.claimUrl}</p>
     </div>
   )
 }

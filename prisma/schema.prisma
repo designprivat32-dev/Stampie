@@ -91,9 +91,6 @@ model Location {
   @@index([orgId])
 }
 
-/// A stamp card programme. The unit the agency creates, hands to a customer and designs.
-/// A customer may own any number of these; a card without `orgId` is created but not yet
-/// assigned, and therefore cannot be stamped by anyone.
 /// What kind of pass a card issues. Fixed when the card is created — the wallet pass type
 /// (loyalty vs. offer) is baked into every pass already in a customer's wallet, so it
 /// cannot be switched afterwards without invalidating them.
@@ -102,6 +99,9 @@ enum CardKind {
   COUPON
 }
 
+/// A stamp card programme. The unit the agency creates, hands to a customer and designs.
+/// A customer may own any number of these; a card without `orgId` is created but not yet
+/// assigned, and therefore cannot be stamped by anyone.
 model Card {
   id    String        @id @default(cuid())
   name  String
@@ -283,6 +283,15 @@ model IssuedPass {
   isTest        Boolean @default(false)
   stamps        Int     @default(0)
   designVersion Int
+
+  /// Which pass this row is. A STAMP card also issues COUPON passes as its reward, so the
+  /// kind belongs to the pass, not only to the card it hangs off.
+  kind CardKind @default(STAMP)
+
+  /// COUPON only: single-use secret that lets the customer add this exact pass to their
+  /// wallet. The serial cannot serve that purpose — it is printed on the pass and shown at
+  /// the till, so anyone who saw one could mint themselves a copy.
+  claimToken String? @unique
 
   /// Stamp goal at issue time — the card keeps its own goal even if the design changes.
   stampGoal    Int       @default(10)

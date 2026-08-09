@@ -6,6 +6,7 @@ import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action
 import { prisma } from '@/lib/db'
 import { decideRedeem, decideStamp, extractSerial, formatCooldown } from '@/lib/cards/stamping'
 import { expireGoogleOffer, syncGoogleStampCount } from '@/lib/wallet/google-sync'
+import { issueRewardCoupon, type IssuedRewardCoupon } from '@/lib/cards/reward-coupon'
 import { loadOrCreateDraft, loadPublishedDesign } from '@/lib/cards/repository'
 import type { CardDesignInput } from '@/lib/cards/schema'
 import { rateLimit } from '@/lib/rate-limit'
@@ -53,6 +54,8 @@ export interface StampResult {
   completesCard: boolean
   /** Whether the change reached the phone. */
   walletSync: 'updated' | 'not_configured' | 'not_found' | 'error'
+  /** Present only when cashing in a full card produced a coupon for the customer. */
+  coupon?: IssuedRewardCoupon
 }
 
 /**
@@ -103,7 +106,7 @@ export async function lookupPassAction(input: unknown): Promise<ActionResult<Pas
     const pass = await prisma.issuedPass.findFirst({
       where: { serial, cardId: parsed.data.cardId },
     })
-    if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Stempelkarte.`, 'not_found')
+    if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Karte.`, 'not_found')
 
     const last = await prisma.stampEvent.findFirst({
       where: { passId: pass.id, kind: 'STAMP' },
@@ -241,10 +244,16 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
     const labels = toLabels(design)
     const sync = await syncGoogleStampCount(cardId, serial, updated.stamps, design)
 
+    // The reward as a real pass, if the card promises one. Issued after the counter has
+    // already been reset: a coupon handed out without the stamps being spent would be free
+    // money, whereas a reset without a coupon is recoverable by hand.
+    const coupon = await issueRewardCoupon(cardId, design, { isTest: pass.isTest })
+
     return ok({
       pass: toSummary(updated, null, labels),
       completesCard: false,
       walletSync: sync.status,
+      ...(coupon ? { coupon } : {}),
     })
   })
 }

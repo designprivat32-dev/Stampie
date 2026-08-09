@@ -77,7 +77,7 @@ export function buildGoogleContext(
 ) {
   return {
     issuerId,
-    classSuffix: `card_${design.cardId}`,
+    classSuffix: design.classSuffix ?? `card_${design.cardId}`,
     objectSuffix: `sn_${serial}`,
     issuerName: design.organizationName,
     serial,
