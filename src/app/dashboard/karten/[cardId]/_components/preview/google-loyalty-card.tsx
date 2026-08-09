@@ -166,38 +166,32 @@ export function GoogleLoyaltyCard({
         </div>
       ) : null}
 
-      <div className="p-4">
-        <div className="flex flex-col items-center rounded-lg bg-white px-4 py-3">
-          <svg viewBox="0 0 21 21" className="size-[96px]" aria-hidden="true">
+      {/*
+        Google renders the barcode in a white box sized close to the code itself — not the
+        padded card-with-caption we had before. It also does not print the serial number
+        next to it on the front face; that only shows up if the scan fails and staff needs
+        to key the code in by hand, which is what `barcode.alternateText` is for, not a
+        front-of-card label.
+      */}
+      <div className="flex justify-center px-4 pb-4">
+        <div className="flex items-center justify-center rounded-md bg-white p-3">
+          <svg viewBox="0 0 21 21" className="size-[152px]" aria-hidden="true">
             {GOOGLE_QR_CELLS.map(([x, y]) => (
               <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="black" />
             ))}
           </svg>
-          <span className="mt-1.5 text-[9px] tracking-widest text-black/55">SN-DEMO-0001</span>
         </div>
       </div>
 
       {/* Below the barcode — Google's order, not ours. */}
       <StampStripImg src={heroSrc} alt="Stempelreihe" aspect={1032 / 336} />
 
-      {live.rewardText.trim() ? (
-        <div className="px-4 pb-4 pt-3">
-          <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-            Belohnung
-          </div>
-          <div className="text-[13px] leading-snug">
-            <EditableField
-              value={live.rewardText}
-              onCommit={(v) => patch({ rewardText: v })}
-              placeholder="Belohnungstext"
-              maxLength={80}
-              tone={tone}
-              ariaLabel="Belohnungstext"
-              truncate={false}
-            />
-          </div>
-        </div>
-      ) : null}
+      {/*
+        No reward-text block here on purpose: `rewardText` maps to `textModulesData`, and
+        Google only renders that in the card's expanded "Details" view, never inline on the
+        front face. `GoogleLoyaltyCardBack` already shows it there — repeating it here would
+        show something on the front the phone never actually displays.
+      */}
     </div>
   )
 }

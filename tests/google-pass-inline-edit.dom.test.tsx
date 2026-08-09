@@ -69,7 +69,7 @@ describe('GoogleLoyaltyCard inline edit', () => {
     expect(storeRef.current?.getState().design.stampLabel).toBe('PUNKTE')
   })
 
-  it('reward text block is hidden until text exists, then becomes editable', () => {
+  it('never renders reward text on the front — Google only shows it in the details view', () => {
     const storeRef = { current: null as CardEditorStore | null }
     render(<Harness design={{ rewardText: '' }} storeRef={storeRef} />)
     expect(screen.queryByText('Belohnung')).toBeNull()
@@ -77,6 +77,7 @@ describe('GoogleLoyaltyCard inline edit', () => {
     act(() => {
       storeRef.current?.getState().patch({ rewardText: 'Gratis Kaffee' })
     })
-    expect(screen.getByText('Belohnung')).toBeTruthy()
+    expect(screen.queryByText('Belohnung')).toBeNull()
+    expect(screen.queryByText('Gratis Kaffee')).toBeNull()
   })
 })
