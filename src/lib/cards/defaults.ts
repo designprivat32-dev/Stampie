@@ -17,6 +17,7 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
 
   programName: '',
   cardTitle: null,
+  issuerDisplayName: null,
   stampLabel: 'Stempel',
   backFields: [],
 

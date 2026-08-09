@@ -153,6 +153,15 @@ export const cardDesignDraftSchema = z
     // texts
     programName: z.string().max(30, 'Programmname ist zu lang (max. 30 Zeichen).'),
     cardTitle: z.string().max(40, 'Überschrift ist zu lang (max. 40 Zeichen).').nullable().default(null),
+    /**
+     * Shown as the issuer on both wallets. Null falls back to the organisation name, which
+     * is the legal entity — shops trading under a brand need to say the brand instead.
+     */
+    issuerDisplayName: z
+      .string()
+      .max(40, 'Aussteller-Name ist zu lang (max. 40 Zeichen).')
+      .nullable()
+      .default(null),
     stampLabel: z.string().min(1, 'Bezeichnung fehlt.').max(16, 'Bezeichnung ist zu lang (max. 16 Zeichen).'),
     backFields: z
       .array(backFieldSchema)

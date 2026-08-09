@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { StampStripImg } from './stamp-strip-img'
+import { resolveIssuerName } from '@/lib/cards/issuer'
 import { stripPreviewUrl } from '@/lib/cards/preview-url'
 import type { CardDesignInput } from '@/lib/cards/schema'
 
@@ -57,7 +58,7 @@ export function AppleStoreCard({
               className="truncate text-[13px] font-semibold leading-tight"
               style={{ color: design.foregroundColor }}
             >
-              {organizationName}
+              {resolveIssuerName(design, organizationName)}
             </span>
           )}
           {design.cardTitle?.trim() ? (

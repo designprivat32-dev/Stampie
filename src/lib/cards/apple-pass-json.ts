@@ -1,4 +1,5 @@
 import { toPassKitRgb } from '@/lib/color/convert'
+import { resolveIssuerName } from './issuer'
 import {
   MAX_AUXILIARY_FIELDS,
   MAX_GEO_LOCATIONS,
@@ -150,7 +151,8 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
     formatVersion: 1,
     passTypeIdentifier: ctx.passTypeIdentifier,
     teamIdentifier: ctx.teamIdentifier,
-    organizationName: ctx.organizationName,
+    // Apple shows this on lock-screen notifications, so it follows the same override.
+    organizationName: resolveIssuerName(design, ctx.organizationName),
     serialNumber: ctx.serial,
     description: design.programName.trim() || 'Stempelkarte',
     backgroundColor: toPassKitRgb(design.backgroundColor),

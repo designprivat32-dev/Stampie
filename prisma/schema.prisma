@@ -194,6 +194,8 @@ model CardDesign {
   // --- texts
   programName String  @default("")
   cardTitle   String?
+  /// Overrides the organisation name as the pass issuer. Null = use the organisation's.
+  issuerDisplayName String?
   stampLabel  String  @default("Stempel")
   /// BackField[] — discriminated union, see src/types/card-design.ts
   backFields  Json    @default("[]")

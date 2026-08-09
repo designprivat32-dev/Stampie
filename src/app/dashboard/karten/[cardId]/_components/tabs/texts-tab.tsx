@@ -117,6 +117,20 @@ export function TextsTab({ location }: { location: LocationSummary }) {
       <PanelSection title="Kartentexte">
         <div className="space-y-3">
           <Field
+            label="Aussteller"
+            htmlFor="issuer-display-name"
+            hint={`Steht auf der Google-Karte ganz oben. Leer = „${location.organizationName}“.`}
+          >
+            <Input
+              id="issuer-display-name"
+              value={design.issuerDisplayName ?? ''}
+              maxLength={40}
+              placeholder={location.organizationName}
+              onChange={(e) => patch({ issuerDisplayName: e.target.value || null })}
+            />
+          </Field>
+
+          <Field
             label="Programmname"
             htmlFor="program-name"
             hint="Pflichtfeld · Apple: Überschrift, Google: Name in der Wallet-Liste"

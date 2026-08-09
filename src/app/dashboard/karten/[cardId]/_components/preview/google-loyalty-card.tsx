@@ -77,7 +77,16 @@ export function GoogleLoyaltyCard({
           Wallet list and in search, so it stays in the editor, just not on this face.
         */}
         <div className="min-w-0 flex-1 self-center">
-          <div className="truncate text-[14px] font-medium leading-tight">{organizationName}</div>
+          <div className="text-[14px] font-medium leading-tight">
+            <EditableField
+              value={live.issuerDisplayName ?? ''}
+              onCommit={(v) => patch({ issuerDisplayName: v || null })}
+              placeholder={organizationName}
+              maxLength={40}
+              tone={tone}
+              ariaLabel="Aussteller"
+            />
+          </div>
         </div>
       </div>
 

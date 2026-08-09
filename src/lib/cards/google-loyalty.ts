@@ -1,4 +1,5 @@
 import { toGoogleHex } from '@/lib/color/convert'
+import { resolveIssuerName } from './issuer'
 import type { CardDesignInput } from './schema'
 
 /**
@@ -134,7 +135,8 @@ export function buildLoyaltyClass(design: CardDesignInput, ctx: BuildGoogleConte
 
   const cls: LoyaltyClass = {
     id: `${ctx.issuerId}.${ctx.classSuffix}`,
-    issuerName: ctx.issuerName,
+    // The one line Google always prints on the card face — see `resolveIssuerName`.
+    issuerName: resolveIssuerName(design, ctx.issuerName),
     programName: design.programName.trim() || 'Stempelkarte',
     reviewStatus: 'UNDER_REVIEW',
     hexBackgroundColor: toGoogleHex(design.backgroundColor),
