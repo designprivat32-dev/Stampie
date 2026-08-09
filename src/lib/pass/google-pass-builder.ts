@@ -1,6 +1,7 @@
 import 'server-only'
 import { createSign } from 'node:crypto'
 import { buildLoyaltyClass, buildLoyaltyObject } from '@/lib/cards/google-loyalty'
+import { buildOfferClass, buildOfferObject } from '@/lib/cards/google-offer'
 import { walletHeroUrl, walletLogoUrl } from '@/lib/wallet/image-urls'
 import type { CardDesign, PassBuilderConfig } from './pass-builder'
 
@@ -65,19 +66,17 @@ function base64url(input: string | Buffer): string {
 }
 
 /**
- * Builds and signs the Save-to-Wallet JWT.
- *
- * The full class definition travels inside the JWT, so no separate API call is needed to
- * create it — Google provisions the class on first save.
+ * The Google-side context both builders need. Kept here so the mock and the real signer
+ * cannot drift apart in what they put into the pass.
  */
-export function buildSignedSaveUrl(
+export function buildGoogleContext(
   design: CardDesign,
   serial: string,
   config: PassBuilderConfig,
-  credentials: GoogleWalletCredentials,
-): string {
-  const ctx = {
-    issuerId: credentials.issuerId,
+  issuerId: string,
+) {
+  return {
+    issuerId,
     classSuffix: `card_${design.cardId}`,
     objectSuffix: `sn_${serial}`,
     issuerName: design.organizationName,
@@ -89,6 +88,43 @@ export function buildSignedSaveUrl(
     heroUrl: walletHeroUrl(config.appUrl, design.cardId, design, design.currentStamps),
     fallbackLogoUrl: walletLogoUrl(config.appUrl, design.cardId, design),
   }
+}
+
+/**
+ * The `payload` half of a Save-to-Wallet JWT.
+ *
+ * A coupon is a different pass type, not a loyalty card with fields hidden: it travels
+ * under `offerClasses`/`offerObjects`, and Google would reject it under the loyalty keys.
+ */
+export function buildSavePayload(
+  design: CardDesign,
+  ctx: ReturnType<typeof buildGoogleContext>,
+): Record<string, unknown> {
+  if (design.kind === 'COUPON') {
+    return {
+      offerClasses: [buildOfferClass(design, ctx)],
+      offerObjects: [buildOfferObject(design, ctx, { redeemed: design.redeemed ?? false })],
+    }
+  }
+  return {
+    loyaltyClasses: [buildLoyaltyClass(design, ctx)],
+    loyaltyObjects: [buildLoyaltyObject(design, ctx)],
+  }
+}
+
+/**
+ * Builds and signs the Save-to-Wallet JWT.
+ *
+ * The full class definition travels inside the JWT, so no separate API call is needed to
+ * create it — Google provisions the class on first save.
+ */
+export function buildSignedSaveUrl(
+  design: CardDesign,
+  serial: string,
+  config: PassBuilderConfig,
+  credentials: GoogleWalletCredentials,
+): string {
+  const ctx = buildGoogleContext(design, serial, config, credentials.issuerId)
 
   const payload = {
     iss: credentials.clientEmail,
@@ -96,10 +132,7 @@ export function buildSignedSaveUrl(
     typ: 'savetowallet',
     iat: Math.floor(Date.now() / 1000),
     origins: [config.appUrl],
-    payload: {
-      loyaltyClasses: [buildLoyaltyClass(design, ctx)],
-      loyaltyObjects: [buildLoyaltyObject(design, ctx)],
-    },
+    payload: buildSavePayload(design, ctx),
   }
 
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))

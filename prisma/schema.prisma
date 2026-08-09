@@ -94,9 +94,18 @@ model Location {
 /// A stamp card programme. The unit the agency creates, hands to a customer and designs.
 /// A customer may own any number of these; a card without `orgId` is created but not yet
 /// assigned, and therefore cannot be stamped by anyone.
+/// What kind of pass a card issues. Fixed when the card is created — the wallet pass type
+/// (loyalty vs. offer) is baked into every pass already in a customer's wallet, so it
+/// cannot be switched afterwards without invalidating them.
+enum CardKind {
+  STAMP
+  COUPON
+}
+
 model Card {
   id    String        @id @default(cuid())
   name  String
+  kind  CardKind      @default(STAMP)
   orgId String?
   org   Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
 
@@ -200,6 +209,14 @@ model CardDesign {
   /// BackField[] — discriminated union, see src/types/card-design.ts
   backFields  Json    @default("[]")
 
+  // --- coupon (CardKind.COUPON); ignored for stamp cards
+  /// Google OfferClass.title — required for a coupon, e.g. "20 % auf alles".
+  offerTitle       String?
+  offerDetails     String?
+  offerFinePrint   String?
+  /// Google OfferClass.redemptionChannel: INSTORE | ONLINE | BOTH
+  redemptionChannel String @default("INSTORE")
+
   // --- Google Wallet optional labels
   accountNameLabel String?
   accountIdLabel   String?
@@ -269,6 +286,10 @@ model IssuedPass {
   /// Set when a full card was cashed in; the counter restarts from zero.
   lastRewardAt DateTime?
   rewardCount  Int       @default(0)
+
+  /// COUPON only: a coupon is single-use, so this is the hard latch against a second
+  /// redemption. Null means unredeemed. Stamp cards never set it — they restart instead.
+  redeemedAt DateTime?
 
   createdAt DateTime @default(now())
 

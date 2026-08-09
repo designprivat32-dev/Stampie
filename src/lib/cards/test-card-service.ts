@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { cardDesignDraftSchema, type CardDesignInput } from './schema'
+import { cardDesignDraftSchema, type CardDesignInput, type CardKind } from './schema'
 import { loadPassAssets } from './asset-service'
 import type { CardDesign } from '@/lib/pass/pass-builder'
 
@@ -11,6 +11,7 @@ import type { CardDesign } from '@/lib/pass/pass-builder'
 
 export interface ResolvedTestCard {
   cardId: string
+  kind: CardKind
   organizationName: string
   design: CardDesignInput
   currentStamps: number
@@ -29,7 +30,7 @@ export async function resolveTestCardToken(token: string): Promise<ResolvedTestC
       cardId: true,
       snapshot: true,
       usedCount: true,
-      card: { select: { name: true, org: { select: { name: true } } } },
+      card: { select: { name: true, kind: true, org: { select: { name: true } } } },
     },
   })
   if (!record || record.usedCount >= MAX_USES) return null
@@ -40,6 +41,7 @@ export async function resolveTestCardToken(token: string): Promise<ResolvedTestC
 
   return {
     cardId: record.cardId,
+    kind: record.card.kind,
     organizationName: record.card.org?.name ?? record.card.name,
     design: parsed.data,
     currentStamps: Math.min(parsed.data.stampGoal, snapshot?.currentStamps ?? 0),
@@ -82,6 +84,7 @@ export async function toPassDesign(resolved: ResolvedTestCard): Promise<CardDesi
   return {
     ...resolved.design,
     cardId: resolved.cardId,
+    kind: resolved.kind,
     organizationName: resolved.organizationName,
     currentStamps: resolved.currentStamps,
     assets,

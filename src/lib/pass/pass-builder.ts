@@ -1,4 +1,4 @@
-import type { CardDesignInput } from '@/lib/cards/schema'
+import type { CardDesignInput, CardKind } from '@/lib/cards/schema'
 import { appUrl } from '@/lib/app-url'
 
 /**
@@ -21,7 +21,11 @@ export interface PassBuilder {
  */
 export interface CardDesign extends CardDesignInput {
   cardId: string
+  /** Decides the wallet pass type: loyalty/storeCard for STAMP, offer/coupon for COUPON. */
+  kind: CardKind
   organizationName: string
+  /** COUPON only: a redeemed coupon is issued in its retired state, not as a fresh one. */
+  redeemed?: boolean
   /** Stamps to render into the strip for this specific pass. */
   currentStamps: number
   /** Resolved asset bytes — the builder must not reach into storage itself. */

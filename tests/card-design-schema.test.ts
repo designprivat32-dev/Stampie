@@ -269,6 +269,56 @@ describe('cardDesignPublishSchema', () => {
   })
 })
 
+describe('publish schema for a coupon', () => {
+  const couponSchema = buildPublishSchema({ contrastConfirmed: false, kind: 'COUPON' })
+
+  /** A coupon needs the legal links and the icon, but an offer title instead of a reward. */
+  const publishableCoupon = (over: Partial<CardDesignInput> = {}): unknown =>
+    publishable({ programName: '', rewardText: '', offerTitle: '20 % auf alles', ...over })
+
+  it('accepts a coupon with an offer title but no reward text', () => {
+    expect(couponSchema.safeParse(publishableCoupon()).success).toBe(true)
+  })
+
+  it('blocks a coupon without an offer title', () => {
+    const r = couponSchema.safeParse(publishableCoupon({ offerTitle: null }))
+    expect(r.success).toBe(false)
+    expect(JSON.stringify(r)).toContain('Gutschein-Titel')
+  })
+
+  it('blocks a coupon whose offer title is only whitespace', () => {
+    expect(couponSchema.safeParse(publishableCoupon({ offerTitle: '   ' })).success).toBe(false)
+  })
+
+  it('still demands icon, imprint and privacy — those are not stamp-specific', () => {
+    expect(couponSchema.safeParse(publishableCoupon({ iconAssetId: null })).success).toBe(false)
+    expect(couponSchema.safeParse(publishableCoupon({ backFields: [] })).success).toBe(false)
+  })
+
+  it('does not accept a stamp card design that lacks an offer title', () => {
+    expect(couponSchema.safeParse(publishable()).success).toBe(false)
+  })
+
+  it('the stamp schema ignores the offer title and still wants a reward', () => {
+    expect(
+      cardDesignPublishSchema.safeParse(publishable({ rewardText: '', offerTitle: '20 % auf alles' }))
+        .success,
+    ).toBe(false)
+  })
+
+  it.each(['INSTORE', 'ONLINE', 'BOTH'])('accepts redemption channel %s', (c) => {
+    expect(
+      cardDesignDraftSchema.safeParse(draft({ redemptionChannel: c as never })).success,
+    ).toBe(true)
+  })
+
+  it('rejects an unknown redemption channel', () => {
+    expect(
+      cardDesignDraftSchema.safeParse(draft({ redemptionChannel: 'BY_POST' as never })).success,
+    ).toBe(false)
+  })
+})
+
 describe('isPristineDesign', () => {
   it('holds for a freshly created draft', () => {
     expect(isPristineDesign(DEFAULT_CARD_DESIGN)).toBe(true)

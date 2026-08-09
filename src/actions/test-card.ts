@@ -12,7 +12,7 @@ import { getMailer, testCardMail } from '@/lib/mail'
 import { rateLimit } from '@/lib/rate-limit'
 import { appUrl } from '@/lib/app-url'
 import { syncGoogleClass } from '@/lib/wallet/google-sync'
-import { issuerName } from '@/lib/cards/card-service'
+import { cardKind, issuerName } from '@/lib/cards/card-service'
 import { passSigningStatus, type PassSigningStatus } from '@/lib/pass/pass-builder'
 import type { Prisma } from '@prisma/client'
 
@@ -66,7 +66,7 @@ export async function createTestCardAction(input: unknown): Promise<ActionResult
     // Push the current design onto the Google class now, not on the scan path: an
     // inlined class is only created once, so without this the demo would show whatever
     // design existed the very first time a card was saved.
-    await syncGoogleClass(cardId, design, await issuerName(cardId))
+    await syncGoogleClass(cardId, design, await issuerName(cardId), await cardKind(cardId))
 
     const draft = await prisma.cardDesign.findFirst({
       where: { cardId, status: 'DRAFT' },

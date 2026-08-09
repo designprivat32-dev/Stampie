@@ -21,6 +21,12 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
   stampLabel: 'Stempel',
   backFields: [],
 
+  // Coupon (CardKind.COUPON) — untouched by stamp cards
+  offerTitle: null,
+  offerDetails: null,
+  offerFinePrint: null,
+  redemptionChannel: 'INSTORE',
+
   // Google Wallet optional labels
   accountNameLabel: null,
   accountIdLabel: null,

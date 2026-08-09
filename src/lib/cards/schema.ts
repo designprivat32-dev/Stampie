@@ -34,6 +34,20 @@ export const EMPTY_STAMP_STYLES = ['outline', 'transparent', 'dashed'] as const
 export type EmptyStampStyle = (typeof EMPTY_STAMP_STYLES)[number]
 export const emptyStampStyleSchema = z.enum(EMPTY_STAMP_STYLES)
 
+/**
+ * What a card issues. Chosen once at creation: the wallet pass type differs (Google
+ * loyalty vs. offer, Apple storeCard vs. coupon) and is baked into every pass already
+ * sitting in a customer's wallet, so switching later would orphan all of them.
+ */
+export const CARD_KINDS = ['STAMP', 'COUPON'] as const
+export type CardKind = (typeof CARD_KINDS)[number]
+export const cardKindSchema = z.enum(CARD_KINDS)
+
+/** Google OfferClass.redemptionChannel — a required field on every offer class. */
+export const REDEMPTION_CHANNELS = ['INSTORE', 'ONLINE', 'BOTH'] as const
+export type RedemptionChannel = (typeof REDEMPTION_CHANNELS)[number]
+export const redemptionChannelSchema = z.enum(REDEMPTION_CHANNELS)
+
 export const STAMP_GOAL_MIN = 3
 export const STAMP_GOAL_MAX = 20
 
@@ -167,6 +181,20 @@ export const cardDesignDraftSchema = z
       .array(backFieldSchema)
       .max(MAX_BACK_FIELDS, `Höchstens ${MAX_BACK_FIELDS} Rückseiten-Felder.`),
 
+    /**
+     * Coupon fields. Nullable at draft level for the same reason `programName` may be
+     * empty: a freshly created draft has none of them yet and autosave must still persist.
+     * `buildCouponPublishSchema` is where they become mandatory.
+     */
+    offerTitle: z.string().max(60, 'Gutschein-Titel ist zu lang (max. 60 Zeichen).').nullable().default(null),
+    offerDetails: z.string().max(500, 'Beschreibung ist zu lang (max. 500 Zeichen).').nullable().default(null),
+    offerFinePrint: z
+      .string()
+      .max(500, 'Einlösebedingungen sind zu lang (max. 500 Zeichen).')
+      .nullable()
+      .default(null),
+    redemptionChannel: redemptionChannelSchema.default('INSTORE'),
+
     // Google Wallet optional labels
     accountNameLabel: z.string().max(15, 'Label ist zu lang (max. 15 Zeichen).').nullable().default(null),
     accountIdLabel: z.string().max(15, 'Label ist zu lang (max. 15 Zeichen).').nullable().default(null),
@@ -249,23 +277,47 @@ export function contrastRatioForDesign(
 export interface PublishContext {
   /** Set when the user explicitly confirmed publishing despite a contrast below 3:1. */
   contrastConfirmed: boolean
+  /** Decides which of the two field sets is mandatory. Defaults to the stamp card. */
+  kind?: CardKind
 }
 
+/**
+ * Publish requirements, branched by card kind.
+ *
+ * Everything a wallet or German law demands applies to both kinds — icon, imprint, privacy,
+ * a sane expiry, readable contrast. Only the content differs: a stamp card is meaningless
+ * without a goal and a reward, a coupon without an offer title, and demanding the other
+ * kind's fields would block publishing on something the pass never shows.
+ */
 export function buildPublishSchema(ctxInput: PublishContext) {
+  const kind: CardKind = ctxInput.kind ?? 'STAMP'
+
   return cardDesignDraftSchema.superRefine((design, ctx) => {
-    if (design.programName.trim().length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['programName'],
-        message: 'Ohne Programmnamen kann die Karte nicht veröffentlicht werden.',
-      })
-    }
-    if (design.rewardText.trim().length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['rewardText'],
-        message: 'Bitte eintragen, was der Kunde für eine volle Karte bekommt.',
-      })
+    if (kind === 'STAMP') {
+      if (design.programName.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['programName'],
+          message: 'Ohne Programmnamen kann die Karte nicht veröffentlicht werden.',
+        })
+      }
+      if (design.rewardText.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rewardText'],
+          message: 'Bitte eintragen, was der Kunde für eine volle Karte bekommt.',
+        })
+      }
+    } else {
+      // Google rejects an OfferClass without a title, so this is a hard requirement
+      // rather than a nicety — it is also the only line the customer really reads.
+      if (!design.offerTitle?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['offerTitle'],
+          message: 'Ohne Gutschein-Titel kann der Gutschein nicht veröffentlicht werden.',
+        })
+      }
     }
     // icon.png is mandatory — a pass without it is rejected by Wallet.
     if (!design.iconAssetId) {

@@ -1,11 +1,14 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { buildPassJson } from '@/lib/cards/apple-pass-json'
-import { buildLoyaltyClass, buildLoyaltyObject } from '@/lib/cards/google-loyalty'
-import { walletHeroUrl, walletLogoUrl } from '@/lib/wallet/image-urls'
 import { renderHeroImage, renderStripImageSet } from '@/lib/cards/render-strip'
 import { createZip, type ZipEntry } from './zip'
-import { buildSignedSaveUrl, readGoogleWalletCredentials } from './google-pass-builder'
+import {
+  buildGoogleContext,
+  buildSavePayload,
+  buildSignedSaveUrl,
+  readGoogleWalletCredentials,
+} from './google-pass-builder'
 import {
   readPassBuilderConfig,
   type CardDesign,
@@ -39,6 +42,7 @@ export class MockPassBuilder implements PassBuilder {
       passTypeIdentifier: this.config.passTypeIdentifier,
       teamIdentifier: this.config.teamIdentifier,
       barcodeMessage: this.barcodeMessage(serial),
+      kind: design.kind,
     })
 
     // The stamp row is regenerated for this exact stamp count — this is the whole reason
@@ -88,19 +92,7 @@ export class MockPassBuilder implements PassBuilder {
       return buildSignedSaveUrl(design, serial, this.config, credentials)
     }
 
-    const ctx = {
-      issuerId: this.config.googleIssuerId,
-      classSuffix: `card_${design.cardId}`,
-      objectSuffix: `sn_${serial}`,
-      issuerName: design.organizationName,
-      serial,
-      currentStamps: design.currentStamps,
-      barcodeMessage: this.barcodeMessage(serial),
-      // Never the raw asset: it is 160x50 for Apple, which Google would crop to a sliver.
-      logoUrl: null,
-      heroUrl: walletHeroUrl(this.config.appUrl, design.cardId, design, design.currentStamps),
-      fallbackLogoUrl: walletLogoUrl(this.config.appUrl, design.cardId, design),
-    }
+    const ctx = buildGoogleContext(design, serial, this.config, this.config.googleIssuerId)
 
     const payload = {
       iss: 'mock@stampie.iam.gserviceaccount.com',
@@ -108,10 +100,9 @@ export class MockPassBuilder implements PassBuilder {
       typ: 'savetowallet',
       iat: Math.floor(Date.now() / 1000),
       origins: [this.config.appUrl],
-      payload: {
-        loyaltyClasses: [buildLoyaltyClass(design, ctx)],
-        loyaltyObjects: [buildLoyaltyObject(design, ctx)],
-      },
+      // Same payload builder as the signed path, so the mock cannot describe a pass the
+      // real link would never produce.
+      payload: buildSavePayload(design, ctx),
     }
 
     const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))

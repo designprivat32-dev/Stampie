@@ -24,7 +24,7 @@ import {
 import { applyTemplate, getTemplate } from '@/lib/cards/templates'
 import { invalidateStripCache } from '@/lib/cards/strip-service'
 import { syncGoogleClass } from '@/lib/wallet/google-sync'
-import { issuerName } from '@/lib/cards/card-service'
+import { cardKind, issuerName } from '@/lib/cards/card-service'
 
 /**
  * Every action re-validates against the same Zod schema the client uses. Client-side
@@ -63,7 +63,11 @@ export async function publishAction(input: unknown): Promise<ActionResult<Publis
 
     const { session, cardId } = await assertCardAccess(parsed.data.cardId)
 
-    const schema = buildPublishSchema({ contrastConfirmed: parsed.data.confirmLowContrast })
+    const kind = await cardKind(cardId)
+    const schema = buildPublishSchema({
+      contrastConfirmed: parsed.data.confirmLowContrast,
+      kind,
+    })
     const validated = schema.safeParse(parsed.data.design)
     if (!validated.success) return fromZodError(validated.error)
 
@@ -78,7 +82,7 @@ export async function publishAction(input: unknown): Promise<ActionResult<Publis
     invalidateStripCache()
 
     // Cards already in a wallet follow the class, so publishing has to reach it too.
-    await syncGoogleClass(cardId, validated.data, await issuerName(cardId))
+    await syncGoogleClass(cardId, validated.data, await issuerName(cardId), kind)
 
     revalidatePath(`/dashboard/karten/${cardId}`)
 

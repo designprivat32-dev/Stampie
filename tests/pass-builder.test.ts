@@ -18,6 +18,7 @@ const design: CardDesign = {
   programName: 'Kaffeekarte',
   rewardText: 'Jeder 10. Kaffee gratis',
   cardId: 'ccrd00000000000000000001',
+  kind: 'STAMP',
   organizationName: 'Café Nord',
   currentStamps: 6,
   assets: {
@@ -129,6 +130,59 @@ describe('MockPassBuilder', () => {
     }
     expect(payload.payload.loyaltyClasses[0]!.programName).toBe('Kaffeekarte')
     expect(payload.payload.loyaltyClasses[0]!.hexBackgroundColor).toBe('#1a1a1a')
+  })
+
+  /** Reads the JWT payload back out of a save URL. */
+  async function savePayload(d: CardDesign): Promise<Record<string, unknown>> {
+    const url = await new MockPassBuilder().buildGoogleSaveUrl(d, 'SN-1')
+    const [, body] = url.split('/').pop()!.split('.')
+    return (
+      JSON.parse(Buffer.from(body!, 'base64url').toString('utf8')) as {
+        payload: Record<string, unknown>
+      }
+    ).payload
+  }
+
+  // A coupon under the loyalty keys is rejected by Google — the pass type is the payload
+  // key, not a field inside it.
+  it('sends a coupon as offerClasses/offerObjects, never as loyalty', async () => {
+    const payload = await savePayload({
+      ...design,
+      kind: 'COUPON',
+      offerTitle: '20 % auf alles',
+    })
+    expect(Object.keys(payload)).toEqual(['offerClasses', 'offerObjects'])
+    expect(payload.loyaltyClasses).toBeUndefined()
+  })
+
+  it('carries the offer title into the class', async () => {
+    const payload = (await savePayload({
+      ...design,
+      kind: 'COUPON',
+      offerTitle: '20 % auf alles',
+    })) as { offerClasses: Array<{ title: string; redemptionChannel: string }> }
+    expect(payload.offerClasses[0]!.title).toBe('20 % auf alles')
+    expect(payload.offerClasses[0]!.redemptionChannel).toBe('INSTORE')
+  })
+
+  it('issues an already redeemed coupon in its retired state', async () => {
+    const payload = (await savePayload({
+      ...design,
+      kind: 'COUPON',
+      offerTitle: '20 % auf alles',
+      redeemed: true,
+    })) as { offerObjects: Array<{ state: string }> }
+    expect(payload.offerObjects[0]!.state).toBe('EXPIRED')
+  })
+
+  it('builds an Apple coupon pass rather than a storeCard', async () => {
+    const bytes = await new MockPassBuilder().buildApplePass(
+      { ...design, kind: 'COUPON', offerTitle: '20 % auf alles' },
+      'SN-1',
+    )
+    const entries = listZipEntries(bytes)
+    expect(entries.map((e) => e.name)).toContain('pass.json')
+    expect(bytes.toString('utf8')).toContain('"coupon"')
   })
 })
 

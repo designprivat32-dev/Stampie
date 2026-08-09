@@ -1,8 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { buildPassJson, type BuildPassJsonContext } from '@/lib/cards/apple-pass-json'
+import {
+  buildPassJson,
+  type BuildPassJsonContext,
+  type PassJson,
+  type StoreCardStructure,
+} from '@/lib/cards/apple-pass-json'
 import { buildLoyaltyClass, buildLoyaltyObject } from '@/lib/cards/google-loyalty'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import type { BackField, CardDesignInput, GeoLocation } from '@/lib/cards/schema'
+
+/** The style key is the pass layout, so reading it also asserts the right one was chosen. */
+function storeCardOf(p: PassJson): StoreCardStructure {
+  if (!p.storeCard) throw new Error('expected a storeCard pass, got ' + JSON.stringify(Object.keys(p)))
+  return p.storeCard
+}
+
+function couponOf(p: PassJson): StoreCardStructure {
+  if (!p.coupon) throw new Error('expected a coupon pass, got ' + JSON.stringify(Object.keys(p)))
+  return p.coupon
+}
 
 const ctx: BuildPassJsonContext = {
   serial: 'SN-123',
@@ -23,13 +39,13 @@ const design = (over: Partial<CardDesignInput> = {}): CardDesignInput => ({
 describe('buildPassJson', () => {
   it('puts the stamp counter in a header field', () => {
     const p = buildPassJson(design(), ctx)
-    expect(p.storeCard.headerFields).toHaveLength(1)
-    expect(p.storeCard.headerFields[0]!.value).toBe('6/10')
-    expect(p.storeCard.headerFields[0]!.label).toBe('Stempel')
+    expect(storeCardOf(p).headerFields).toHaveLength(1)
+    expect(storeCardOf(p).headerFields[0]!.value).toBe('6/10')
+    expect(storeCardOf(p).headerFields[0]!.label).toBe('Stempel')
   })
 
   it('leaves primaryFields empty — storeCard renders them behind the strip', () => {
-    expect(buildPassJson(design(), ctx).storeCard.primaryFields).toEqual([])
+    expect(storeCardOf(buildPassJson(design(), ctx)).primaryFields).toEqual([])
   })
 
   it('emits colours as rgb() strings, never hex', () => {
@@ -60,10 +76,10 @@ describe('buildPassJson', () => {
       customerName: 'Anna Berger',
       memberSince: new Date('2024-03-07T00:00:00Z'),
     })
-    expect(p.storeCard.secondaryFields.length).toBeLessThanOrEqual(4)
-    expect(p.storeCard.auxiliaryFields.length).toBeLessThanOrEqual(4)
-    expect(p.storeCard.headerFields.length).toBeLessThanOrEqual(3)
-    expect(p.storeCard.auxiliaryFields.map((f) => f.value)).toContain('07.03.2024')
+    expect(storeCardOf(p).secondaryFields.length).toBeLessThanOrEqual(4)
+    expect(storeCardOf(p).auxiliaryFields.length).toBeLessThanOrEqual(4)
+    expect(storeCardOf(p).headerFields.length).toBeLessThanOrEqual(3)
+    expect(storeCardOf(p).auxiliaryFields.map((f) => f.value)).toContain('07.03.2024')
   })
 
   it('caps locations at 10 even if more slipped through', () => {
@@ -86,7 +102,7 @@ describe('buildPassJson', () => {
 
   it('clamps the stamp counter to the goal', () => {
     const p = buildPassJson(design({ stampGoal: 5 }), { ...ctx, currentStamps: 99 })
-    expect(p.storeCard.headerFields[0]!.value).toBe('5/5')
+    expect(storeCardOf(p).headerFields[0]!.value).toBe('5/5')
   })
 
   it('maps back fields one-to-one, unlimited', () => {
@@ -96,7 +112,7 @@ describe('buildPassJson', () => {
       label: `L${i}`,
       value: `V${i}`,
     }))
-    expect(buildPassJson(design({ backFields }), ctx).storeCard.backFields).toHaveLength(20)
+    expect(storeCardOf(buildPassJson(design({ backFields }), ctx)).backFields).toHaveLength(20)
   })
 
   it('sets sharingProhibited only when sharing is off', () => {
@@ -218,3 +234,69 @@ describe('heroImage carries the stamp row', () => {
   })
 })
 
+
+describe('buildPassJson for a coupon', () => {
+  const couponCtx: BuildPassJsonContext = { ...ctx, kind: 'COUPON' }
+
+  const coupon = (over: Partial<CardDesignInput> = {}): CardDesignInput =>
+    design({
+      offerTitle: '20 % auf alles',
+      offerDetails: 'Gilt auf das gesamte Sortiment.',
+      offerFinePrint: 'Nicht mit anderen Aktionen kombinierbar.',
+      ...over,
+    })
+
+  it('uses the coupon style, not storeCard — the key is the layout', () => {
+    const p = buildPassJson(coupon(), couponCtx)
+    expect(p.coupon).toBeDefined()
+    expect(p.storeCard).toBeUndefined()
+  })
+
+  it('puts the offer in primaryFields, where Wallet sets it largest', () => {
+    expect(couponOf(buildPassJson(coupon(), couponCtx)).primaryFields[0]!.value).toBe('20 % auf alles')
+  })
+
+  it('carries no stamp counter', () => {
+    expect(couponOf(buildPassJson(coupon(), couponCtx)).headerFields).toEqual([])
+  })
+
+  it('shows the details but not the stamp card reward text', () => {
+    const values = couponOf(buildPassJson(coupon(), couponCtx)).secondaryFields.map((f) => f.value)
+    expect(values).toContain('Gilt auf das gesamte Sortiment.')
+    expect(values).not.toContain('Jeder 10. Kaffee gratis')
+  })
+
+  it('puts the fine print first on the back, above the shop fields', () => {
+    const back = couponOf(
+      buildPassJson(
+        coupon({
+          backFields: [{ id: 'a', type: 'text', label: 'Hinweis', value: 'Bis Ende Mai' }],
+        }),
+        couponCtx,
+      ),
+    ).backFields
+    expect(back[0]!.label).toBe('Einlösebedingungen')
+    expect(back[1]!.label).toBe('Hinweis')
+  })
+
+  it('describes itself by the offer, since a coupon has no programme', () => {
+    expect(buildPassJson(coupon({ programName: 'Kaffeekarte' }), couponCtx).description).toBe(
+      '20 % auf alles',
+    )
+  })
+
+  it('falls back to a generic description rather than emitting an empty one', () => {
+    expect(buildPassJson(coupon({ offerTitle: null, programName: '' }), couponCtx).description).toBe(
+      'Gutschein',
+    )
+  })
+
+  it('still honours the issuer override and the expiry', () => {
+    const p = buildPassJson(
+      coupon({ issuerDisplayName: 'Café Nordstadt', expiresAt: new Date('2030-06-01') }),
+      couponCtx,
+    )
+    expect(p.organizationName).toBe('Café Nordstadt')
+    expect(p.expirationDate).toContain('2030-06-01')
+  })
+})
