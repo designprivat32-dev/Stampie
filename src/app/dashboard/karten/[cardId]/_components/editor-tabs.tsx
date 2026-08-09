@@ -11,8 +11,15 @@ import { useCardEditor } from '@/stores/card-editor-provider'
 import type { LocationSummary } from '@/types/location'
 
 /**
- * A coupon has no stamps, so that tab is not merely empty for it — it is absent. Both kinds
- * reach the coupon editor, because a stamp card can hand one out as its reward.
+ * Which tabs exist depends on the card kind, and the rule is not cosmetic: a tab is shown
+ * only when the fields inside it reach the pass being built.
+ *
+ * A coupon has no stamps, so that tab is absent rather than empty. The Google Wallet tab is
+ * absent too — every field in it (`accountName`, `accountId`, `rewardsTier` and their
+ * labels) belongs to `LoyaltyClass`; `buildOfferClass` reads none of them, so on a coupon
+ * they are controls that change nothing.
+ *
+ * Both kinds reach the coupon editor, because a stamp card can hand one out as its reward.
  */
 export function EditorTabs({ location }: { location: LocationSummary }) {
   const kind = useCardEditor((s) => s.kind)
@@ -25,7 +32,7 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
         {isStamp ? <TabsTrigger value="program">Stempel</TabsTrigger> : null}
         <TabsTrigger value="coupon">Gutschein</TabsTrigger>
         <TabsTrigger value="texts">Texte</TabsTrigger>
-        <TabsTrigger value="google">Google Wallet</TabsTrigger>
+        {isStamp ? <TabsTrigger value="google">Google Wallet</TabsTrigger> : null}
         <TabsTrigger value="advanced">Erweitert</TabsTrigger>
       </TabsList>
 
@@ -44,9 +51,11 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
         <TabsContent value="texts">
           <TextsTab location={location} />
         </TabsContent>
-        <TabsContent value="google">
-          <GoogleWalletTab />
-        </TabsContent>
+        {isStamp ? (
+          <TabsContent value="google">
+            <GoogleWalletTab />
+          </TabsContent>
+        ) : null}
         <TabsContent value="advanced">
           <AdvancedTab location={location} />
         </TabsContent>

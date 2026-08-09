@@ -72,14 +72,31 @@ describe('editor for a coupon card', () => {
     expect(screen.queryByRole('tab', { name: 'Stempel' })).toBeNull()
   })
 
+  // Every field in that tab is a LoyaltyClass field; buildOfferClass reads none of them,
+  // so on a coupon they are controls that change nothing about the pass.
+  it('has no Google Wallet tab — its fields are loyalty-only', () => {
+    render(<Editor kind="COUPON" />)
+    expect(screen.queryByRole('tab', { name: 'Google Wallet' })).toBeNull()
+  })
+
+  it('leaves exactly the four tabs whose fields reach an offer pass', () => {
+    render(<Editor kind="COUPON" />)
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Branding',
+      'Gutschein',
+      'Texte',
+      'Erweitert',
+    ])
+  })
+
   it('offers the coupon tab', () => {
     render(<Editor kind="COUPON" />)
     expect(screen.getByRole('tab', { name: 'Gutschein' })).toBeTruthy()
   })
 
-  it('keeps branding, texts and the wallet tabs — those apply to both kinds', () => {
+  it('keeps branding, texts and the advanced tab — those apply to both kinds', () => {
     render(<Editor kind="COUPON" />)
-    for (const name of ['Branding', 'Texte', 'Google Wallet', 'Erweitert']) {
+    for (const name of ['Branding', 'Texte', 'Erweitert']) {
       expect(screen.getByRole('tab', { name })).toBeTruthy()
     }
   })
@@ -95,5 +112,10 @@ describe('editor for a stamp card', () => {
   it('reaches the coupon tab too — a full card can hand one out', () => {
     render(<Editor kind="STAMP" />)
     expect(screen.getByRole('tab', { name: 'Gutschein' })).toBeTruthy()
+  })
+
+  it('keeps the Google Wallet tab, where those fields do reach the pass', () => {
+    render(<Editor kind="STAMP" />)
+    expect(screen.getByRole('tab', { name: 'Google Wallet' })).toBeTruthy()
   })
 })
