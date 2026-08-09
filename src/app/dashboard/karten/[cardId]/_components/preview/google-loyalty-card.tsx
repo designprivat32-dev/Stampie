@@ -1,9 +1,11 @@
 'use client'
 
+import { EditableField } from './editable-field'
 import { StampStripImg } from './stamp-strip-img'
 import { stripPreviewUrl } from '@/lib/cards/preview-url'
 import { readableOn } from '@/lib/color/contrast'
 import type { CardDesignInput } from '@/lib/cards/schema'
+import { useCardEditor } from '@/stores/card-editor-provider'
 
 /**
  * Pixel-near rebuild of a Google Wallet loyalty card.
@@ -13,6 +15,10 @@ import type { CardDesignInput } from '@/lib/cards/schema'
  * image is 3:1, and — the one that surprises everyone — the barcode comes *before* the
  * stamp row. Google fixes that order and offers no field to change it, so the preview
  * copies it rather than showing a nicer layout the real card will never have.
+ *
+ * Text fields are click-to-edit directly on the card, the same way Google's own Pass
+ * Builder works — no detour through the sidebar. They read and write the store live
+ * (not the debounced `design` prop) so a keystroke lands on the card immediately.
  */
 export function GoogleLoyaltyCard({
   design,
@@ -27,9 +33,12 @@ export function GoogleLoyaltyCard({
   logoUrl: string | null
   organizationName: string
 }) {
+  const patch = useCardEditor((s) => s.patch)
+  const live = useCardEditor((s) => s.design)
   const heroSrc = stripPreviewUrl(design, { cardId, currentStamps, target: 'google', scale: 1 })
   // Google picks the text colour from the background — mirror that, do not use fg/label.
   const ink = readableOn(design.backgroundColor)
+  const tone: 'light' | 'dark' = ink === '#ffffff' ? 'light' : 'dark'
   const muted = ink === '#ffffff' ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.6)'
 
   return (
@@ -56,23 +65,46 @@ export function GoogleLoyaltyCard({
           <div className="truncate text-[12px]" style={{ color: muted }}>
             {organizationName}
           </div>
-          <div className="truncate text-[14px] font-medium leading-tight">
-            {design.programName.trim() || 'Stempelkarte'}
+          <div className="text-[14px] font-medium leading-tight">
+            <EditableField
+              value={live.programName}
+              onCommit={(v) => patch({ programName: v })}
+              placeholder="Stempelkarte"
+              maxLength={30}
+              tone={tone}
+              ariaLabel="Programmname"
+            />
           </div>
         </div>
       </div>
 
-      {/* Google Wallet optional: rewards tier */}
-      {design.googleRewardsTierEnabled && design.rewardsTier ? (
+      {/* Google Wallet optional: rewards tier. Gated on the live value, not the debounced
+          `design` prop, so the input does not vanish mid-edit while the user is typing it
+          out from empty. */}
+      {live.googleRewardsTierEnabled && live.rewardsTier ? (
         <div className="px-4 pb-2">
           <div className="flex items-center gap-2">
-            {design.rewardsTierLabel ? (
+            {live.rewardsTierLabel ? (
               <span className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-                {design.rewardsTierLabel}
+                <EditableField
+                  value={live.rewardsTierLabel ?? ''}
+                  onCommit={(v) => patch({ rewardsTierLabel: v || null })}
+                  placeholder="Stufe"
+                  maxLength={9}
+                  tone={tone}
+                  ariaLabel="Label für Stufe"
+                />
               </span>
             ) : null}
             <span className="rounded-full bg-white/20 px-2 py-0.5 text-[12px] font-medium">
-              {design.rewardsTier}
+              <EditableField
+                value={live.rewardsTier ?? ''}
+                onCommit={(v) => patch({ rewardsTier: v || null })}
+                placeholder="Gold"
+                maxLength={7}
+                tone={tone}
+                ariaLabel="Stufen-Name"
+              />
             </span>
           </div>
         </div>
@@ -80,7 +112,14 @@ export function GoogleLoyaltyCard({
 
       <div className="px-4 pb-3">
         <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-          {design.stampLabel}
+          <EditableField
+            value={live.stampLabel}
+            onCommit={(v) => patch({ stampLabel: v })}
+            placeholder="Stempel"
+            maxLength={16}
+            tone={tone}
+            ariaLabel="Stempel-Bezeichnung"
+          />
         </div>
         <div className="text-[26px] font-normal leading-tight tabular-nums">
           {currentStamps}
@@ -91,21 +130,35 @@ export function GoogleLoyaltyCard({
         </div>
       </div>
 
-      {/* Google Wallet optional: account name labels */}
-      {(design.accountNameLabel || design.accountIdLabel) ? (
+      {/* Google Wallet optional: account name labels — gated on the live value, see above. */}
+      {(live.accountNameLabel || live.accountIdLabel) ? (
         <div className="flex gap-4 px-4 pb-3">
-          {design.accountNameLabel ? (
+          {live.accountNameLabel ? (
             <div>
               <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-                {design.accountNameLabel}
+                <EditableField
+                  value={live.accountNameLabel ?? ''}
+                  onCommit={(v) => patch({ accountNameLabel: v || null })}
+                  placeholder="Mitglied"
+                  maxLength={15}
+                  tone={tone}
+                  ariaLabel="Label für Kontoinhaber"
+                />
               </div>
               <div className="text-[13px]">—</div>
             </div>
           ) : null}
-          {design.accountIdLabel ? (
+          {live.accountIdLabel ? (
             <div>
               <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
-                {design.accountIdLabel}
+                <EditableField
+                  value={live.accountIdLabel ?? ''}
+                  onCommit={(v) => patch({ accountIdLabel: v || null })}
+                  placeholder="Nr."
+                  maxLength={15}
+                  tone={tone}
+                  ariaLabel="Label für ID"
+                />
               </div>
               <div className="text-[13px]">—</div>
             </div>
@@ -127,12 +180,22 @@ export function GoogleLoyaltyCard({
       {/* Below the barcode — Google's order, not ours. */}
       <StampStripImg src={heroSrc} alt="Stempelreihe" aspect={1032 / 336} />
 
-      {design.rewardText.trim() ? (
+      {live.rewardText.trim() ? (
         <div className="px-4 pb-4 pt-3">
           <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
             Belohnung
           </div>
-          <div className="text-[13px] leading-snug">{design.rewardText.trim()}</div>
+          <div className="text-[13px] leading-snug">
+            <EditableField
+              value={live.rewardText}
+              onCommit={(v) => patch({ rewardText: v })}
+              placeholder="Belohnungstext"
+              maxLength={80}
+              tone={tone}
+              ariaLabel="Belohnungstext"
+              truncate={false}
+            />
+          </div>
         </div>
       ) : null}
     </div>
