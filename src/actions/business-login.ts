@@ -84,3 +84,70 @@ export async function createBusinessLoginAction(
     return ok({ username, password })
   })
 }
+
+/** Existing app logins of a business (usernames only — never the passwords). */
+export async function listBusinessLoginsAction(
+  orgId: string,
+): Promise<
+  ActionResult<
+    Array<{ userId: string; username: string; createdAt: string; mustChangePassword: boolean }>
+  >
+> {
+  return guarded(async () => {
+    const idParsed = z.string().cuid().safeParse(orgId)
+    if (!idParsed.success) return fail('Ungültige Kunden-ID.', 'validation')
+
+    const session = await requireSession()
+    if (!(await isAgency(session.userId))) {
+      return fail('Nur das Agentur-Team darf Zugänge sehen.', 'forbidden')
+    }
+
+    const users = await prisma.user.findMany({
+      where: { username: { not: null }, memberships: { some: { orgId: idParsed.data } } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, username: true, createdAt: true, mustChangePassword: true },
+    })
+
+    return ok(
+      users.map((u) => ({
+        userId: u.id,
+        username: u.username ?? '',
+        createdAt: u.createdAt.toISOString(),
+        mustChangePassword: u.mustChangePassword,
+      })),
+    )
+  })
+}
+
+/** Resets an app login to a new random start password and invalidates its sessions. */
+export async function resetBusinessLoginPasswordAction(
+  userId: string,
+): Promise<ActionResult<BusinessLogin>> {
+  return guarded(async () => {
+    const idParsed = z.string().cuid().safeParse(userId)
+    if (!idParsed.success) return fail('Ungültige ID.', 'validation')
+
+    const session = await requireSession()
+    if (!(await isAgency(session.userId))) {
+      return fail('Nur das Agentur-Team darf Passwörter zurücksetzen.', 'forbidden')
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: idParsed.data, username: { not: null } },
+      select: { id: true, username: true },
+    })
+    if (!user || !user.username) return fail('Login nicht gefunden.', 'not_found')
+
+    const password = randomPassword()
+    const passwordHash = await hashPassword(password)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword: true },
+    })
+    // Bestehende Anmeldungen ungültig machen — nach dem Reset muss neu eingeloggt werden.
+    await prisma.appSession.deleteMany({ where: { userId: user.id } })
+
+    revalidatePath('/dashboard/kunden')
+    return ok({ username: user.username, password })
+  })
+}
