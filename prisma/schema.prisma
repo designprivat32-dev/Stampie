@@ -291,7 +291,12 @@ model IssuedPass {
   /// COUPON only: single-use secret that lets the customer add this exact pass to their
   /// wallet. The serial cannot serve that purpose — it is printed on the pass and shown at
   /// the till, so anyone who saw one could mint themselves a copy.
-  claimToken String? @unique
+  ///
+  /// Indexed but deliberately not `@unique`: `prisma db push` refuses to add a unique
+  /// constraint without `--accept-data-loss`, and arming that flag in the deploy command
+  /// would wave through every future destructive change as well. Uniqueness comes from the
+  /// value instead — 32 random bytes, so a collision is not a case worth designing for.
+  claimToken String?
 
   /// Stamp goal at issue time — the card keeps its own goal even if the design changes.
   stampGoal    Int       @default(10)
@@ -308,6 +313,7 @@ model IssuedPass {
   events StampEvent[]
 
   @@index([cardId, isTest])
+  @@index([claimToken])
 }
 
 enum StampEventKind {
