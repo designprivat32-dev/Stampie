@@ -36,6 +36,14 @@ export interface CardDesign extends CardDesignInput {
   currentStamps: number
   /** Resolved asset bytes — the builder must not reach into storage itself. */
   assets: PassAssets
+  /**
+   * Per-pass secret for Apple's web service, resolved by the caller for the same reason
+   * the assets are: keeping the builder free of IO is what lets it be unit-tested.
+   *
+   * Absent means the pass ships without `webServiceURL`, and Wallet never asks for
+   * updates — correct for a throwaway test card, and the only option without a certificate.
+   */
+  appleAuthToken?: string | null
 }
 
 export interface PassAssets {

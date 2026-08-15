@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { loadPassAssets } from './asset-service'
 import { loadPublishedDesign } from './repository'
+import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
 import type { CardDesignInput, CardKind } from './schema'
 import type { CardDesign } from '@/lib/pass/pass-builder'
 
@@ -113,12 +114,16 @@ export async function issuePassForDevice(
   return { serial: pass.serial, currentStamps: resolved.startStamps, created: true }
 }
 
-/** Assembles what the PassBuilder needs, assets included. */
+/** Assembles what the PassBuilder needs, assets and update token included. */
 export async function toHandoutDesign(
   resolved: ResolvedHandout,
   currentStamps: number,
+  serial: string,
 ): Promise<CardDesign> {
-  const assets = await loadPassAssets(resolved.design, resolved.cardId)
+  const [assets, appleAuthToken] = await Promise.all([
+    loadPassAssets(resolved.design, resolved.cardId),
+    ensureAppleAuthToken(serial),
+  ])
   return {
     ...resolved.design,
     cardId: resolved.cardId,
@@ -126,5 +131,6 @@ export async function toHandoutDesign(
     organizationName: resolved.organizationName,
     currentStamps,
     assets,
+    appleAuthToken,
   }
 }

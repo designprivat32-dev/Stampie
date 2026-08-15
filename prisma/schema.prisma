@@ -351,13 +351,43 @@ model IssuedPass {
   /// redemption. Null means unredeemed. Stamp cards never set it — they restart instead.
   redeemedAt DateTime?
 
+  /// Secret Apple's PassKit web service checks on every call for this pass — the
+  /// `Authorization: ApplePass <token>` header the device sends back. Generated once, on
+  /// first build, and baked into that build's `authenticationToken` field; a pass built
+  /// before this feature existed simply has none and is never registered for push.
+  appleAuthToken String?
+
+  /// Bumped on every write. The tag a device hands back as `passesUpdatedSince` — "give me
+  /// what changed after this" — is this value, so it has to move on every stamp, not just
+  /// on demand.
+  updatedAt DateTime @updatedAt
+
   createdAt DateTime @default(now())
 
-  events StampEvent[]
+  events              StampEvent[]
+  appleRegistrations  AppleDeviceRegistration[]
 
   @@index([cardId, isTest])
   @@index([claimToken])
   @@index([cardId, deviceKey])
+}
+
+/// One row per (device, pass): what Apple's Wallet app asked us to remember when the
+/// customer added the pass, so a later push knows which phones to wake.
+///
+/// Deliberately not `@unique` on `pushToken` alone — the identifying pair PassKit itself
+/// uses is device + pass, and treating the token as globally unique would break the
+/// (rare, real) case of the same device token appearing again after an app reinstall.
+model AppleDeviceRegistration {
+  id                      String     @id @default(cuid())
+  deviceLibraryIdentifier String
+  passId                  String
+  pass                    IssuedPass @relation(fields: [passId], references: [id], onDelete: Cascade)
+  pushToken               String
+  createdAt               DateTime   @default(now())
+
+  @@unique([deviceLibraryIdentifier, passId])
+  @@index([passId])
 }
 
 enum StampEventKind {

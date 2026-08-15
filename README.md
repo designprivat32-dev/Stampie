@@ -147,7 +147,6 @@ im Wallet landet.
 | Bereich | Zustand |
 |---|---|
 | E-Mail | `console`-Adapter; SMTP-Implementierung fehlt. |
-| Apple-Aktualisierung | Ein neuer Stempel erreicht iOS nicht — dafür fehlt der PassKit-Web-Service samt APNs. Google wird per `PATCH` aktualisiert. |
 
 ## Testabdeckung
 
@@ -155,7 +154,7 @@ im Wallet landet.
 npm test
 ```
 
-464 Tests: Rasterberechnung (N = 3, 5, 6, 10, 12, 20 plus Randfälle), PNG-Ausgabe in allen
+478 Tests: Rasterberechnung (N = 3, 5, 6, 10, 12, 20 plus Randfälle), PNG-Ausgabe in allen
 drei Auflösungen, WCAG-Kontrast, das Zod-Schema inklusive jeder PassKit-Grenze, das
 PassKit-/Google-Mapping, die Upload-Pipeline (Magic Bytes, SVG-Sanitizing, EXIF), der
 ZIP-Writer, die Apple-Signatur (PKCS#12-Import, Zertifikatsprüfung, detached PKCS#7),

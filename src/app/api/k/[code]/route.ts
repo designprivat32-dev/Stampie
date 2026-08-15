@@ -53,7 +53,7 @@ export async function GET(
   }
 
   const { serial, currentStamps } = await issuePassForDevice(resolved, deviceKey)
-  const design = await toHandoutDesign(resolved, currentStamps)
+  const design = await toHandoutDesign(resolved, currentStamps, serial)
   const builder = getPassBuilder()
 
   const response =

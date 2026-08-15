@@ -4,6 +4,7 @@ import { buildPassJson } from '@/lib/cards/apple-pass-json'
 import { renderFallbackIconSet } from '@/lib/cards/render-icon'
 import { renderHeroImage, renderStripImageSet } from '@/lib/cards/render-strip'
 import { readAppleWalletCredentials, signManifest } from './apple-pass-builder'
+import { applePassKitBaseUrl } from './apple-passkit-url'
 import { createZip, type ZipEntry } from './zip'
 import {
   buildGoogleContext,
@@ -41,6 +42,10 @@ export class MockPassBuilder implements PassBuilder {
   }
 
   async buildApplePass(design: CardDesign, serial: string): Promise<Buffer> {
+    // Only a signed pass can be updated: without a certificate there is no APNs identity
+    // to push with, so advertising a web service would promise something we cannot keep.
+    const authenticationToken = readAppleWalletCredentials() ? (design.appleAuthToken ?? null) : null
+
     const passJson = buildPassJson(design, {
       serial,
       currentStamps: design.currentStamps,
@@ -49,6 +54,9 @@ export class MockPassBuilder implements PassBuilder {
       teamIdentifier: this.config.teamIdentifier,
       barcodeMessage: this.barcodeMessage(serial),
       kind: design.kind,
+      webService: authenticationToken
+        ? { url: applePassKitBaseUrl(), authenticationToken }
+        : null,
     })
 
     const files: ZipEntry[] = [

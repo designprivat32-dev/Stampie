@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { requireAppUser } from '@/lib/auth/app-session'
 import { decideStamp, extractSerial, formatCooldown } from '@/lib/cards/stamping'
 import { rateLimit } from '@/lib/rate-limit'
+import { pushAppleWalletUpdate } from '@/lib/wallet/apple-sync'
 
 export const runtime = 'nodejs'
 
@@ -122,6 +123,10 @@ export async function POST(request: Request): Promise<Response> {
     })
     return next
   })
+
+  // Best-effort: the stamp is booked and audited, so a phone that is off must not turn a
+  // successful scan into an error at the till.
+  await pushAppleWalletUpdate(serial)
 
   return NextResponse.json({
     ok: true,

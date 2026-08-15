@@ -110,12 +110,33 @@ Log als `[apple-wallet] …` ausgegeben:
 | Datei lädt, Wallet öffnet nicht | fehlendes `icon.png` (wird inzwischen immer erzeugt) oder abgelaufenes Zertifikat |
 | Vorher funktionierend, jetzt nicht | Zertifikat ist ein Jahr gültig und muss erneuert werden — Schritte 3–5 wiederholen, Schlüssel aus Schritt 2 bleibt |
 
-## Was damit noch nicht geht
+## Automatische Aktualisierung
 
-Ein neuer Stempel erreicht ein bereits installiertes iPhone-Wallet **nicht** von selbst.
-Dafür fehlt der PassKit-Web-Service: `webServiceURL` im Pass, vier Endpunkte für
-Registrierung und Abruf sowie APNs-Pushes an registrierte Geräte. Der Kunde muss die
-Karte bis dahin neu laden. Google Wallet wird bereits per `PATCH` aktualisiert.
+Ein neuer Stempel erreicht ein bereits installiertes iPhone-Wallet von selbst. Dahinter
+steht der PassKit-Web-Service unter `/api/apple-passkit`:
+
+| Endpunkt | Wer ruft auf | Wofür |
+|---|---|---|
+| `POST /v1/devices/…/registrations/…/<serial>` | Wallet beim Hinzufügen | Push-Token merken |
+| `DELETE` auf denselben Pfad | Wallet beim Löschen | Gerät vergessen |
+| `GET /v1/devices/…/registrations/<passTypeId>` | Wallet nach einem Push | „Was hat sich geändert?" |
+| `GET /v1/passes/<passTypeId>/<serial>` | Wallet danach | frisch gebautes `.pkpass` |
+| `POST /v1/log` | Wallet bei Problemen | landet im Serverlog als `[apple-passkit]` |
+
+Beim Stempeln geht ein leerer Push an APNs (`api.push.apple.com`), authentifiziert per
+mTLS mit **demselben** Pass-Zertifikat, das auch die Pässe signiert — Apple knüpft beides
+an dieselbe Pass Type ID. Es ist also **kein zweites Zertifikat** nötig. Das Gerät holt
+sich daraufhin den neuen Pass, Stempelreihe inklusive.
+
+Der Push ist bewusst „best effort": der Stempel ist gebucht und protokolliert, bevor er
+losgeht. Ein ausgeschaltetes Handy darf keinen Scan an der Kasse fehlschlagen lassen —
+es kostet nur eine veraltete Karte, bis Wallet das nächste Mal nachfragt.
+
+Nur signierte Pässe bekommen `webServiceURL`. Ohne Zertifikat gäbe es keine
+Push-Identität, und ein Pass würde eine Aktualisierung versprechen, die nie kommt.
+Testkarten aus dem Dashboard bleiben absichtlich außen vor.
+
+Google Wallet wird weiterhin per `PATCH` aktualisiert.
 
 ## Kosten und Bedingungen
 

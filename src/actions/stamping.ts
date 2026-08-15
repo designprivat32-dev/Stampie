@@ -6,6 +6,7 @@ import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action
 import { prisma } from '@/lib/db'
 import { decideRedeem, decideStamp, extractSerial, formatCooldown } from '@/lib/cards/stamping'
 import { expireGoogleOffer, syncGoogleStampCount } from '@/lib/wallet/google-sync'
+import { pushAppleWalletUpdate } from '@/lib/wallet/apple-sync'
 import { issueRewardCoupon, type IssuedRewardCoupon } from '@/lib/cards/reward-coupon'
 import { loadOrCreateDraft, loadPublishedDesign } from '@/lib/cards/repository'
 import type { CardDesignInput } from '@/lib/cards/schema'
@@ -187,7 +188,12 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
 
     const design = await currentDesign(cardId)
     const labels = toLabels(design)
-    const sync = await syncGoogleStampCount(cardId, serial, updated.stamps, design)
+    // Both wallets in parallel: neither may hold up the till, and Apple's push involves a
+    // TLS handshake per device.
+    const [sync] = await Promise.all([
+      syncGoogleStampCount(cardId, serial, updated.stamps, design),
+      pushAppleWalletUpdate(serial),
+    ])
 
     return ok({
       pass: toSummary(updated, new Date(), labels),
@@ -242,7 +248,12 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
 
     const design = await currentDesign(cardId)
     const labels = toLabels(design)
-    const sync = await syncGoogleStampCount(cardId, serial, updated.stamps, design)
+    // Both wallets in parallel: neither may hold up the till, and Apple's push involves a
+    // TLS handshake per device.
+    const [sync] = await Promise.all([
+      syncGoogleStampCount(cardId, serial, updated.stamps, design),
+      pushAppleWalletUpdate(serial),
+    ])
 
     // The reward as a real pass, if the card promises one. Issued after the counter has
     // already been reset: a coupon handed out without the stamps being spent would be free

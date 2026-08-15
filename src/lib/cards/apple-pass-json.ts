@@ -77,6 +77,12 @@ export interface PassJson {
   expirationDate?: string
   sharingProhibited?: boolean
   logoText?: string
+  /**
+   * Both present or both absent — Wallet only asks the web service for updates when it has
+   * somewhere to ask and a token to prove it is allowed to.
+   */
+  webServiceURL?: string
+  authenticationToken?: string
 }
 
 const BARCODE_MAP: Record<BarcodeFormat, PassBarcode['format']> = {
@@ -102,6 +108,13 @@ export interface BuildPassJsonContext {
   memberSince?: Date | null
   /** Defaults to the stamp card so existing callers keep their behaviour. */
   kind?: CardKind
+  /**
+   * The PassKit web service, so an installed pass can be pushed a fresh stamp count
+   * instead of sitting stale until the customer deletes and re-adds it. Omitted entirely
+   * when either half is missing — a `webServiceURL` with no token would let anyone who
+   * finds the URL ask for updates without proving which pass they hold.
+   */
+  webService?: { url: string; authenticationToken: string } | null
 }
 
 /**
@@ -233,6 +246,11 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
 
   if (!design.shareable) {
     pass.sharingProhibited = true
+  }
+
+  if (ctx.webService) {
+    pass.webServiceURL = ctx.webService.url
+    pass.authenticationToken = ctx.webService.authenticationToken
   }
 
   return pass
