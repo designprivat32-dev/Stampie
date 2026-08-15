@@ -39,7 +39,9 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  const user = await prisma.user.findUnique({ where: { username } })
+  // findFirst, not findUnique: `username` carries an index rather than a unique constraint
+  // (see the schema for why). Uniqueness is guaranteed by the derived, unique e-mail.
+  const user = await prisma.user.findFirst({ where: { username } })
   const passwordOk = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false
 
   if (!user || !passwordOk) {

@@ -39,13 +39,25 @@ model User {
   email       String       @unique
   name        String?
   // --- App-Login (Betriebs-App). Nullable, weil bestehende/Agentur-Nutzer keins brauchen.
-  username          String?  @unique
+  ///
+  /// Indiziert, aber bewusst nicht `@unique` — aus demselben Grund wie bei
+  /// `IssuedPass.claimToken`: `prisma db push` verlangt für eine Unique-Constraint
+  /// `--accept-data-loss`, und dieses Flag im Deploy-Kommando würde künftig auch eine
+  /// versehentlich gelöschte Spalte stillschweigend durchwinken.
+  ///
+  /// Eindeutig bleibt der Name trotzdem: `createBusinessLoginAction` leitet die E-Mail
+  /// aus ihm ab (`<username>@login.stampie.local`), und `email` *ist* unique. Ein zweiter
+  /// Nutzer mit demselben Benutzernamen scheitert damit an der Datenbank, nicht erst an
+  /// einer Prüfung im Anwendungscode.
+  username          String?
   passwordHash      String?
   /// Beim ersten Login muss das von uns vergebene Start-Passwort geändert werden.
   mustChangePassword Boolean @default(false)
   createdAt   DateTime     @default(now())
   memberships Membership[]
   appSessions AppSession[]
+
+  @@index([username])
 }
 
 /// Anmelde-Token der Betriebs-App. Die App schickt den Token im Authorization-Header.

@@ -60,7 +60,7 @@ export async function createBusinessLoginAction(
     const base = slugify(org.name)
     let username = base
     for (let i = 0; i < 50; i++) {
-      const taken = await prisma.user.findUnique({ where: { username }, select: { id: true } })
+      const taken = await prisma.user.findFirst({ where: { username }, select: { id: true } })
       if (!taken) break
       username = `${base}-${Math.floor(Math.random() * 900 + 100)}`
     }
