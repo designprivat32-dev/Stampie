@@ -25,9 +25,17 @@ immer mit `pass.` und ist umgekehrte Domainschreibweise:
 pass.de.stampie.stampcard
 ```
 
-Er ist dauerhaft und lässt sich nicht umbenennen. Eine Pass Type ID reicht für alle
-Karten aller Kunden — die einzelne Karte wird über `serialNumber` unterschieden, nicht
-über den Typ.
+Er ist dauerhaft und lässt sich nicht umbenennen.
+
+Eine Pass Type ID reicht **funktional** für alle Karten aller Kunden: die einzelne Karte
+wird über `serialNumber` unterschieden, Stempeln und Einlösen funktionieren.
+
+Für die **Darstellung** reicht sie nicht. Apple gruppiert Karten vom Typ `storeCard`
+allein nach der Pass Type ID — zwei Karten verschiedener Läden landen im Wallet des
+Kunden also im selben Stapel. `groupingIdentifier`, Apples Schlüssel dafür, wird bei
+`storeCard` und `coupon` ignoriert; er gilt nur für Bordkarten und Eventtickets. Auch ein
+anderer `organizationName` ändert nichts. Getrennte Stapel gibt es nur mit einer eigenen
+Pass Type ID je Laden.
 
 ## 2. Schlüssel und Zertifikatsanfrage erzeugen
 
