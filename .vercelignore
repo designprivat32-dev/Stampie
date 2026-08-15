@@ -9,6 +9,9 @@
 # src/lib/storage/, which silently breaks the build with a module-not-found.
 /.pglite/
 /storage/
+# Signing material for Apple Wallet. The build reads the certificate from the
+# environment, never from disk — the private key has no business in a deployment.
+/apple-certs/
 /coverage/
 /tests/
 /scripts/

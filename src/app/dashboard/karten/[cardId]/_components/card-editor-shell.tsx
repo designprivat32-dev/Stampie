@@ -56,6 +56,8 @@ export function CardEditorShell({
   useUndoShortcuts()
 
   const cardId = useCardEditor((state) => state.cardId)
+  const kind = useCardEditor((state) => state.kind)
+  const isStamp = kind === 'STAMP'
 
   const { canUndo, canRedo, undo, redo } = useTemporal()
 
@@ -120,10 +122,13 @@ export function CardEditorShell({
                 <Redo2 />
               </Button>
 
-              <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(true)}>
-                <LayoutTemplate />
-                Vorlagen
-              </Button>
+              {/* Templates set stamp goal, icon and reward text — a coupon has none. */}
+              {isStamp ? (
+                <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(true)}>
+                  <LayoutTemplate />
+                  Vorlagen
+                </Button>
+              ) : null}
               <Button variant="ghost" size="sm" onClick={() => setVersionsOpen(true)}>
                 <History />
                 Versionen
@@ -167,6 +172,7 @@ export function CardEditorShell({
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}
+
               />
             </div>
           ) : null}
@@ -182,6 +188,7 @@ export function CardEditorShell({
               <PreviewPane
                 cardId={cardId}
                 organizationName={location.organizationName || location.name}
+
               />
             </div>
           </main>

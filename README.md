@@ -137,7 +137,7 @@ buchen. Das wird serverseitig in `assertStampAccess` geprüft, nicht nur in der 
 | Bereich | Zustand |
 |---|---|
 | Auth | Stub in [`src/lib/auth/session.ts`](src/lib/auth/session.ts) — löst den User aus `DEV_SESSION_USER_EMAIL` auf. Die Tenancy-Prüfung darüber ist echt. |
-| Apple Wallet | [`MockPassBuilder`](src/lib/pass/mock-pass-builder.ts) erzeugt ein vollständiges `.pkpass`-ZIP inkl. `manifest.json`, aber ohne `signature`. **iOS lehnt den Pass deshalb ab.** Für echte Pässe: Apple Developer Program (99 €/Jahr), Pass Type ID Zertifikat, PKCS#7-Signatur über `manifest.json`. |
+| Apple Wallet | Signierung ist **implementiert** ([`apple-pass-builder.ts`](src/lib/pass/apple-pass-builder.ts), PKCS#7 über `manifest.json`). Sobald `APPLE_PASS_CERTIFICATE`, `APPLE_PASS_TYPE_ID` und `APPLE_TEAM_ID` gesetzt sind, enthält das `.pkpass` eine `signature` und iOS nimmt es an. Einrichtung: [APPLE-WALLET.md](APPLE-WALLET.md) — Apple Developer Program (99 €/Jahr), kein Mac nötig. Ohne Zertifikat bleibt das Bundle unsigniert und Wallet lehnt es ab. |
 | Google Wallet | Signierung ist **implementiert** ([`google-pass-builder.ts`](src/lib/pass/google-pass-builder.ts), RS256). Sobald `GOOGLE_ISSUER_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL` und `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` gesetzt sind, entsteht ein echter Save-Link. Ohne sie fällt der Builder auf einen Mock zurück, den Google ablehnt. |
 
 Der Testkarten-Dialog zeigt eine Warnung, solange für eine der beiden Plattformen keine
@@ -155,8 +155,9 @@ im Wallet landet.
 npm test
 ```
 
-326 Tests: Rasterberechnung (N = 3, 5, 6, 10, 12, 20 plus Randfälle), PNG-Ausgabe in allen
+448 Tests: Rasterberechnung (N = 3, 5, 6, 10, 12, 20 plus Randfälle), PNG-Ausgabe in allen
 drei Auflösungen, WCAG-Kontrast, das Zod-Schema inklusive jeder PassKit-Grenze, das
 PassKit-/Google-Mapping, die Upload-Pipeline (Magic Bytes, SVG-Sanitizing, EXIF), der
-ZIP-Writer, der Editor-Store inklusive Undo/Redo sowie die Stempel-Regeln
+ZIP-Writer, die Apple-Signatur (PKCS#12-Import, Zertifikatsprüfung, detached PKCS#7),
+der Editor-Store inklusive Undo/Redo sowie die Stempel-Regeln
 (Doppelscan-Sperre, Einlösen, Seriennummern-Erkennung).

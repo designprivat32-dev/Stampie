@@ -51,7 +51,14 @@ export async function GET(
   const square = await loadAsset(design.squareLogoAssetId, 'SQUARE_LOGO')
   const uploaded = square ?? (await loadAsset(design.logoAssetId, 'LOGO'))
 
-  const png = await renderLogoImage(design, WALLET_LOGO_SIZE, uploaded)
+  // The generated mark falls back to the stamp icon, which a coupon has no editor for —
+  // its value is whatever the default happened to be, so a shop that uploaded no logo would
+  // get a coffee cup on a discount voucher. `star` is the icon library's own neutral
+  // fallback and carries no claim about what is being sold.
+  const card = await prisma.card.findFirst({ where: { id: cardId }, select: { kind: true } })
+  const logoDesign = card?.kind === 'COUPON' ? { ...design, stampIcon: 'star' } : design
+
+  const png = await renderLogoImage(logoDesign, WALLET_LOGO_SIZE, uploaded)
 
   return new NextResponse(new Uint8Array(png), {
     status: 200,

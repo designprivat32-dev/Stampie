@@ -9,6 +9,7 @@ import { accessibleOrgIds, listCards, listCustomers, type CardSummary } from '@/
 import { designToRow } from '@/lib/cards/repository'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import { getTemplate, templateAsDesign } from '@/lib/cards/templates'
+import { cardKindSchema } from '@/lib/cards/schema'
 
 /**
  * Card lifecycle: list, create, assign, archive.
@@ -20,6 +21,11 @@ import { getTemplate, templateAsDesign } from '@/lib/cards/templates'
 
 const createInputSchema = z.object({
   name: z.string().min(1, 'Bitte einen Namen für die Karte angeben.').max(60),
+  /**
+   * Fixed here for good: the wallet pass type follows from it and is baked into every pass
+   * handed out afterwards, so there is deliberately no action to change it later.
+   */
+  kind: cardKindSchema.default('STAMP'),
   orgId: z.string().cuid().nullable().default(null),
   locationId: z.string().cuid().nullable().default(null),
   /** Optional industry preset, so a new card is not born blank. */
@@ -80,12 +86,18 @@ export async function createCardAction(input: unknown): Promise<ActionResult<{ c
       if (!location) return fail('Diese Filiale gehört nicht zum gewählten Betrieb.', 'validation')
     }
 
-    const template = parsed.data.templateId ? getTemplate(parsed.data.templateId) : undefined
+    // Templates set stamp colours, icons and texts — none of which a coupon has, so a
+    // coupon starts from the defaults even if a template was picked.
+    const template =
+      parsed.data.kind === 'STAMP' && parsed.data.templateId
+        ? getTemplate(parsed.data.templateId)
+        : undefined
     const design = template ? templateAsDesign(template) : DEFAULT_CARD_DESIGN
 
     const card = await prisma.card.create({
       data: {
         name: parsed.data.name.trim(),
+        kind: parsed.data.kind,
         orgId,
         locationId: parsed.data.locationId,
         createdBy: session.userId,

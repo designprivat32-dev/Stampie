@@ -2,9 +2,10 @@ import 'server-only'
 import { createSign } from 'node:crypto'
 import { readGoogleWalletCredentials } from '@/lib/pass/google-pass-builder'
 import { buildLoyaltyClass } from '@/lib/cards/google-loyalty'
+import { buildOfferClass } from '@/lib/cards/google-offer'
 import { appUrl } from '@/lib/app-url'
 import { walletHeroUrl, walletLogoUrl } from './image-urls'
-import type { CardDesignInput } from '@/lib/cards/schema'
+import type { CardDesignInput, CardKind } from '@/lib/cards/schema'
 
 /**
  * Pushes a new stamp count to a card that already lives in Google Wallet.
@@ -79,6 +80,7 @@ export async function syncGoogleClass(
   cardId: string,
   design: CardDesignInput,
   organizationName: string,
+  kind: CardKind = 'STAMP',
 ): Promise<GoogleSyncResult> {
   const credentials = readGoogleWalletCredentials()
   if (!credentials) return { status: 'not_configured' }
@@ -86,7 +88,7 @@ export async function syncGoogleClass(
   const classId = `${credentials.issuerId}.card_${cardId}`
   const base = appUrl()
 
-  const body = buildLoyaltyClass(design, {
+  const ctx = {
     issuerId: credentials.issuerId,
     classSuffix: `card_${cardId}`,
     objectSuffix: 'unused',
@@ -97,11 +99,17 @@ export async function syncGoogleClass(
     logoUrl: null,
     heroUrl: walletHeroUrl(base, cardId, design, 0),
     fallbackLogoUrl: walletLogoUrl(base, cardId, design),
-  })
+  }
+
+  // Coupons live under a different resource entirely — patching an offer class through
+  // the loyalty endpoint is a 404, not a partial update.
+  const isCoupon = kind === 'COUPON'
+  const resource = isCoupon ? 'offerClass' : 'loyaltyClass'
+  const body = isCoupon ? buildOfferClass(design, ctx) : buildLoyaltyClass(design, ctx)
 
   try {
     const accessToken = await getAccessToken(credentials.clientEmail, credentials.privateKey)
-    const response = await fetch(`${WALLET_API}/loyaltyClass/${encodeURIComponent(classId)}`, {
+    const response = await fetch(`${WALLET_API}/${resource}/${encodeURIComponent(classId)}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -137,6 +145,38 @@ export type GoogleSyncResult =
  * A card the customer never saved simply does not exist on Google's side — that is a
  * normal outcome, not a failure, so it is reported separately from a real error.
  */
+/**
+ * Retires a redeemed coupon in the customer's wallet.
+ *
+ * The Offers API has no "redeemed" flag — `state: EXPIRED` is the only lever, and it moves
+ * the pass into the customer's expired passes so it cannot be presented again. Whether it
+ * was actually redeemed stays our record (`IssuedPass.redeemedAt`); this call is only the
+ * visible half.
+ */
+export async function expireGoogleOffer(serial: string): Promise<GoogleSyncResult> {
+  const credentials = readGoogleWalletCredentials()
+  if (!credentials) return { status: 'not_configured' }
+
+  const objectId = `${credentials.issuerId}.sn_${serial}`
+
+  try {
+    const accessToken = await getAccessToken(credentials.clientEmail, credentials.privateKey)
+    const response = await fetch(`${WALLET_API}/offerObject/${encodeURIComponent(objectId)}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'EXPIRED' }),
+    })
+
+    if (response.status === 404) return { status: 'not_found' }
+    if (!response.ok) {
+      return { status: 'error', message: `${response.status} ${await response.text()}` }
+    }
+    return { status: 'updated' }
+  } catch (e) {
+    return { status: 'error', message: e instanceof Error ? e.message : 'unknown' }
+  }
+}
+
 export async function syncGoogleStampCount(
   cardId: string,
   serial: string,

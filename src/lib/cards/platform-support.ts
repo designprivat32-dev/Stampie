@@ -33,6 +33,11 @@ export type SupportedField =
   | 'expiresAt'
   | 'shareable'
   | 'cardTitle'
+  | 'googleAccountNameLabel'
+  | 'googleAccountIdLabel'
+  | 'googleRewardsTierLabel'
+  | 'googleRewardsTier'
+  | 'googleAccountName'
 
 const FULL_BOTH: PlatformSupport = { apple: 'full', google: 'full', note: '' }
 
@@ -94,6 +99,31 @@ export const PLATFORM_SUPPORT: Record<SupportedField, PlatformSupport> = {
     apple: 'full',
     google: 'partial',
     note: 'Google Wallet zeigt die Überschrift als Teil des Programmnamens.',
+  },
+  googleAccountNameLabel: {
+    apple: 'none',
+    google: 'full',
+    note: 'Nur Google Wallet — Label für den Kontoinhaber auf der Vorderseite.',
+  },
+  googleAccountIdLabel: {
+    apple: 'none',
+    google: 'full',
+    note: 'Nur Google Wallet — Label für die Mitglieds-ID auf der Vorderseite.',
+  },
+  googleRewardsTierLabel: {
+    apple: 'none',
+    google: 'full',
+    note: 'Nur Google Wallet — Label für die Stufe auf der Vorderseite.',
+  },
+  googleRewardsTier: {
+    apple: 'none',
+    google: 'full',
+    note: 'Nur Google Wallet — Stufen-Name (z. B. Gold) auf der Vorderseite.',
+  },
+  googleAccountName: {
+    apple: 'none',
+    google: 'full',
+    note: 'Nur Google Wallet — Name des Karteninhabers (wird bei Ausgabe vergeben).',
   },
 }
 

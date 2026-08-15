@@ -1,4 +1,5 @@
 import { toPassKitRgb } from '@/lib/color/convert'
+import { resolveIssuerName } from './issuer'
 import {
   MAX_AUXILIARY_FIELDS,
   MAX_GEO_LOCATIONS,
@@ -6,6 +7,7 @@ import {
   MAX_SECONDARY_FIELDS,
   type BarcodeFormat,
   type CardDesignInput,
+  type CardKind,
 } from './schema'
 
 /**
@@ -42,6 +44,7 @@ export interface PassLocation {
   maxDistance?: number
 }
 
+/** Same shape for both styles we emit — only the key it sits under differs. */
 export interface StoreCardStructure {
   headerFields: PassField[]
   primaryFields: PassField[]
@@ -62,7 +65,13 @@ export interface PassJson {
   labelColor: string
   barcode: PassBarcode
   barcodes: PassBarcode[]
-  storeCard: StoreCardStructure
+  /**
+   * Exactly one of these is set — the key *is* the pass style, and Wallet picks the layout
+   * from it. `storeCard` puts the strip image behind the primary field, which is what a
+   * stamp row needs; `coupon` is the style Apple intends for a single-use offer.
+   */
+  storeCard?: StoreCardStructure
+  coupon?: StoreCardStructure
   locations?: PassLocation[]
   maxDistance?: number
   expirationDate?: string
@@ -91,6 +100,8 @@ export interface BuildPassJsonContext {
   barcodeMessage: string
   customerName?: string | null
   memberSince?: Date | null
+  /** Defaults to the stamp card so existing callers keep their behaviour. */
+  kind?: CardKind
 }
 
 /**
@@ -100,32 +111,51 @@ export interface BuildPassJsonContext {
  * is a terrible way to find out.
  */
 export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext): PassJson {
+  const kind: CardKind = ctx.kind ?? 'STAMP'
+  const isCoupon = kind === 'COUPON'
   const stamps = Math.max(0, Math.min(design.stampGoal, ctx.currentStamps))
 
-  const headerFields: PassField[] = (
-    [
-      {
-        key: 'stamps',
-        label: design.stampLabel,
-        value: `${stamps}/${design.stampGoal}`,
-        textAlignment: 'PKTextAlignmentRight',
-      },
-    ] satisfies PassField[]
-  ).slice(0, MAX_HEADER_FIELDS)
+  // A coupon has no counter, so its header stays empty rather than showing "0/10".
+  const headerFields: PassField[] = isCoupon
+    ? []
+    : (
+        [
+          {
+            key: 'stamps',
+            label: design.stampLabel,
+            value: `${stamps}/${design.stampGoal}`,
+            textAlignment: 'PKTextAlignmentRight',
+          },
+        ] satisfies PassField[]
+      ).slice(0, MAX_HEADER_FIELDS)
+
+  // The offer itself belongs in primaryFields — on a coupon that is the line Wallet sets
+  // in the largest type. A storeCard hides primaryFields behind the strip, so it stays
+  // empty there and the stamp grid keeps the space.
+  const primaryFields: PassField[] =
+    isCoupon && design.offerTitle?.trim()
+      ? [{ key: 'offer', value: design.offerTitle.trim() }]
+      : []
 
   const secondaryFields: PassField[] = []
-  if (design.rewardText.trim()) {
-    secondaryFields.push({ key: 'reward', label: 'Belohnung', value: design.rewardText.trim() })
-  }
-  if (design.programName.trim()) {
-    secondaryFields.push({ key: 'program', label: 'Programm', value: design.programName.trim() })
+  if (isCoupon) {
+    if (design.offerDetails?.trim()) {
+      secondaryFields.push({ key: 'details', value: design.offerDetails.trim() })
+    }
+  } else {
+    if (design.rewardText.trim()) {
+      secondaryFields.push({ key: 'reward', label: 'Belohnung', value: design.rewardText.trim() })
+    }
+    if (design.programName.trim()) {
+      secondaryFields.push({ key: 'program', label: 'Programm', value: design.programName.trim() })
+    }
   }
 
   const auxiliaryFields: PassField[] = []
   if (ctx.customerName) {
     auxiliaryFields.push({ key: 'customer', label: 'Kunde', value: ctx.customerName })
   }
-  if (ctx.memberSince) {
+  if (ctx.memberSince && !isCoupon) {
     auxiliaryFields.push({
       key: 'member-since',
       label: 'Mitglied seit',
@@ -139,6 +169,16 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
     value: f.value,
   }))
 
+  // Fine print is a legal term of the offer — it goes on the back, above the shop's own
+  // fields, because that is where a customer looks for the conditions.
+  if (isCoupon && design.offerFinePrint?.trim()) {
+    backFields.unshift({
+      key: 'fine-print',
+      label: 'Einlösebedingungen',
+      value: design.offerFinePrint.trim(),
+    })
+  }
+
   const barcode: PassBarcode = {
     format: toPassKitBarcodeFormat(design.barcodeFormat),
     message: ctx.barcodeMessage,
@@ -146,27 +186,32 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
     altText: ctx.serial,
   }
 
+  const structure: StoreCardStructure = {
+    headerFields,
+    primaryFields,
+    secondaryFields: secondaryFields.slice(0, MAX_SECONDARY_FIELDS),
+    auxiliaryFields: auxiliaryFields.slice(0, MAX_AUXILIARY_FIELDS),
+    backFields,
+  }
+
+  const fallbackDescription = isCoupon ? 'Gutschein' : 'Stempelkarte'
+
   const pass: PassJson = {
     formatVersion: 1,
     passTypeIdentifier: ctx.passTypeIdentifier,
     teamIdentifier: ctx.teamIdentifier,
-    organizationName: ctx.organizationName,
+    // Apple shows this on lock-screen notifications, so it follows the same override.
+    organizationName: resolveIssuerName(design, ctx.organizationName),
     serialNumber: ctx.serial,
-    description: design.programName.trim() || 'Stempelkarte',
+    description:
+      (isCoupon ? design.offerTitle?.trim() : design.programName.trim()) || fallbackDescription,
     backgroundColor: toPassKitRgb(design.backgroundColor),
     foregroundColor: toPassKitRgb(design.foregroundColor),
     labelColor: toPassKitRgb(design.labelColor),
     barcode,
     barcodes: [barcode],
-    storeCard: {
-      headerFields,
-      // storeCard renders primaryFields behind the strip image — leave it empty so the
-      // stamp grid stays readable.
-      primaryFields: [],
-      secondaryFields: secondaryFields.slice(0, MAX_SECONDARY_FIELDS),
-      auxiliaryFields: auxiliaryFields.slice(0, MAX_AUXILIARY_FIELDS),
-      backFields,
-    },
+    // The style key decides the layout, so exactly one of the two is ever present.
+    ...(isCoupon ? { coupon: structure } : { storeCard: structure }),
   }
 
   if (design.cardTitle?.trim()) {

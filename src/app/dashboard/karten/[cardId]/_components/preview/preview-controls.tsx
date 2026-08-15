@@ -57,6 +57,7 @@ export function PreviewControls({ onExport }: { onExport: () => Promise<void> })
   const stamps = useCardEditor((s) => s.simulatedStamps)
   const setStamps = useCardEditor((s) => s.setSimulatedStamps)
   const goal = useCardEditor((s) => s.design.stampGoal)
+  const isStamp = useCardEditor((s) => s.kind === 'STAMP')
 
   const [exporting, setExporting] = React.useState(false)
   const [exportError, setExportError] = React.useState<string | null>(null)
@@ -106,34 +107,37 @@ export function PreviewControls({ onExport }: { onExport: () => Promise<void> })
         </Button>
       </div>
 
-      <div className="rounded-lg border border-line bg-surface px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="simulate-stamps">Stempel simulieren</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-medium tabular-nums text-ink">
-              {stamps} / {goal}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Zurücksetzen"
-              onClick={() => setStamps(0)}
-            >
-              <RotateCw />
-            </Button>
+      {/* A coupon has no counter to simulate — it is either valid or already redeemed. */}
+      {isStamp ? (
+        <div className="rounded-lg border border-line bg-surface px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="simulate-stamps">Stempel simulieren</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-medium tabular-nums text-ink">
+                {stamps} / {goal}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Zurücksetzen"
+                onClick={() => setStamps(0)}
+              >
+                <RotateCw />
+              </Button>
+            </div>
           </div>
+          <Slider
+            id="simulate-stamps"
+            className="mt-1"
+            min={0}
+            max={goal}
+            step={1}
+            value={[Math.min(stamps, goal)]}
+            onValueChange={([next]) => setStamps(next ?? 0)}
+            aria-label="Anzahl gestempelter Felder"
+          />
         </div>
-        <Slider
-          id="simulate-stamps"
-          className="mt-1"
-          min={0}
-          max={goal}
-          step={1}
-          value={[Math.min(stamps, goal)]}
-          onValueChange={([next]) => setStamps(next ?? 0)}
-          aria-label="Anzahl gestempelter Felder"
-        />
-      </div>
+      ) : null}
 
       <div className="flex flex-col items-center gap-1.5">
         <Button variant="outline" onClick={handleExport} disabled={exporting} className="w-full">

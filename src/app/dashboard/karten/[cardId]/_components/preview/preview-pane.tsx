@@ -2,10 +2,13 @@
 
 import * as React from 'react'
 import { toPng } from 'html-to-image'
+import { AppleCouponCard } from './apple-coupon-card'
 import { AppleStoreCard } from './apple-store-card'
 import { AppleStoreCardBack } from './apple-store-card-back'
 import { GoogleLoyaltyCard } from './google-loyalty-card'
 import { GoogleLoyaltyCardBack } from './google-loyalty-card-back'
+import { GoogleOfferCard } from './google-offer-card'
+import { GoogleOfferCardBack } from './google-offer-card-back'
 import { PreviewControls } from './preview-controls'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import { useDebounced } from '@/hooks/use-debounced'
@@ -22,6 +25,7 @@ export function PreviewPane({
   cardId: string
   organizationName: string
 }) {
+  const kind = useCardEditor((s) => s.kind)
   const liveDesign = useCardEditor((s) => s.design)
   const design = useDebounced(liveDesign, 150)
 
@@ -65,7 +69,27 @@ export function PreviewPane({
         data-theme={theme}
       >
         <div ref={cardRef} className="p-2">
-          {platform === 'apple' ? (
+          {kind === 'COUPON' ? (
+            platform === 'apple' ? (
+              side === 'front' ? (
+                <AppleCouponCard
+                  design={design}
+                  logoUrl={logoUrl}
+                  organizationName={organizationName}
+                />
+              ) : (
+                <AppleStoreCardBack design={design} />
+              )
+            ) : side === 'front' ? (
+              <GoogleOfferCard
+                design={design}
+                logoUrl={googleLogoUrl}
+                organizationName={organizationName}
+              />
+            ) : (
+              <GoogleOfferCardBack design={design} />
+            )
+          ) : platform === 'apple' ? (
             side === 'front' ? (
               <AppleStoreCard
                 design={design}

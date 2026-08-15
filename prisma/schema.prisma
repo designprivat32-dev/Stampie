@@ -109,12 +109,21 @@ model Location {
   @@index([orgId])
 }
 
+/// What kind of pass a card issues. Fixed when the card is created — the wallet pass type
+/// (loyalty vs. offer) is baked into every pass already in a customer's wallet, so it
+/// cannot be switched afterwards without invalidating them.
+enum CardKind {
+  STAMP
+  COUPON
+}
+
 /// A stamp card programme. The unit the agency creates, hands to a customer and designs.
 /// A customer may own any number of these; a card without `orgId` is created but not yet
 /// assigned, and therefore cannot be stamped by anyone.
 model Card {
   id    String        @id @default(cuid())
   name  String
+  kind  CardKind      @default(STAMP)
   orgId String?
   org   Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
 
@@ -212,9 +221,32 @@ model CardDesign {
   // --- texts
   programName String  @default("")
   cardTitle   String?
+  /// Overrides the organisation name as the pass issuer. Null = use the organisation's.
+  issuerDisplayName String?
   stampLabel  String  @default("Stempel")
   /// BackField[] — discriminated union, see src/types/card-design.ts
   backFields  Json    @default("[]")
+
+  // --- coupon fields. Used twice: as the card itself when Card.kind is COUPON, and as
+  //     the reward a full stamp card hands out when rewardCouponEnabled is set.
+  /// STAMP only: a full card issues a coupon pass instead of just a line of reward text.
+  rewardCouponEnabled Boolean @default(false)
+  /// Google OfferClass.title — required for a coupon, e.g. "20 % auf alles".
+  offerTitle       String?
+  offerDetails     String?
+  offerFinePrint   String?
+  /// Google OfferClass.redemptionChannel: INSTORE | ONLINE | BOTH
+  redemptionChannel String @default("INSTORE")
+
+  // --- Google Wallet optional labels
+  accountNameLabel String?
+  accountIdLabel   String?
+  rewardsTierLabel String?
+  rewardsTier      String?
+
+  // --- Google Wallet optional features (disabled by default)
+  googleAccountNameEnabled Boolean @default(false)
+  googleRewardsTierEnabled Boolean @default(false)
 
   // --- advanced
   barcodeFormat String    @default("QR")
@@ -270,17 +302,36 @@ model IssuedPass {
   stamps        Int     @default(0)
   designVersion Int
 
+  /// Which pass this row is. A STAMP card also issues COUPON passes as its reward, so the
+  /// kind belongs to the pass, not only to the card it hangs off.
+  kind CardKind @default(STAMP)
+
+  /// COUPON only: single-use secret that lets the customer add this exact pass to their
+  /// wallet. The serial cannot serve that purpose — it is printed on the pass and shown at
+  /// the till, so anyone who saw one could mint themselves a copy.
+  ///
+  /// Indexed but deliberately not `@unique`: `prisma db push` refuses to add a unique
+  /// constraint without `--accept-data-loss`, and arming that flag in the deploy command
+  /// would wave through every future destructive change as well. Uniqueness comes from the
+  /// value instead — 32 random bytes, so a collision is not a case worth designing for.
+  claimToken String?
+
   /// Stamp goal at issue time — the card keeps its own goal even if the design changes.
   stampGoal    Int       @default(10)
   /// Set when a full card was cashed in; the counter restarts from zero.
   lastRewardAt DateTime?
   rewardCount  Int       @default(0)
 
+  /// COUPON only: a coupon is single-use, so this is the hard latch against a second
+  /// redemption. Null means unredeemed. Stamp cards never set it — they restart instead.
+  redeemedAt DateTime?
+
   createdAt DateTime @default(now())
 
   events StampEvent[]
 
   @@index([cardId, isTest])
+  @@index([claimToken])
 }
 
 enum StampEventKind {

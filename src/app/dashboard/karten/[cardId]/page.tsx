@@ -74,14 +74,18 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
   )
 
   return (
-    <CardEditorProvider init={{ cardId: card.id, design: draft.design, assetUrls }}>
+    <CardEditorProvider init={{ cardId: card.id, kind: card.kind, design: draft.design, assetUrls }}>
       <CardEditorShell
         cardName={card.name}
         location={location}
         userEmail={access.session.email}
         publishedVersion={draft.publishedVersion}
-        // Only on a card nobody has touched yet — see isPristineDesign.
-        suggestTemplate={draft.publishedVersion === null && isPristineDesign(draft.design)}
+        // Templates carry stamp goals and icons, so they only make sense for a stamp card.
+        suggestTemplate={
+          card.kind === 'STAMP' &&
+          draft.publishedVersion === null &&
+          isPristineDesign(draft.design)
+        }
         canStamp={access.canStamp}
       />
     </CardEditorProvider>

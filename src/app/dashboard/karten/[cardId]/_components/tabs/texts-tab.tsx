@@ -17,6 +17,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
   const addBackField = useCardEditor((s) => s.addBackField)
+  const isStamp = useCardEditor((s) => s.kind === 'STAMP')
 
   const existingTypes = new Set(design.backFields.map((f) => f.label.toLowerCase()))
   const legalKinds = new Set(design.backFields.filter((f) => f.type === 'legal').map((f) => f.kind))
@@ -117,18 +118,38 @@ export function TextsTab({ location }: { location: LocationSummary }) {
       <PanelSection title="Kartentexte">
         <div className="space-y-3">
           <Field
-            label="Programmname"
-            htmlFor="program-name"
-            hint="Pflichtfeld zum Veröffentlichen."
+            label="Aussteller"
+            htmlFor="issuer-display-name"
+            hint={`Steht auf der Google-Karte ganz oben. Leer = „${location.organizationName}“.`}
           >
             <Input
-              id="program-name"
-              value={design.programName}
-              maxLength={30}
-              placeholder="Kaffeekarte"
-              onChange={(e) => patch({ programName: e.target.value })}
+              id="issuer-display-name"
+              value={design.issuerDisplayName ?? ''}
+              maxLength={40}
+              placeholder={location.organizationName}
+              onChange={(e) => patch({ issuerDisplayName: e.target.value || null })}
             />
           </Field>
+
+          {/*
+            A coupon is named by its offer title, which `buildPassJson` and the Wallet list
+            both use — asking for a second name here would only create two competing ones.
+          */}
+          {isStamp ? (
+            <Field
+              label="Programmname"
+              htmlFor="program-name"
+              hint="Pflichtfeld · Apple: Überschrift, Google: Name in der Wallet-Liste"
+            >
+              <Input
+                id="program-name"
+                value={design.programName}
+                maxLength={30}
+                placeholder="Kaffeekarte"
+                onChange={(e) => patch({ programName: e.target.value })}
+              />
+            </Field>
+          ) : null}
 
           <Field
             label="Kartenüberschrift"
@@ -145,19 +166,21 @@ export function TextsTab({ location }: { location: LocationSummary }) {
             />
           </Field>
 
-          <Field
-            label="Label für den Stempelstand"
-            htmlFor="stamp-label"
-            hint={'Steht über der Zahl, z. B. „Besuche“.'}
-          >
-            <Input
-              id="stamp-label"
-              value={design.stampLabel}
-              maxLength={16}
-              placeholder="Stempel"
-              onChange={(e) => patch({ stampLabel: e.target.value })}
-            />
-          </Field>
+          {isStamp ? (
+            <Field
+              label="Label für den Stempelstand"
+              htmlFor="stamp-label"
+              hint={'Steht über der Zahl, z. B. „Besuche“.'}
+            >
+              <Input
+                id="stamp-label"
+                value={design.stampLabel}
+                maxLength={16}
+                placeholder="Stempel"
+                onChange={(e) => patch({ stampLabel: e.target.value })}
+              />
+            </Field>
+          ) : null}
         </div>
       </PanelSection>
 

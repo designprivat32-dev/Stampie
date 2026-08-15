@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { temporal } from 'zundo'
-import type { BackField, CardDesignInput, GeoLocation } from '@/lib/cards/schema'
+import type { BackField, CardDesignInput, CardKind, GeoLocation } from '@/lib/cards/schema'
 import type { StripTarget } from '@/lib/cards/render-strip'
 
 export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
@@ -11,6 +11,14 @@ export type PreviewTheme = 'light' | 'dark'
 
 export interface CardEditorState {
   cardId: string
+  /**
+   * Which pass this card issues. Lives in the store rather than being passed down, because
+   * stamp-specific controls sit in half a dozen unrelated components — a prop would have to
+   * reach every one of them, and the ones it did not reach would silently keep offering
+   * stamps on a coupon. Immutable for the lifetime of the editor: the kind is fixed at
+   * creation.
+   */
+  kind: CardKind
   design: CardDesignInput
 
   /** JSON of the last successfully persisted design — the dirty check compares to this. */
@@ -61,6 +69,8 @@ export interface CardEditorState {
 
 export interface CardEditorInit {
   cardId: string
+  /** Defaults to the stamp card, which is what every card created before coupons is. */
+  kind?: CardKind
   design: CardDesignInput
   assetUrls?: Record<string, string>
 }
@@ -72,6 +82,7 @@ export const createCardEditorStore = (init: CardEditorInit) =>
     temporal(
       (set, get) => ({
         cardId: init.cardId,
+        kind: init.kind ?? 'STAMP',
         design: init.design,
 
         savedSnapshot: snapshot(init.design),

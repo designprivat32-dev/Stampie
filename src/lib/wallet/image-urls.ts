@@ -29,7 +29,7 @@ function hash(input: string): string {
  * keeps the old URL, and Google — which caches pass images by URL and never revalidates —
  * goes on serving the broken logo forever.
  */
-const LOGO_RENDERER_VERSION = '4'
+const LOGO_RENDERER_VERSION = '5'
 
 /** Fields the generated logo depends on. */
 function logoVersion(design: CardDesignInput): string {

@@ -18,6 +18,7 @@ export function BrandingTab() {
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
   const setAssetUrl = useCardEditor((s) => s.setAssetUrl)
+  const isStamp = useCardEditor((s) => s.kind === 'STAMP')
   // The preview switch decides which wallet's settings are on screen.
   const platform = useCardEditor((s) => s.previewPlatform)
 
@@ -176,20 +177,26 @@ export function BrandingTab() {
         </div>
       </PanelSection>
 
-      <PanelSection title="Hintergrundbild" action={<PlatformSupportBadge field="hero" />}>
-        <AssetUpload
-          kind="HERO"
-          assetId={design.heroAssetId}
-          label="Hintergrundbild"
-          hint="Optional · 1032 × 336 (3:1) · hinter der Stempelreihe"
-          aspect={1032 / 336}
-          previewClassName="h-12 w-24"
-          cropTitle="Hintergrundbild zuschneiden"
-          cropDescription="Google Wallet zeigt das Bild im Verhältnis 3:1. Apple Wallet nutzt einen deutlich schmaleren Ausschnitt."
-          onUploaded={(asset) => patch({ heroAssetId: asset.id })}
-          onCleared={() => patch({ heroAssetId: null })}
-        />
-      </PanelSection>
+      {/*
+        The background image is composited *into* the stamp strip by the renderer, so it
+        has nowhere to go on a coupon — that pass carries no strip at all.
+      */}
+      {isStamp ? (
+        <PanelSection title="Hintergrundbild" action={<PlatformSupportBadge field="hero" />}>
+          <AssetUpload
+            kind="HERO"
+            assetId={design.heroAssetId}
+            label="Hintergrundbild"
+            hint="Optional · 1032 × 336 (3:1) · hinter der Stempelreihe"
+            aspect={1032 / 336}
+            previewClassName="h-12 w-24"
+            cropTitle="Hintergrundbild zuschneiden"
+            cropDescription="Google Wallet zeigt das Bild im Verhältnis 3:1. Apple Wallet nutzt einen deutlich schmaleren Ausschnitt."
+            onUploaded={(asset) => patch({ heroAssetId: asset.id })}
+            onCleared={() => patch({ heroAssetId: null })}
+          />
+        </PanelSection>
+      ) : null}
     </div>
   )
 }

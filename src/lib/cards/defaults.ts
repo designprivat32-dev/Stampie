@@ -17,8 +17,26 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
 
   programName: '',
   cardTitle: null,
+  issuerDisplayName: null,
   stampLabel: 'Stempel',
   backFields: [],
+
+  // Coupon fields — the card itself for COUPON, the reward for a STAMP card
+  rewardCouponEnabled: false,
+  offerTitle: null,
+  offerDetails: null,
+  offerFinePrint: null,
+  redemptionChannel: 'INSTORE',
+
+  // Google Wallet optional labels
+  accountNameLabel: null,
+  accountIdLabel: null,
+  rewardsTierLabel: null,
+  rewardsTier: null,
+
+  // Google Wallet optional features (disabled by default)
+  googleAccountNameEnabled: false,
+  googleRewardsTierEnabled: false,
 
   barcodeFormat: 'QR',
   geoLocations: [],

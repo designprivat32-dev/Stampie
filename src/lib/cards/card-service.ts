@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
+import type { CardKind } from './schema'
 
 /**
  * Reads around the `Card` aggregate.
@@ -35,6 +36,16 @@ export interface CardSummary {
     stampIconAssetId: string | null
     heroAssetId: string | null
   } | null
+}
+
+/**
+ * What the card issues. Every consumer of a design needs it — the publish gate, the pass
+ * builders and the editor all branch on it — so it is read from the card, never inferred
+ * from whether coupon fields happen to be filled in.
+ */
+export async function cardKind(cardId: string): Promise<CardKind> {
+  const card = await prisma.card.findFirst({ where: { id: cardId }, select: { kind: true } })
+  return card?.kind ?? 'STAMP'
 }
 
 /** The name shown as the pass issuer. Falls back sensibly for unassigned cards. */
