@@ -360,7 +360,12 @@ model IssuedPass {
   /// Bumped on every write. The tag a device hands back as `passesUpdatedSince` — "give me
   /// what changed after this" — is this value, so it has to move on every stamp, not just
   /// on demand.
-  updatedAt DateTime @updatedAt
+  ///
+  /// `@default(now())` as well as `@updatedAt`: without a default, adding the column to a
+  /// table that already holds passes is a change Postgres cannot make, and the deploy
+  /// stops. Existing rows start at the moment of the migration, which is harmless — no
+  /// device is registered for them yet.
+  updatedAt DateTime @default(now()) @updatedAt
 
   createdAt DateTime @default(now())
 
