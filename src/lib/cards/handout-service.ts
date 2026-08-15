@@ -85,18 +85,24 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
  * Test passes are excluded from the lookup so a card tried out from the dashboard is never
  * mistaken for the customer's real one.
  */
-export async function issuePassForDevice(
+export async function findPassForDevice(
   resolved: ResolvedHandout,
   deviceKey: string,
-): Promise<{ serial: string; currentStamps: number; created: boolean }> {
+): Promise<{ serial: string; currentStamps: number } | null> {
   const existing = await prisma.issuedPass.findFirst({
     where: { cardId: resolved.cardId, deviceKey, isTest: false, kind: resolved.kind },
     select: { serial: true, stamps: true },
     orderBy: { createdAt: 'desc' },
   })
-  if (existing) {
-    return { serial: existing.serial, currentStamps: existing.stamps, created: false }
-  }
+  return existing ? { serial: existing.serial, currentStamps: existing.stamps } : null
+}
+
+export async function issuePassForDevice(
+  resolved: ResolvedHandout,
+  deviceKey: string,
+): Promise<{ serial: string; currentStamps: number; created: boolean }> {
+  const existing = await findPassForDevice(resolved, deviceKey)
+  if (existing) return { ...existing, created: false }
 
   const pass = await prisma.issuedPass.create({
     data: {

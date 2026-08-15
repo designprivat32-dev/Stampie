@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import {
   DEVICE_COOKIE,
   DEVICE_COOKIE_MAX_AGE,
+  findPassForDevice,
   issuePassForDevice,
   newDeviceKey,
   resolveHandoutCode,
@@ -42,17 +43,25 @@ export async function GET(
   const existingKey = request.cookies.get(DEVICE_COOKIE)?.value
   const deviceKey = existingKey ?? newDeviceKey()
 
-  // The chip sits in public. Without a ceiling, one person with a spare afternoon could
-  // mint thousands of passes and drown the shop's numbers.
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  if (!rateLimit(`handout:${resolved.cardId}:${ip}`, 20, 60 * 60 * 1000).allowed) {
-    return NextResponse.json(
-      { error: 'Zu viele Karten von diesem Anschluss. Bitte später erneut versuchen.' },
-      { status: 429 },
-    )
+  // Handing back a card this phone already holds creates nothing, so it is never rate
+  // limited — otherwise a customer re-tapping their own card (which they will, because
+  // tapping *looks* like how you collect a stamp) eats the shop's allowance.
+  const existing = existingKey ? await findPassForDevice(resolved, deviceKey) : null
+
+  if (!existing) {
+    // Only minting a new pass is capped, and generously: every customer in a café sits
+    // behind the same WiFi address, so a tight per-IP ceiling locks out real people on a
+    // busy afternoon. This is a backstop against a script, not a queue.
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    if (!rateLimit(`handout:${resolved.cardId}:${ip}`, 120, 60 * 60 * 1000).allowed) {
+      return NextResponse.json(
+        { error: 'Zu viele neue Karten von diesem Anschluss. Bitte später erneut versuchen.' },
+        { status: 429 },
+      )
+    }
   }
 
-  const { serial, currentStamps } = await issuePassForDevice(resolved, deviceKey)
+  const { serial, currentStamps } = existing ?? (await issuePassForDevice(resolved, deviceKey))
   const design = await toHandoutDesign(resolved, currentStamps, serial)
   const builder = getPassBuilder()
 

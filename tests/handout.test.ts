@@ -17,6 +17,7 @@ vi.mock('@/lib/cards/repository', () => ({
 vi.mock('@/lib/cards/asset-service', () => ({ loadPassAssets: async () => ({}) }))
 
 const {
+  findPassForDevice,
   issuePassForDevice,
   newDeviceKey,
   newNfcCode,
@@ -110,6 +111,30 @@ describe('issuePassForDevice', () => {
     expect(create).toHaveBeenCalledTimes(2)
     expect(findFirst.mock.calls[0]?.[0].where.deviceKey).toBe('device-1')
     expect(findFirst.mock.calls[1]?.[0].where.deviceKey).toBe('device-2')
+  })
+})
+
+/**
+ * Split out from issuing so the route can tell "this phone already has a card" from "this
+ * mints a new one" *before* deciding whether the rate limit applies. A returning customer
+ * must never be turned away by a ceiling meant for scripts.
+ */
+describe('findPassForDevice', () => {
+  it('reports an existing pass without creating anything', async () => {
+    findFirst.mockResolvedValue({ serial: 'K-ABCDEF', stamps: 7 })
+
+    expect(await findPassForDevice(resolved, 'device-1')).toEqual({
+      serial: 'K-ABCDEF',
+      currentStamps: 7,
+    })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('reports null for a phone that has none, still without creating', async () => {
+    findFirst.mockResolvedValue(null)
+
+    expect(await findPassForDevice(resolved, 'device-1')).toBeNull()
+    expect(create).not.toHaveBeenCalled()
   })
 })
 
