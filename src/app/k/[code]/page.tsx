@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { detectPlatform } from '@/lib/cards/test-card-service'
 import { resolveHandoutCode } from '@/lib/cards/handout-service'
+import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,24 +47,8 @@ export default async function HandoutLandingPage({
   const title = design.cardTitle?.trim() || design.programName.trim() || 'Stempelkarte'
   const reward = design.rewardText.trim()
 
-  const apple = (
-    <a
-      key="apple"
-      href={`/api/k/${code}?p=apple`}
-      className="block rounded-xl bg-ink px-4 py-3.5 text-center text-[15px] font-medium text-surface"
-    >
-      Zu Apple Wallet hinzufügen
-    </a>
-  )
-  const google = (
-    <a
-      key="google"
-      href={`/api/k/${code}?p=google`}
-      className="block rounded-xl border border-line bg-surface px-4 py-3.5 text-center text-[15px] font-medium text-ink"
-    >
-      Zu Google Wallet hinzufügen
-    </a>
-  )
+  const apple = <AppleWalletButton key="apple" href={`/api/k/${code}?p=apple`} className="w-full justify-center" />
+  const google = <GoogleWalletButton key="google" href={`/api/k/${code}?p=google`} className="w-full justify-center" />
 
   // The detected wallet leads; the other one keeps its full-size button rather than being
   // demoted to fine print, because a wrong guess otherwise looks like an unsupported phone.

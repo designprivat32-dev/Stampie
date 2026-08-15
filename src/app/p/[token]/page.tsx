@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import { detectPlatform, resolveTestCardToken } from '@/lib/cards/test-card-service'
+import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,22 +35,10 @@ export default async function TestCardLandingPage({
   const name = resolved.design.programName.trim() || 'Stempelkarte'
 
   const apple = (
-    <a
-      key="apple"
-      href={`/api/test-card/${token}?p=apple`}
-      className="flex h-12 items-center justify-center rounded-lg bg-ink px-5 text-sm font-medium text-surface"
-    >
-      Zu Apple Wallet hinzufügen
-    </a>
+    <AppleWalletButton key="apple" href={`/api/test-card/${token}?p=apple`} className="w-full justify-center" />
   )
   const google = (
-    <a
-      key="google"
-      href={`/api/test-card/${token}?p=google`}
-      className="flex h-12 items-center justify-center rounded-lg border border-line bg-surface px-5 text-sm font-medium text-ink"
-    >
-      Zu Google Wallet hinzufügen
-    </a>
+    <GoogleWalletButton key="google" href={`/api/test-card/${token}?p=google`} className="w-full justify-center" />
   )
   const buttons = platform === 'google' ? [google, apple] : [apple, google]
 
