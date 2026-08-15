@@ -2,7 +2,7 @@
 
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
-import { assertCardAccess, isAgency, requireSession } from '@/lib/auth/session'
+import { assertCardAccess, isAdminSession, requireSession } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { accessibleOrgIds, listCards, listCustomers, type CardSummary } from '@/lib/cards/card-service'
@@ -14,9 +14,9 @@ import { cardKindSchema } from '@/lib/cards/schema'
 /**
  * Card lifecycle: list, create, assign, archive.
  *
- * Everything here is scoped by what the caller may see — agency members reach every card,
- * customers only their own organisation's. `accessibleOrgIds` returns null for agency,
- * which the queries read as "no restriction".
+ * Everything here is scoped by what the caller may see. `accessibleOrgIds` returns null
+ * for the dashboard operator, which the queries read as "no restriction"; customer logins
+ * never arrive here, they go through the app API.
  */
 
 const createInputSchema = z.object({
@@ -118,8 +118,8 @@ export async function assignCardAction(input: unknown): Promise<ActionResult<nul
     if (!parsed.success) return fromZodError(parsed.error)
 
     const session = await requireSession()
-    if (!(await isAgency(session.userId))) {
-      return fail('Nur das Agentur-Team darf Karten zuweisen.', 'forbidden')
+    if (!(await isAdminSession(session.userId))) {
+      return fail('Karten zuweisen darf nur die Verwaltung.', 'forbidden')
     }
     await assertCardAccess(parsed.data.cardId)
 

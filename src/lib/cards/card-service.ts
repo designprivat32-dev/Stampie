@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
+import { isAdminSession } from '@/lib/auth/session'
 import type { CardKind } from './schema'
 
 /**
@@ -160,12 +161,19 @@ export async function listCustomers(orgIds: string[] | null): Promise<CustomerOp
   return rows
 }
 
-/** Organisations the user belongs to; null for agency members, who see everything. */
+/**
+ * Organisations the user may see, or null for "no restriction".
+ *
+ * Null for the dashboard operator (see `isAdminSession`) — otherwise a card handed to a
+ * customer would disappear from the very overview it was handed out in. Customer logins
+ * never reach this function; the app API scopes itself by `orgId`.
+ */
 export async function accessibleOrgIds(userId: string): Promise<string[] | null> {
+  if (await isAdminSession(userId)) return null
+
   const memberships = await prisma.membership.findMany({
     where: { userId },
-    select: { orgId: true, role: true },
+    select: { orgId: true },
   })
-  if (memberships.some((m) => m.role === 'AGENCY')) return null
   return memberships.map((m) => m.orgId)
 }

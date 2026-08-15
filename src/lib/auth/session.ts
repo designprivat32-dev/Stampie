@@ -79,22 +79,33 @@ export class StampPermissionError extends Error {
   }
 }
 
-/** True when the user holds an agency membership anywhere. */
-export async function isAgency(userId: string): Promise<boolean> {
-  const membership = await prisma.membership.findFirst({
-    where: { userId, role: 'AGENCY' },
-    select: { id: true },
-  })
-  return membership !== null
+/**
+ * Whether this session administers every customer.
+ *
+ * Single-operator setup, same premise as `/dashboard/kunden`: the web dashboard has no
+ * real login — `getSession()` resolves the one operator from `DEV_SESSION_USER_EMAIL` —
+ * so whoever reaches it *is* the operator, whatever the membership rows happen to say.
+ * Tying card assignment to an AGENCY row meant a freshly created login could add customers
+ * but not hand a card to one, which is not a rule anyone chose.
+ *
+ * This does not widen what a *customer* sees. Their logins go through the app API
+ * (`lib/auth/app-session.ts`), which scopes every query to their own `orgId` and never
+ * touches this function.
+ *
+ * Deliberately a function rather than an inlined `true`: when real dashboard auth lands,
+ * this is the single place that decides who administers all customers.
+ */
+export async function isAdminSession(_userId: string): Promise<boolean> {
+  return true
 }
 
 /**
  * The tenancy gate for cards.
  *
- * Agency members reach every card, including ones not yet assigned to a customer.
- * Everyone else reaches only cards belonging to an organisation they are a member of.
- * A card that does not resolve is reported as missing, never as forbidden — otherwise a
- * guessed id would confirm that it exists.
+ * The dashboard operator reaches every card, including ones not yet assigned to a
+ * customer — see `isAdminSession`. Everyone else reaches only cards belonging to an
+ * organisation they are a member of. A card that does not resolve is reported as missing,
+ * never as forbidden — otherwise a guessed id would confirm that it exists.
  */
 export async function assertCardAccess(cardId: string): Promise<CardAccess> {
   const session = await requireSession()
@@ -105,9 +116,8 @@ export async function assertCardAccess(cardId: string): Promise<CardAccess> {
   })
   if (!card) throw new LocationAccessError('Karte nicht gefunden.')
 
-  const agency = await isAgency(session.userId)
-  if (agency) {
-    // Single-operator setup: the agency login also runs the till, so it may stamp assigned
+  if (await isAdminSession(session.userId)) {
+    // Single-operator setup: the operator also runs the till, so they may stamp assigned
     // cards. (Unassigned cards still cannot be stamped — assertStampAccess checks orgId.)
     return { session, cardId: card.id, orgId: card.orgId, role: 'AGENCY', canStamp: card.orgId !== null }
   }
