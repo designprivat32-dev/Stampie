@@ -209,6 +209,8 @@ function printEnv(): void {
       '',
       `APPLE_PASS_TYPE_ID="${passTypeId}"`,
       `APPLE_TEAM_ID="${teamId}"`,
+      // Empty on purpose. Deployment UIs that reject empty values can drop the line
+      // entirely — a missing variable and an empty one are read the same way.
       'APPLE_PASS_CERTIFICATE_PASSWORD=""',
       `APPLE_PASS_CERTIFICATE="${base64}"`,
       '',

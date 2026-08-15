@@ -70,7 +70,12 @@ APPLE_PASS_CERTIFICATE_PASSWORD=""
 APPLE_PASS_CERTIFICATE="MIIL…"   # base64 der .p12, eine sehr lange Zeile
 ```
 
-Auf Vercel dieselben vier Werte unter *Settings → Environment Variables* anlegen und
+`APPLE_PASS_CERTIFICATE_PASSWORD` ist absichtlich leer — das Skript exportiert die `.p12`
+ohne Export-Passwort. Ein fehlender und ein leerer Wert werden identisch gelesen, die
+Zeile darf also auch ganz wegfallen. Vercel nimmt leere Werte teilweise nicht an; dort
+reichen die drei anderen.
+
+Auf Vercel dieselben Werte unter *Settings → Environment Variables* anlegen und
 neu deployen. `APPLE_PASS_CERTIFICATE` ist base64, damit es als Umgebungsvariable
 transportierbar ist — die `.p12` selbst gehört nicht ins Repository.
 
