@@ -7,6 +7,7 @@ import {
   ChevronDown,
   History,
   LayoutTemplate,
+  Nfc,
   QrCode,
   Redo2,
   Rocket,
@@ -20,6 +21,7 @@ import { PreviewPane } from './preview/preview-pane'
 import { SaveStatusIndicator } from './save-status-indicator'
 import { PublishDialog } from './dialogs/publish-dialog'
 import { TemplateDialog } from './dialogs/template-dialog'
+import { HandoutDialog } from './dialogs/handout-dialog'
 import { TestCardDialog } from './dialogs/test-card-dialog'
 import { VersionHistoryDialog } from './dialogs/version-history-dialog'
 import { useAutosave } from '@/hooks/use-autosave'
@@ -63,6 +65,7 @@ export function CardEditorShell({
 
   const [templateOpen, setTemplateOpen] = React.useState(suggestTemplate)
   const [testCardOpen, setTestCardOpen] = React.useState(false)
+  const [handoutOpen, setHandoutOpen] = React.useState(false)
   const [publishOpen, setPublishOpen] = React.useState(false)
   const [versionsOpen, setVersionsOpen] = React.useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = React.useState(false)
@@ -142,6 +145,10 @@ export function CardEditorShell({
                 </Button>
               ) : null}
 
+              <Button variant="ghost" size="sm" onClick={() => setHandoutOpen(true)}>
+                <Nfc />
+                Ausgeben
+              </Button>
               <Button variant="secondary" size="sm" onClick={() => setTestCardOpen(true)}>
                 <Smartphone />
                 Testkarte aufs Handy
@@ -195,6 +202,7 @@ export function CardEditorShell({
       </div>
 
       <TemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
+      <HandoutDialog open={handoutOpen} onOpenChange={setHandoutOpen} />
       <TestCardDialog
         open={testCardOpen}
         onOpenChange={setTestCardOpen}

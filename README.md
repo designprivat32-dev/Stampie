@@ -106,6 +106,7 @@ Organization (= Kunde)
 | `/dashboard/karten/[cardId]/stempeln` | Kassenansicht |
 | `/s/[serial]` | Ziel des Barcodes |
 | `/p/[token]` | Testkarten-Landing für den QR |
+| `/k/[code]` | Kartenausgabe: Ziel des NFC-Chips und des Aufsteller-QR |
 
 ### Rollen
 
@@ -154,7 +155,7 @@ im Wallet landet.
 npm test
 ```
 
-448 Tests: Rasterberechnung (N = 3, 5, 6, 10, 12, 20 plus Randfälle), PNG-Ausgabe in allen
+464 Tests: Rasterberechnung (N = 3, 5, 6, 10, 12, 20 plus Randfälle), PNG-Ausgabe in allen
 drei Auflösungen, WCAG-Kontrast, das Zod-Schema inklusive jeder PassKit-Grenze, das
 PassKit-/Google-Mapping, die Upload-Pipeline (Magic Bytes, SVG-Sanitizing, EXIF), der
 ZIP-Writer, die Apple-Signatur (PKCS#12-Import, Zertifikatsprüfung, detached PKCS#7),
