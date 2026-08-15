@@ -1,12 +1,7 @@
-import { cookies, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { detectPlatform } from '@/lib/cards/test-card-service'
-import {
-  DEVICE_COOKIE,
-  DEVICE_COOKIE_MAX_AGE,
-  newDeviceKey,
-  resolveHandoutCode,
-} from '@/lib/cards/handout-service'
+import { resolveHandoutCode } from '@/lib/cards/handout-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +13,10 @@ export const dynamic = 'force-dynamic'
  * sees one system dialog and is done. Everything we cannot classify gets a choice instead
  * of a wrong guess.
  *
- * The device cookie is set *here* rather than in the download route: a redirect sets it
- * just as well, but only this page is guaranteed to run before either wallet path, and the
- * cookie is what makes a second tap return the same card.
+ * The device cookie that makes a second tap return the same card is set by
+ * `/api/k/[code]`, not here: Next only allows writing cookies from a Server Action or a
+ * Route Handler, and every path out of this page — the automatic redirect as much as the
+ * two buttons — goes through that route anyway.
  */
 export default async function HandoutLandingPage({
   params,
@@ -39,17 +35,6 @@ export default async function HandoutLandingPage({
         </p>
       </main>
     )
-  }
-
-  const jar = await cookies()
-  if (!jar.get(DEVICE_COOKIE)) {
-    jar.set(DEVICE_COOKIE, newDeviceKey(), {
-      maxAge: DEVICE_COOKIE_MAX_AGE,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    })
   }
 
   const platform = detectPlatform((await headers()).get('user-agent'))
