@@ -1,5 +1,4 @@
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { detectPlatform, resolveTestCardToken } from '@/lib/cards/test-card-service'
 
 export const dynamic = 'force-dynamic'
@@ -7,9 +6,10 @@ export const dynamic = 'force-dynamic'
 /**
  * Landing page for the test-card QR code.
  *
- * iOS and Android are sent straight through to the right download, so the path from scan
- * to card-in-wallet is one redirect. Everything else (desktop, in-app browsers we cannot
- * classify) gets an explicit choice instead of a wrong guess.
+ * The device is detected only to decide which button leads — never to redirect. Sending
+ * the top-level navigation to a `.pkpass` hands the browser a download instead of a
+ * document, and Wallet's sheet then opens over a blank screen that the customer is still
+ * looking at afterwards. Same reasoning as `/k/[code]`.
  */
 export default async function TestCardLandingPage({
   params,
@@ -31,10 +31,27 @@ export default async function TestCardLandingPage({
   }
 
   const platform = detectPlatform((await headers()).get('user-agent'))
-  if (platform === 'apple') redirect(`/api/test-card/${token}?p=apple`)
-  if (platform === 'google') redirect(`/api/test-card/${token}?p=google`)
-
   const name = resolved.design.programName.trim() || 'Stempelkarte'
+
+  const apple = (
+    <a
+      key="apple"
+      href={`/api/test-card/${token}?p=apple`}
+      className="flex h-12 items-center justify-center rounded-lg bg-ink px-5 text-sm font-medium text-surface"
+    >
+      Zu Apple Wallet hinzufügen
+    </a>
+  )
+  const google = (
+    <a
+      key="google"
+      href={`/api/test-card/${token}?p=google`}
+      className="flex h-12 items-center justify-center rounded-lg border border-line bg-surface px-5 text-sm font-medium text-ink"
+    >
+      Zu Google Wallet hinzufügen
+    </a>
+  )
+  const buttons = platform === 'google' ? [google, apple] : [apple, google]
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
@@ -46,20 +63,7 @@ export default async function TestCardLandingPage({
         </p>
       </div>
 
-      <div className="flex w-full flex-col gap-3">
-        <a
-          href={`/api/test-card/${token}?p=apple`}
-          className="flex h-12 items-center justify-center rounded-lg bg-ink px-5 text-sm font-medium text-white"
-        >
-          Zu Apple Wallet hinzufügen
-        </a>
-        <a
-          href={`/api/test-card/${token}?p=google`}
-          className="flex h-12 items-center justify-center rounded-lg border border-line bg-surface px-5 text-sm font-medium text-ink"
-        >
-          Zu Google Wallet hinzufügen
-        </a>
-      </div>
+      <div className="flex w-full flex-col gap-3">{buttons}</div>
 
       <p className="text-[12px] text-ink-3">Dieser Link ist 30 Minuten gültig.</p>
     </main>

@@ -1,5 +1,4 @@
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { detectPlatform } from '@/lib/cards/test-card-service'
 import { resolveHandoutCode } from '@/lib/cards/handout-service'
 
@@ -9,14 +8,18 @@ export const dynamic = 'force-dynamic'
  * Where the NFC chip and the counter QR point.
  *
  * The chip stores this URL and nothing else — tapping it opens this page, on any phone,
- * without an app. iOS and Android are sent straight to the right wallet, so the customer
- * sees one system dialog and is done. Everything we cannot classify gets a choice instead
- * of a wrong guess.
+ * without an app.
  *
- * The device cookie that makes a second tap return the same card is set by
- * `/api/k/[code]`, not here: Next only allows writing cookies from a Server Action or a
- * Route Handler, and every path out of this page — the automatic redirect as much as the
- * two buttons — goes through that route anyway.
+ * This page deliberately does *not* redirect straight to the pass. It used to, and the
+ * result was a blank screen: sending the top-level navigation to a `.pkpass` gives the
+ * browser a download instead of a document, so Wallet's sheet opened over nothing and the
+ * customer was left staring at an empty page after adding the card. A tap on a link from
+ * a rendered page behaves differently — the sheet opens *over this page*, and closing it
+ * comes back here.
+ *
+ * The device is still detected, but only to decide which button leads. Detection is a
+ * guess — an iPad reports as a Mac, in-app browsers lie — so the other wallet stays one
+ * tap away rather than being hidden behind a wrong assumption.
  */
 export default async function HandoutLandingPage({
   params,
@@ -38,42 +41,57 @@ export default async function HandoutLandingPage({
   }
 
   const platform = detectPlatform((await headers()).get('user-agent'))
-  if (platform === 'apple') redirect(`/api/k/${code}?p=apple`)
-  if (platform === 'google') redirect(`/api/k/${code}?p=google`)
+  const { design } = resolved
 
-  const name = resolved.design.programName.trim() || 'Stempelkarte'
+  const title = design.cardTitle?.trim() || design.programName.trim() || 'Stempelkarte'
+  const reward = design.rewardText.trim()
+
+  const apple = (
+    <a
+      key="apple"
+      href={`/api/k/${code}?p=apple`}
+      className="block rounded-xl bg-ink px-4 py-3.5 text-center text-[15px] font-medium text-surface"
+    >
+      Zu Apple Wallet hinzufügen
+    </a>
+  )
+  const google = (
+    <a
+      key="google"
+      href={`/api/k/${code}?p=google`}
+      className="block rounded-xl border border-line bg-surface px-4 py-3.5 text-center text-[15px] font-medium text-ink"
+    >
+      Zu Google Wallet hinzufügen
+    </a>
+  )
+
+  // The detected wallet leads; the other one keeps its full-size button rather than being
+  // demoted to fine print, because a wrong guess otherwise looks like an unsupported phone.
+  const buttons = platform === 'google' ? [google, apple] : [apple, google]
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
-      <div className="space-y-1">
-        <p className="text-[13px] uppercase tracking-wide text-ink-3">
-          {resolved.organizationName}
-        </p>
-        <h1 className="text-xl font-semibold text-ink">{name}</h1>
-        <p className="text-sm text-ink-2">
-          Wähle aus, in welches Wallet die Karte gelegt werden soll.
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10">
+      <div className="flex flex-1 flex-col justify-center gap-7">
+        {/* The card's own colours, so the page reads as the shop's, not as ours. */}
+        <div
+          className="rounded-2xl px-5 py-7 text-center"
+          style={{ backgroundColor: design.backgroundColor, color: design.foregroundColor }}
+        >
+          <p className="text-[13px] opacity-75">{resolved.organizationName}</p>
+          <p className="mt-1 text-[22px] font-semibold leading-tight">{title}</p>
+          <p className="mt-3 text-[13px] opacity-75">
+            {design.stampGoal} {design.stampLabel.trim() || 'Stempel'}
+            {reward ? ` — ${reward}` : ''}
+          </p>
+        </div>
+
+        <div className="space-y-2.5">{buttons}</div>
+
+        <p className="text-center text-[12px] leading-snug text-ink-3">
+          Beim nächsten Antippen bekommst du wieder dieselbe Karte — mit den Stempeln, die
+          bis dahin darauf sind.
         </p>
       </div>
-
-      <div className="flex w-full flex-col gap-2">
-        <a
-          href={`/api/k/${code}?p=apple`}
-          className="rounded-lg bg-ink px-4 py-3 text-[14px] font-medium text-surface"
-        >
-          Zu Apple Wallet hinzufügen
-        </a>
-        <a
-          href={`/api/k/${code}?p=google`}
-          className="rounded-lg border border-line px-4 py-3 text-[14px] font-medium text-ink"
-        >
-          Zu Google Wallet hinzufügen
-        </a>
-      </div>
-
-      <p className="text-[12px] leading-snug text-ink-3">
-        Beim nächsten Antippen bekommst du wieder dieselbe Karte — mit den Stempeln, die
-        bis dahin darauf sind.
-      </p>
     </main>
   )
 }
