@@ -29,6 +29,8 @@ export interface ResolvedHandout {
   kind: CardKind
   organizationName: string
   design: CardDesignInput
+  /** Stamps a freshly issued pass starts with. Always 0 for a coupon — it has no counter. */
+  startStamps: number
 }
 
 /** Codes live on stickers and chips, so they are short enough to type but not guessable. */
@@ -49,7 +51,13 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
 
   const card = await prisma.card.findFirst({
     where: { nfcCode: code, archivedAt: null },
-    select: { id: true, name: true, kind: true, org: { select: { name: true } } },
+    select: {
+      id: true,
+      name: true,
+      kind: true,
+      handoutStartStamps: true,
+      org: { select: { name: true } },
+    },
   })
   if (!card) return null
 
@@ -61,6 +69,10 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
     kind: card.kind,
     organizationName: card.org?.name ?? card.name,
     design,
+    // Capped against *this* design's goal, not stored capped — the goal can change after
+    // the card has been live for a while, and the cap has to track that, not a snapshot.
+    startStamps:
+      card.kind === 'STAMP' ? Math.min(card.handoutStartStamps, design.stampGoal) : 0,
   }
 }
 
@@ -91,14 +103,14 @@ export async function issuePassForDevice(
       cardId: resolved.cardId,
       kind: resolved.kind,
       deviceKey,
-      stamps: 0,
+      stamps: resolved.startStamps,
       stampGoal: resolved.design.stampGoal,
       designVersion: 1,
     },
     select: { serial: true },
   })
 
-  return { serial: pass.serial, currentStamps: 0, created: true }
+  return { serial: pass.serial, currentStamps: resolved.startStamps, created: true }
 }
 
 /** Assembles what the PassBuilder needs, assets included. */

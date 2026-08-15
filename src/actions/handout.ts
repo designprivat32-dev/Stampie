@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db'
 import { appUrl } from '@/lib/app-url'
 import { newNfcCode } from '@/lib/cards/handout-service'
 import { loadPublishedDesign } from '@/lib/cards/repository'
+import type { CardKind } from '@/lib/cards/schema'
 
 /**
  * The public hand-out link: what goes onto the NFC chips and the counter QR.
@@ -30,6 +31,9 @@ export interface HandoutState {
   link: HandoutLink | null
   /** A draft has nothing to hand out — the link stays disabled until the card is published. */
   isPublished: boolean
+  kind: CardKind
+  /** Stamps a freshly issued pass starts with. Always 0 for a coupon — it has no counter. */
+  startStamps: number
 }
 
 async function buildLink(cardId: string, code: string): Promise<HandoutLink> {
@@ -49,7 +53,10 @@ export async function getHandoutStateAction(cardId: string): Promise<ActionResul
     await assertCardAccess(parsed.data)
 
     const [card, published] = await Promise.all([
-      prisma.card.findFirst({ where: { id: parsed.data }, select: { nfcCode: true } }),
+      prisma.card.findFirst({
+        where: { id: parsed.data },
+        select: { nfcCode: true, kind: true, handoutStartStamps: true },
+      }),
       loadPublishedDesign(parsed.data),
     ])
     if (!card) return fail('Karte nicht gefunden.', 'not_found')
@@ -57,6 +64,8 @@ export async function getHandoutStateAction(cardId: string): Promise<ActionResul
     return ok({
       link: card.nfcCode ? await buildLink(parsed.data, card.nfcCode) : null,
       isPublished: published !== null,
+      kind: card.kind,
+      startStamps: card.handoutStartStamps,
     })
   })
 }
@@ -90,6 +99,32 @@ export async function enableHandoutAction(cardId: string): Promise<ActionResult<
 
     revalidatePath('/dashboard/karten')
     return ok(await buildLink(parsed.data, code))
+  })
+}
+
+const updateStartStampsInputSchema = z.object({
+  cardId: z.string().cuid(),
+  // Not capped at the current stampGoal here — the design can still change after this is
+  // set, and resolveHandoutCode() re-caps against whatever goal is live at issue time.
+  value: z.number().int('Bitte eine ganze Zahl angeben.').min(0).max(999),
+})
+
+export async function updateHandoutStartStampsAction(
+  cardId: string,
+  value: number,
+): Promise<ActionResult<null>> {
+  return guarded(async () => {
+    const parsed = updateStartStampsInputSchema.safeParse({ cardId, value })
+    if (!parsed.success) return fail('Ungültiger Wert.', 'validation')
+
+    await assertCardAccess(parsed.data.cardId)
+    await prisma.card.update({
+      where: { id: parsed.data.cardId },
+      data: { handoutStartStamps: parsed.data.value },
+    })
+
+    revalidatePath('/dashboard/karten')
+    return ok(null)
   })
 }
 

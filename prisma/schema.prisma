@@ -140,6 +140,14 @@ model Card {
   /// add under `--accept-data-loss`.
   nfcCode String?
 
+  /// Stempel, mit denen eine frisch über den Ausgabe-Link ausgestellte Karte startet,
+  /// statt bei 0 — für eine Anlaufaktion ("1 Stempel geschenkt") oder den Umstieg von
+  /// Papierkarten. Gilt nur für neue Karten, nicht rückwirkend für bereits ausgegebene.
+  ///
+  /// Nicht gegen `stampGoal` gedeckelt: das Ziel kann sich ändern, nachdem die Karte
+  /// längst läuft, daher passiert das Deckeln erst beim tatsächlichen Ausstellen.
+  handoutStartStamps Int @default(0)
+
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   createdBy  String

@@ -30,6 +30,7 @@ const resolved = {
   kind: 'STAMP' as const,
   organizationName: 'Café Nord',
   design: { ...DEFAULT_CARD_DESIGN, stampGoal: 10 },
+  startStamps: 0,
 }
 
 beforeEach(() => {
@@ -79,6 +80,27 @@ describe('issuePassForDevice', () => {
     expect(findFirst.mock.calls[0]?.[0].where).toMatchObject({ isTest: false })
   })
 
+  it('starts a new pass with the configured start stamps, not 0', async () => {
+    findFirst.mockResolvedValue(null)
+    create.mockResolvedValue({ serial: 'K-ABCDEF' })
+
+    const result = await issuePassForDevice({ ...resolved, startStamps: 3 }, 'device-1')
+
+    expect(result).toEqual({ serial: 'K-ABCDEF', currentStamps: 3, created: true })
+    expect(create.mock.calls[0]?.[0].data.stamps).toBe(3)
+  })
+
+  it('ignores start stamps for a phone that already has a pass', async () => {
+    findFirst.mockResolvedValue({ serial: 'K-ABCDEF', stamps: 1 })
+
+    const result = await issuePassForDevice({ ...resolved, startStamps: 3 }, 'device-1')
+
+    // The tap comes after startStamps was set, but this device's card already exists —
+    // reissuing it at a higher count would hand out free stamps the till never booked.
+    expect(result.currentStamps).toBe(1)
+    expect(create).not.toHaveBeenCalled()
+  })
+
   it('keeps different phones apart', async () => {
     findFirst.mockResolvedValue(null)
     create.mockResolvedValue({ serial: 'K-111111' })
@@ -100,7 +122,13 @@ describe('resolveHandoutCode', () => {
   })
 
   it('hands out nothing for a card that was never published', async () => {
-    cardFindFirst.mockResolvedValue({ id: 'c1', name: 'Karte', kind: 'STAMP', org: null })
+    cardFindFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Karte',
+      kind: 'STAMP',
+      handoutStartStamps: 0,
+      org: null,
+    })
     loadPublishedDesign.mockResolvedValue(null)
 
     expect(await resolveHandoutCode('a'.repeat(22))).toBeNull()
@@ -114,11 +142,59 @@ describe('resolveHandoutCode', () => {
   })
 
   it('falls back to the card name when no customer is assigned', async () => {
-    cardFindFirst.mockResolvedValue({ id: 'c1', name: 'Kaffeekarte', kind: 'STAMP', org: null })
+    cardFindFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Kaffeekarte',
+      kind: 'STAMP',
+      handoutStartStamps: 0,
+      org: null,
+    })
     loadPublishedDesign.mockResolvedValue(DEFAULT_CARD_DESIGN)
 
     const result = await resolveHandoutCode('a'.repeat(22))
     expect(result?.organizationName).toBe('Kaffeekarte')
+  })
+
+  it('caps the configured start stamps at the current stamp goal', async () => {
+    cardFindFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Kaffeekarte',
+      kind: 'STAMP',
+      handoutStartStamps: 8,
+      org: null,
+    })
+    loadPublishedDesign.mockResolvedValue({ ...DEFAULT_CARD_DESIGN, stampGoal: 5 })
+
+    const result = await resolveHandoutCode('a'.repeat(22))
+    expect(result?.startStamps).toBe(5)
+  })
+
+  it('passes an unreached start stamp count through unchanged', async () => {
+    cardFindFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Kaffeekarte',
+      kind: 'STAMP',
+      handoutStartStamps: 2,
+      org: null,
+    })
+    loadPublishedDesign.mockResolvedValue({ ...DEFAULT_CARD_DESIGN, stampGoal: 10 })
+
+    const result = await resolveHandoutCode('a'.repeat(22))
+    expect(result?.startStamps).toBe(2)
+  })
+
+  it('is always 0 for a coupon, which has no counter to start', async () => {
+    cardFindFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Gutschein',
+      kind: 'COUPON',
+      handoutStartStamps: 5,
+      org: null,
+    })
+    loadPublishedDesign.mockResolvedValue(DEFAULT_CARD_DESIGN)
+
+    const result = await resolveHandoutCode('a'.repeat(22))
+    expect(result?.startStamps).toBe(0)
   })
 })
 

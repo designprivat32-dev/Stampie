@@ -16,6 +16,7 @@ import {
   disableHandoutAction,
   enableHandoutAction,
   getHandoutStateAction,
+  updateHandoutStartStampsAction,
   type HandoutState,
 } from '@/actions/handout'
 import { useCardEditor } from '@/stores/card-editor-provider'
@@ -35,12 +36,17 @@ export function HandoutDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const cardId = useCardEditor((s) => s.cardId)
+  const stampGoal = useCardEditor((s) => s.design.stampGoal)
 
   const [state, setState] = React.useState<HandoutState | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
   const [confirmingOff, setConfirmingOff] = React.useState(false)
+
+  const [startStamps, setStartStamps] = React.useState(0)
+  const [startStampsBusy, setStartStampsBusy] = React.useState(false)
+  const [startStampsSaved, setStartStampsSaved] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) return
@@ -49,17 +55,38 @@ export function HandoutDialog({
     setConfirmingOff(false)
     void (async () => {
       const result = await getHandoutStateAction(cardId)
-      if (result.success) setState(result.data)
-      else setError(result.error.message)
+      if (result.success) {
+        setState(result.data)
+        setStartStamps(result.data.startStamps)
+      } else {
+        setError(result.error.message)
+      }
     })()
   }, [open, cardId])
+
+  const saveStartStamps = async (next: number) => {
+    setStartStamps(next)
+    setStartStampsBusy(true)
+    setStartStampsSaved(false)
+    const result = await updateHandoutStartStampsAction(cardId, next)
+    if (!result.success) {
+      setError(result.error.message)
+    } else {
+      setState((prev) => (prev ? { ...prev, startStamps: next } : prev))
+      setStartStampsSaved(true)
+    }
+    setStartStampsBusy(false)
+  }
 
   const enable = async () => {
     setBusy(true)
     setError(null)
     const result = await enableHandoutAction(cardId)
-    if (result.success) setState({ link: result.data, isPublished: true })
-    else setError(result.error.message)
+    if (result.success) {
+      setState((prev) => (prev ? { ...prev, link: result.data, isPublished: true } : prev))
+    } else {
+      setError(result.error.message)
+    }
     setBusy(false)
   }
 
@@ -117,6 +144,44 @@ export function HandoutDialog({
             <p className="text-[12px] leading-snug text-ink-3">
               Bisher ausgegeben: <strong className="text-ink-2">{state.link.issuedCount}</strong>
             </p>
+
+            {state.kind === 'STAMP' ? (
+              <div className="space-y-1.5">
+                <label htmlFor="handout-start-stamps" className="text-[13px] font-medium text-ink">
+                  Startstempel neuer Karten
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="handout-start-stamps"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={stampGoal}
+                    value={startStamps}
+                    className="w-24"
+                    onChange={(e) => setStartStamps(Number(e.target.value))}
+                    onBlur={(e) => {
+                      const clamped = Math.min(
+                        Math.max(0, Math.round(Number(e.target.value) || 0)),
+                        stampGoal,
+                      )
+                      if (clamped !== state.startStamps) void saveStartStamps(clamped)
+                      else setStartStamps(clamped)
+                    }}
+                  />
+                  <span className="text-[12px] text-ink-3">von {stampGoal}</span>
+                  {startStampsBusy ? <Spinner className="size-3.5" /> : null}
+                  {!startStampsBusy && startStampsSaved ? (
+                    <Check className="size-3.5 text-ok" />
+                  ) : null}
+                </div>
+                <p className="text-[12px] leading-snug text-ink-3">
+                  Jede neue Karte über diesen Link startet mit so vielen Stempeln — z. B. für
+                  eine Anlaufaktion oder den Umstieg von Papierkarten. Bereits ausgegebene
+                  Karten ändern sich dadurch nicht.
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[12px] leading-snug text-ink-2">
               <p className="font-medium text-ink">Chip beschreiben</p>
