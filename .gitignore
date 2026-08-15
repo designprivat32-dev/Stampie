@@ -11,6 +11,11 @@ coverage/
 
 .pglite/
 
+# Apple Wallet signing material — private key, CSR, .p12.
+apple-certs/
+*.p12
+*.cer
+
 .vercel
 
 # Local dev helper scripts + first-run marker — not part of the shared project.

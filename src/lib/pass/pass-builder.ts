@@ -1,12 +1,12 @@
 import type { CardDesignInput, CardKind } from '@/lib/cards/schema'
 import { appUrl } from '@/lib/app-url'
+import { readAppleWalletCredentials } from './apple-pass-builder'
 
 /**
  * The seam between the card designer and pass generation.
  *
- * Signing (`.pkpass` PKCS#7 with the Apple pass certificate) and the real Google Wallet
- * JWT come later. Everything above this interface — the editor, the preview, the test
- * card flow — is finished and will not change when the real implementation lands.
+ * Everything above this interface — the editor, the preview, the test card flow — is
+ * independent of whether the passes handed out are signed.
  */
 export interface PassBuilder {
   /** Returns the raw bytes of a `.pkpass` bundle. */
@@ -78,9 +78,11 @@ export interface PassSigningStatus {
 
 export function passSigningStatus(): PassSigningStatus {
   return {
-    // Requires an Apple Developer Program membership: Pass Type ID certificate plus the
-    // WWDR intermediate, and a PKCS#7 detached signature over manifest.json.
-    apple: Boolean(process.env.APPLE_PASS_CERTIFICATE && process.env.APPLE_PASS_CERTIFICATE_PASSWORD),
+    // Not just "an env var is set": the .p12 is actually opened and its UID/OU checked
+    // against APPLE_PASS_TYPE_ID/APPLE_TEAM_ID. A certificate that cannot be parsed or
+    // does not match reports as unconfigured, with the reason on the server log — Wallet
+    // gives no diagnostics of its own.
+    apple: readAppleWalletCredentials() !== null,
     // Deliberately mirrors readGoogleWalletCredentials(), including the numeric issuer-id
     // check — a Merchant ID pasted in its place must not report as "configured".
     google: Boolean(

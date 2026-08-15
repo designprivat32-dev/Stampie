@@ -1,7 +1,9 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { buildPassJson } from '@/lib/cards/apple-pass-json'
+import { renderFallbackIconSet } from '@/lib/cards/render-icon'
 import { renderHeroImage, renderStripImageSet } from '@/lib/cards/render-strip'
+import { readAppleWalletCredentials, signManifest } from './apple-pass-builder'
 import { createZip, type ZipEntry } from './zip'
 import {
   buildGoogleContext,
@@ -17,15 +19,19 @@ import {
 } from './pass-builder'
 
 /**
- * Mock implementation.
+ * The pass builder.
  *
- * It produces a *real* .pkpass archive — correct file names, correct pass.json, all three
- * strip resolutions, a correct manifest.json of SHA-1 digests — and omits only the
- * `signature` entry, because signing needs the Apple certificate. That means the bundle
- * can be inspected byte for byte today and the real builder is a strictly additive change.
+ * It produces a real .pkpass archive — correct file names, correct pass.json, all three
+ * strip resolutions, a correct manifest.json of SHA-1 digests. The `signature` entry is
+ * added as soon as an Apple Pass Type ID certificate is configured; without one the
+ * bundle is still emitted unsigned so the whole flow can be inspected byte for byte, and
+ * only the final "add to Wallet" step fails.
  *
- * The Google side returns a save URL carrying an unsigned JWT with the real
- * LoyaltyClass/LoyaltyObject payload, for the same reason.
+ * The Google side behaves the same way: a properly signed save link with credentials, an
+ * unsigned one without.
+ *
+ * The name is historical — this used to be mock-only and the module path is referenced
+ * from a dozen call sites.
  */
 export class MockPassBuilder implements PassBuilder {
   constructor(private readonly config: PassBuilderConfig = readPassBuilderConfig()) {}
@@ -64,12 +70,13 @@ export class MockPassBuilder implements PassBuilder {
       )
     }
 
-    const icon = design.assets.icon
-    if (icon) {
-      files.push({ name: 'icon.png', data: icon['1x'] })
-      if (icon['2x']) files.push({ name: 'icon@2x.png', data: icon['2x'] })
-      if (icon['3x']) files.push({ name: 'icon@3x.png', data: icon['3x'] })
-    }
+    // icon.png is the one file PassKit refuses to do without, and it refuses silently.
+    // A card without an uploaded icon gets a monogram tile rather than a dead download.
+    const icon =
+      design.assets.icon ?? (await renderFallbackIconSet(design, design.organizationName))
+    files.push({ name: 'icon.png', data: icon['1x'] })
+    if (icon['2x']) files.push({ name: 'icon@2x.png', data: icon['2x'] })
+    if (icon['3x']) files.push({ name: 'icon@3x.png', data: icon['3x'] })
 
     const logo = design.assets.logo
     if (logo) {
@@ -78,14 +85,19 @@ export class MockPassBuilder implements PassBuilder {
       if (logo['3x']) files.push({ name: 'logo@3x.png', data: logo['3x'] })
     }
 
-    // manifest.json maps every file to its SHA-1. The real builder signs exactly this.
+    // manifest.json maps every file to its SHA-1. The signature covers exactly this.
     const manifest: Record<string, string> = {}
     for (const f of files) {
       manifest[f.name] = createHash('sha1').update(f.data).digest('hex')
     }
-    files.push({ name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') })
+    const manifestBytes = Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')
+    files.push({ name: 'manifest.json', data: manifestBytes })
 
-    // NOTE: no `signature` entry — see class doc.
+    const credentials = readAppleWalletCredentials()
+    if (credentials) {
+      files.push({ name: 'signature', data: signManifest(manifestBytes, credentials) })
+    }
+
     return createZip(files)
   }
 
