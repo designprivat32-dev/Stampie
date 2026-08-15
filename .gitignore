@@ -21,3 +21,6 @@ apple-certs/
 # Local dev helper scripts + first-run marker — not part of the shared project.
 *.bat
 .db-initialized
+
+# PGlite-Datenverzeichnisse, inklusive Backups davon.
+.pglite*/
