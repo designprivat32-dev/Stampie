@@ -47,8 +47,8 @@ export default async function HandoutLandingPage({
   const title = design.cardTitle?.trim() || design.programName.trim() || 'Stempelkarte'
   const reward = design.rewardText.trim()
 
-  const apple = <AppleWalletButton key="apple" href={`/api/k/${code}?p=apple`} className="w-full justify-center" />
-  const google = <GoogleWalletButton key="google" href={`/api/k/${code}?p=google`} className="w-full justify-center" />
+  const apple = <AppleWalletButton key="apple" href={`/api/k/${code}?p=apple`} className="justify-center" />
+  const google = <GoogleWalletButton key="google" href={`/api/k/${code}?p=google`} className="justify-center" />
 
   // The detected wallet leads; the other one keeps its full-size button rather than being
   // demoted to fine print, because a wrong guess otherwise looks like an unsupported phone.
@@ -70,7 +70,7 @@ export default async function HandoutLandingPage({
           </p>
         </div>
 
-        <div className="space-y-2.5">{buttons}</div>
+        <div className="flex flex-col items-center gap-3">{buttons}</div>
 
         <p className="text-center text-[12px] leading-snug text-ink-3">
           Beim nächsten Antippen bekommst du wieder dieselbe Karte — mit den Stempeln, die

@@ -1,103 +1,75 @@
 import { cn } from '@/lib/utils'
 
 /**
- * "Add to Apple Wallet" / "Add to Google Wallet" buttons.
+ * The official "Zu Apple Wallet hinzufügen" / "Hinzufügen zu Google Wallet" badges.
  *
- * Rebuilt rather than dropped in as Apple's and Google's supplied artwork, for one reason:
- * both companies ship their badge as a fixed image and ask that it not be altered — Apple's
- * Wallet guidelines name the corner radius specifically. A matching pair of buttons was
- * wanted, so they are drawn here instead of an official asset being bent out of shape.
+ * Both are Apple's and Google's own artwork, used unaltered — which is what their brand
+ * guidelines require in almost the same words: no redrawing, no changed colours, no
+ * changed corner radius. That is also why the two do not match: Google's badge is a pill,
+ * Apple's a rectangle with a small radius. Making them agree would mean editing one of
+ * them, so the mismatch is accepted on purpose.
  *
- * Text sits in the DOM rather than inside the SVG: it picks up the page font, wraps
- * sensibly, and a screen reader gets a real label instead of a graphic.
+ * The files live in `public/wallet-badges/` and are served as plain images. They carry
+ * their own text, so there is nothing to translate here — the German files are the ones
+ * checked in.
+ *
+ * Google's *condensed* badge is used rather than its wide one, which Google offers for
+ * exactly this: at a shared height the wide version is more than twice Apple's width and
+ * the pair reads as lopsided on a phone. Condensed sits at 3.6 against Apple's 3.2.
  */
 
-/** One value, both buttons — the whole point is that they match. */
-const SHAPE = 'flex items-center gap-3 rounded-xl px-5 py-2.5'
+/**
+ * Height, not width. Both badges keep their own aspect ratio, which the guidelines also
+ * require, so the shared height is what makes them sit level next to each other.
+ * Google asks for at least 48dp; this clears that for both.
+ */
+const BADGE_HEIGHT = 'h-[52px]'
 
-function Label({ lead, name }: { lead: string; name: string }) {
-  return (
-    <span className="text-left leading-tight">
-      <span className="block text-[11px] font-normal opacity-90">{lead}</span>
-      <span className="block text-[17px] font-semibold tracking-tight">{name}</span>
-    </span>
-  )
-}
-
-/** The card stack sliding into a pocket. */
-function AppleWalletIcon() {
-  return (
-    <svg viewBox="0 0 32 32" className="size-8 shrink-0" aria-hidden="true">
-      <rect x="9" y="4" width="14" height="6" rx="1.6" fill="#F4544A" />
-      <rect x="7.5" y="7" width="17" height="6" rx="1.6" fill="#F5B93B" />
-      <rect x="6" y="10" width="20" height="6" rx="1.6" fill="#5FC15C" />
-      <rect x="4.5" y="13" width="23" height="7" rx="1.8" fill="#4DA9E8" />
-      <rect x="2.4" y="17.4" width="27.2" height="10.2" rx="2.8" fill="#EDEDF0" />
-      {/* The thumb notch. Barely darker than the pocket on purpose — at full contrast it
-          stops reading as an indent and turns into a grey blob. */}
-      <path d="M12.4 17.4a3.6 3.6 0 0 0 7.2 0Z" fill="#E2E2E9" />
-    </svg>
-  )
-}
-
-/** The rounded tile with a card across it, in Google's four colours. */
-function GoogleWalletIcon() {
-  return (
-    <svg viewBox="0 0 32 32" className="size-8 shrink-0" aria-hidden="true">
-      <rect x="2" y="2" width="28" height="28" rx="8" fill="#FFFFFF" />
-      <rect x="6.5" y="6" width="19" height="4.2" rx="2.1" fill="#4285F4" />
-      <rect x="6.5" y="9.4" width="19" height="4.2" rx="2.1" fill="#34A853" />
-      <rect x="6.5" y="12.8" width="19" height="4.2" rx="2.1" fill="#FBBC04" />
-      <rect x="6.5" y="16.2" width="19" height="4.2" rx="2.1" fill="#EA4335" />
-      {/* The card sits low enough that all four colours stay visible above it. */}
-      <rect
-        x="5"
-        y="19.4"
-        width="22"
-        height="6.8"
-        rx="2.4"
-        fill="#FFFFFF"
-        stroke="#DADCE0"
-        strokeWidth="0.9"
-      />
-    </svg>
-  )
-}
-
-export function AppleWalletButton({
+function BadgeLink({
   href,
+  src,
+  alt,
+  width,
+  height,
   className,
-  lead = 'Add to',
-  name = 'Apple Wallet',
 }: {
   href: string
+  src: string
+  alt: string
+  width: number
+  height: number
   className?: string
-  lead?: string
-  name?: string
 }) {
   return (
-    <a href={href} aria-label={`${lead} ${name}`} className={cn(SHAPE, 'bg-black text-white', className)}>
-      <AppleWalletIcon />
-      <Label lead={lead} name={name} />
+    <a href={href} className={cn('inline-flex', className)} aria-label={alt}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} width={width} height={height} className={cn(BADGE_HEIGHT, 'w-auto')} />
     </a>
   )
 }
 
-export function GoogleWalletButton({
-  href,
-  className,
-  lead = 'Add to',
-  name = 'Google Wallet',
-}: {
-  href: string
-  className?: string
-  lead?: string
-  name?: string
-}) {
+export function AppleWalletButton({ href, className }: { href: string; className?: string }) {
   return (
-    <a href={href} aria-label={`${lead} ${name}`} className={cn(SHAPE, 'bg-black text-white', className)}>
-      <GoogleWalletIcon />
-      <Label lead={lead} name={name} />
-    </a>
+    <BadgeLink
+      href={href}
+      src="/wallet-badges/apple-wallet-de.svg"
+      alt="Zu Apple Wallet hinzufügen"
+      width={110}
+      height={35}
+      className={className}
+    />
+  )
+}
+
+export function GoogleWalletButton({ href, className }: { href: string; className?: string }) {
+  return (
+    <BadgeLink
+      href={href}
+      src="/wallet-badges/google-wallet-de.svg"
+      alt="Hinzufügen zu Google Wallet"
+      width={199}
+      height={55}
+      className={className}
+    />
   )
 }

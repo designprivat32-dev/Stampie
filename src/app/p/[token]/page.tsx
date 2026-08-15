@@ -35,10 +35,10 @@ export default async function TestCardLandingPage({
   const name = resolved.design.programName.trim() || 'Stempelkarte'
 
   const apple = (
-    <AppleWalletButton key="apple" href={`/api/test-card/${token}?p=apple`} className="w-full justify-center" />
+    <AppleWalletButton key="apple" href={`/api/test-card/${token}?p=apple`} className="justify-center" />
   )
   const google = (
-    <GoogleWalletButton key="google" href={`/api/test-card/${token}?p=google`} className="w-full justify-center" />
+    <GoogleWalletButton key="google" href={`/api/test-card/${token}?p=google`} className="justify-center" />
   )
   const buttons = platform === 'google' ? [google, apple] : [apple, google]
 
@@ -52,7 +52,7 @@ export default async function TestCardLandingPage({
         </p>
       </div>
 
-      <div className="flex w-full flex-col gap-3">{buttons}</div>
+      <div className="flex flex-col items-center gap-3">{buttons}</div>
 
       <p className="text-[12px] text-ink-3">Dieser Link ist 30 Minuten gültig.</p>
     </main>
