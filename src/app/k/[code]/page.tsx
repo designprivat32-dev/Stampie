@@ -1,7 +1,8 @@
 import { headers } from 'next/headers'
 import { detectPlatform } from '@/lib/cards/test-card-service'
-import { resolveHandoutCode } from '@/lib/cards/handout-service'
+import { resolveHandoutCode, type ResolvedHandout } from '@/lib/cards/handout-service'
 import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
+import { formatAddress, formatOpeningHours } from '@/types/customer'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,13 +71,59 @@ export default async function HandoutLandingPage({
           </p>
         </div>
 
+        {resolved.greeting ? (
+          <p className="text-center text-[15px] leading-snug text-ink-2">{resolved.greeting}</p>
+        ) : null}
+
         <div className="flex flex-col items-center gap-3">{buttons}</div>
 
         <p className="text-center text-[12px] leading-snug text-ink-3">
           Beim nächsten Antippen bekommst du wieder dieselbe Karte — mit den Stempeln, die
           bis dahin darauf sind.
         </p>
+
+        <ShopDetails customer={resolved.customer} />
       </div>
     </main>
+  )
+}
+
+/**
+ * The shop's own details under the buttons.
+ *
+ * Every line is optional and simply omitted when empty — a customer can exist before the
+ * agency has captured an address, and an empty "Adresse:" label looks like a fault. The
+ * whole block disappears when there is nothing at all to show.
+ */
+function ShopDetails({ customer }: { customer: ResolvedHandout['customer'] }) {
+  const address = formatAddress(customer)
+  const hours = formatOpeningHours(customer.openingHours)
+
+  if (!address && !hours && !customer.phone && !customer.website) return null
+
+  return (
+    <div className="space-y-3 border-t border-line pt-5 text-center text-[12px] leading-relaxed text-ink-3">
+      {address ? <p className="whitespace-pre-line">{address}</p> : null}
+
+      {hours ? (
+        <div>
+          <p className="font-medium text-ink-2">Öffnungszeiten</p>
+          <p className="whitespace-pre-line">{hours}</p>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        {customer.phone ? (
+          <a href={`tel:${customer.phone.replace(/\s/g, '')}`} className="underline">
+            {customer.phone}
+          </a>
+        ) : null}
+        {customer.website ? (
+          <a href={customer.website} rel="noreferrer" className="underline">
+            Website
+          </a>
+        ) : null}
+      </div>
+    </div>
   )
 }

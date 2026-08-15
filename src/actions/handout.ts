@@ -34,6 +34,8 @@ export interface HandoutState {
   kind: CardKind
   /** Stamps a freshly issued pass starts with. Always 0 for a coupon — it has no counter. */
   startStamps: number
+  /** Free text shown to the customer above the wallet buttons. */
+  greeting: string
 }
 
 async function buildLink(cardId: string, code: string): Promise<HandoutLink> {
@@ -55,7 +57,12 @@ export async function getHandoutStateAction(cardId: string): Promise<ActionResul
     const [card, published] = await Promise.all([
       prisma.card.findFirst({
         where: { id: parsed.data },
-        select: { nfcCode: true, kind: true, handoutStartStamps: true },
+        select: {
+          nfcCode: true,
+          kind: true,
+          handoutStartStamps: true,
+          handoutGreeting: true,
+        },
       }),
       loadPublishedDesign(parsed.data),
     ])
@@ -66,6 +73,7 @@ export async function getHandoutStateAction(cardId: string): Promise<ActionResul
       isPublished: published !== null,
       kind: card.kind,
       startStamps: card.handoutStartStamps,
+      greeting: card.handoutGreeting ?? '',
     })
   })
 }
@@ -121,6 +129,33 @@ export async function updateHandoutStartStampsAction(
     await prisma.card.update({
       where: { id: parsed.data.cardId },
       data: { handoutStartStamps: parsed.data.value },
+    })
+
+    revalidatePath('/dashboard/karten')
+    return ok(null)
+  })
+}
+
+const GREETING_MAX = 200
+
+export async function updateHandoutGreetingAction(
+  cardId: string,
+  value: string,
+): Promise<ActionResult<null>> {
+  return guarded(async () => {
+    const parsed = z
+      .object({ cardId: z.string().cuid(), value: z.string().max(GREETING_MAX) })
+      .safeParse({ cardId, value })
+    if (!parsed.success) {
+      return fail(`Der Text ist zu lang (max. ${GREETING_MAX} Zeichen).`, 'validation')
+    }
+
+    await assertCardAccess(parsed.data.cardId)
+    await prisma.card.update({
+      where: { id: parsed.data.cardId },
+      // Empty means "no greeting", stored as NULL rather than an empty string so the page
+      // has one thing to check instead of two.
+      data: { handoutGreeting: parsed.data.value.trim() || null },
     })
 
     revalidatePath('/dashboard/karten')

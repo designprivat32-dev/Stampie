@@ -41,8 +41,14 @@ const WEEKDAY_LABELS: Record<number, string> = {
   7: 'So',
 }
 
-export function formatAddress(customer: CustomerSummary): string {
-  const lines = [customer.street, [customer.postalCode, customer.city].filter(Boolean).join(' ')]
+/**
+ * Takes only the three fields it reads, not a whole `CustomerSummary` — callers that have
+ * an address but no full customer record would otherwise have to invent one.
+ */
+export function formatAddress(
+  address: Pick<CustomerSummary, 'street' | 'postalCode' | 'city'>,
+): string {
+  const lines = [address.street, [address.postalCode, address.city].filter(Boolean).join(' ')]
   return lines.filter((l) => l && l.trim().length > 0).join('\n')
 }
 

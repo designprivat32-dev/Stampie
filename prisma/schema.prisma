@@ -148,6 +148,13 @@ model Card {
   /// längst läuft, daher passiert das Deckeln erst beim tatsächlichen Ausstellen.
   handoutStartStamps Int @default(0)
 
+  /// Begrüßung auf der Ausgabeseite, dort wo der Kunde vor dem Hinzufügen landet.
+  ///
+  /// Gehört zur Karte und nicht zum Design: das Design beschreibt den Pass im Wallet und
+  /// wird versioniert veröffentlicht, dieser Text steht nur auf einer Webseite und soll
+  /// sich ändern lassen, ohne dafür eine neue Version auszurollen.
+  handoutGreeting String?
+
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   createdBy  String

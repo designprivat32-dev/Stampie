@@ -32,6 +32,15 @@ const resolved = {
   organizationName: 'Café Nord',
   design: { ...DEFAULT_CARD_DESIGN, stampGoal: 10 },
   startStamps: 0,
+  greeting: null,
+  customer: {
+    street: null,
+    postalCode: null,
+    city: null,
+    phone: null,
+    website: null,
+    openingHours: [],
+  },
 }
 
 beforeEach(() => {
@@ -152,6 +161,7 @@ describe('resolveHandoutCode', () => {
       name: 'Karte',
       kind: 'STAMP',
       handoutStartStamps: 0,
+      handoutGreeting: null,
       org: null,
     })
     loadPublishedDesign.mockResolvedValue(null)
@@ -172,6 +182,7 @@ describe('resolveHandoutCode', () => {
       name: 'Kaffeekarte',
       kind: 'STAMP',
       handoutStartStamps: 0,
+      handoutGreeting: null,
       org: null,
     })
     loadPublishedDesign.mockResolvedValue(DEFAULT_CARD_DESIGN)
@@ -186,6 +197,7 @@ describe('resolveHandoutCode', () => {
       name: 'Kaffeekarte',
       kind: 'STAMP',
       handoutStartStamps: 8,
+      handoutGreeting: null,
       org: null,
     })
     loadPublishedDesign.mockResolvedValue({ ...DEFAULT_CARD_DESIGN, stampGoal: 5 })
@@ -200,6 +212,7 @@ describe('resolveHandoutCode', () => {
       name: 'Kaffeekarte',
       kind: 'STAMP',
       handoutStartStamps: 2,
+      handoutGreeting: null,
       org: null,
     })
     loadPublishedDesign.mockResolvedValue({ ...DEFAULT_CARD_DESIGN, stampGoal: 10 })
@@ -214,6 +227,7 @@ describe('resolveHandoutCode', () => {
       name: 'Gutschein',
       kind: 'COUPON',
       handoutStartStamps: 5,
+      handoutGreeting: null,
       org: null,
     })
     loadPublishedDesign.mockResolvedValue(DEFAULT_CARD_DESIGN)

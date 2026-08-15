@@ -5,6 +5,7 @@ import { loadPassAssets } from './asset-service'
 import { loadPublishedDesign } from './repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
 import type { CardDesignInput, CardKind } from './schema'
+import type { OpeningHours } from '@/types/customer'
 import type { CardDesign } from '@/lib/pass/pass-builder'
 
 /**
@@ -32,6 +33,21 @@ export interface ResolvedHandout {
   design: CardDesignInput
   /** Stamps a freshly issued pass starts with. Always 0 for a coupon — it has no counter. */
   startStamps: number
+  /** Free text the shop writes for this card, shown above the buttons. */
+  greeting: string | null
+  /**
+   * The shop's own details, so the page reads as theirs. Every field is optional: a
+   * customer can exist before the agency has captured any of it, and a missing line is
+   * simply left out rather than shown empty.
+   */
+  customer: {
+    street: string | null
+    postalCode: string | null
+    city: string | null
+    phone: string | null
+    website: string | null
+    openingHours: OpeningHours[]
+  }
 }
 
 /** Codes live on stickers and chips, so they are short enough to type but not guessable. */
@@ -57,7 +73,18 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
       name: true,
       kind: true,
       handoutStartStamps: true,
-      org: { select: { name: true } },
+      handoutGreeting: true,
+      org: {
+        select: {
+          name: true,
+          street: true,
+          postalCode: true,
+          city: true,
+          phone: true,
+          website: true,
+          openingHours: true,
+        },
+      },
     },
   })
   if (!card) return null
@@ -74,6 +101,17 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
     // the card has been live for a while, and the cap has to track that, not a snapshot.
     startStamps:
       card.kind === 'STAMP' ? Math.min(card.handoutStartStamps, design.stampGoal) : 0,
+    greeting: card.handoutGreeting?.trim() || null,
+    customer: {
+      street: card.org?.street ?? null,
+      postalCode: card.org?.postalCode ?? null,
+      city: card.org?.city ?? null,
+      phone: card.org?.phone ?? null,
+      website: card.org?.website ?? null,
+      openingHours: Array.isArray(card.org?.openingHours)
+        ? (card.org.openingHours as unknown as OpeningHours[])
+        : [],
+    },
   }
 }
 

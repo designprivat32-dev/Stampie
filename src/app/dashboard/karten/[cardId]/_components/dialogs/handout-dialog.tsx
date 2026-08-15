@@ -10,12 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { Input, Textarea } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/misc'
 import {
   disableHandoutAction,
   enableHandoutAction,
   getHandoutStateAction,
+  updateHandoutGreetingAction,
   updateHandoutStartStampsAction,
   type HandoutState,
 } from '@/actions/handout'
@@ -48,6 +49,10 @@ export function HandoutDialog({
   const [startStampsBusy, setStartStampsBusy] = React.useState(false)
   const [startStampsSaved, setStartStampsSaved] = React.useState(false)
 
+  const [greeting, setGreeting] = React.useState('')
+  const [greetingBusy, setGreetingBusy] = React.useState(false)
+  const [greetingSaved, setGreetingSaved] = React.useState(false)
+
   React.useEffect(() => {
     if (!open) return
     setError(null)
@@ -58,6 +63,7 @@ export function HandoutDialog({
       if (result.success) {
         setState(result.data)
         setStartStamps(result.data.startStamps)
+        setGreeting(result.data.greeting)
       } else {
         setError(result.error.message)
       }
@@ -98,6 +104,20 @@ export function HandoutDialog({
     else setError(result.error.message)
     setConfirmingOff(false)
     setBusy(false)
+  }
+
+  const saveGreeting = async (next: string) => {
+    if (next === state?.greeting) return
+    setGreetingBusy(true)
+    setGreetingSaved(false)
+    const result = await updateHandoutGreetingAction(cardId, next)
+    if (!result.success) {
+      setError(result.error.message)
+    } else {
+      setState((prev) => (prev ? { ...prev, greeting: next } : prev))
+      setGreetingSaved(true)
+    }
+    setGreetingBusy(false)
   }
 
   const copy = async () => {
@@ -182,6 +202,27 @@ export function HandoutDialog({
                 </p>
               </div>
             ) : null}
+
+            <div className="space-y-1.5">
+              <label htmlFor="handout-greeting" className="text-[13px] font-medium text-ink">
+                Begrüßung auf der Ausgabeseite
+              </label>
+              <Textarea
+                id="handout-greeting"
+                value={greeting}
+                maxLength={200}
+                rows={2}
+                placeholder="Willkommen bei Café Nord — deine erste Tasse geht auf uns."
+                onChange={(e) => setGreeting(e.target.value)}
+                onBlur={(e) => void saveGreeting(e.target.value.trim())}
+              />
+              <div className="flex items-center gap-2 text-[12px] text-ink-3">
+                <span>{greeting.length}/200</span>
+                {greetingBusy ? <Spinner className="size-3.5" /> : null}
+                {!greetingBusy && greetingSaved ? <Check className="size-3.5 text-ok" /> : null}
+                <span className="ml-auto">Leer lassen blendet den Text aus.</span>
+              </div>
+            </div>
 
             <div className="space-y-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[12px] leading-snug text-ink-2">
               <p className="font-medium text-ink">Chip beschreiben</p>
