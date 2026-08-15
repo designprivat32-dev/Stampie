@@ -2,11 +2,12 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Building2, Mail, MapPin, Pencil, Phone, Plus, Search } from 'lucide-react'
+import { Building2, KeyRound, Mail, MapPin, Pencil, Phone, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/misc'
 import { CustomerDialog } from './customer-dialog'
+import { LoginsDialog } from './logins-dialog'
 import type { CustomerRecord } from '@/lib/customers/customer-service'
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; customer: CustomerRecord } | null
@@ -24,6 +25,7 @@ export function CustomersView({
 }) {
   const [query, setQuery] = React.useState('')
   const [dialog, setDialog] = React.useState<DialogState>(null)
+  const [loginsFor, setLoginsFor] = React.useState<CustomerRecord | null>(null)
 
   const term = query.trim().toLowerCase()
   const filtered = term
@@ -151,16 +153,27 @@ export function CustomersView({
                     )}
                   </td>
                   {canManage ? (
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`${c.name} bearbeiten`}
-                        title="Bearbeiten"
-                        onClick={() => setDialog({ mode: 'edit', customer: c })}
-                      >
-                        <Pencil />
-                      </Button>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${c.name}: App-Zugänge`}
+                          title="App-Zugänge (Login)"
+                          onClick={() => setLoginsFor(c)}
+                        >
+                          <KeyRound />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${c.name} bearbeiten`}
+                          title="Bearbeiten"
+                          onClick={() => setDialog({ mode: 'edit', customer: c })}
+                        >
+                          <Pencil />
+                        </Button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -171,6 +184,7 @@ export function CustomersView({
       )}
 
       <CustomerDialog state={dialog} onOpenChange={(open) => !open && setDialog(null)} />
+      <LoginsDialog customer={loginsFor} onOpenChange={(open) => !open && setLoginsFor(null)} />
     </div>
   )
 }
