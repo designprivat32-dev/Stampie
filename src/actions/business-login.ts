@@ -3,7 +3,7 @@
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
-import { isAgency, requireSession } from '@/lib/auth/session'
+import { requireSession } from '@/lib/auth/session'
 import { fail, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
@@ -45,10 +45,7 @@ export async function createBusinessLoginAction(
     const idParsed = z.string().cuid().safeParse(orgId)
     if (!idParsed.success) return fail('Ungültige Kunden-ID.', 'validation')
 
-    const session = await requireSession()
-    if (!(await isAgency(session.userId))) {
-      return fail('Nur das Agentur-Team darf Logins erzeugen.', 'forbidden')
-    }
+    await requireSession()
 
     const org = await prisma.organization.findFirst({
       where: { id: idParsed.data },
@@ -97,10 +94,7 @@ export async function listBusinessLoginsAction(
     const idParsed = z.string().cuid().safeParse(orgId)
     if (!idParsed.success) return fail('Ungültige Kunden-ID.', 'validation')
 
-    const session = await requireSession()
-    if (!(await isAgency(session.userId))) {
-      return fail('Nur das Agentur-Team darf Zugänge sehen.', 'forbidden')
-    }
+    await requireSession()
 
     const users = await prisma.user.findMany({
       where: { username: { not: null }, memberships: { some: { orgId: idParsed.data } } },
@@ -127,10 +121,7 @@ export async function resetBusinessLoginPasswordAction(
     const idParsed = z.string().cuid().safeParse(userId)
     if (!idParsed.success) return fail('Ungültige ID.', 'validation')
 
-    const session = await requireSession()
-    if (!(await isAgency(session.userId))) {
-      return fail('Nur das Agentur-Team darf Passwörter zurücksetzen.', 'forbidden')
-    }
+    await requireSession()
 
     const user = await prisma.user.findFirst({
       where: { id: idParsed.data, username: { not: null } },

@@ -2,15 +2,15 @@
 
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
-import { isAgency, requireSession } from '@/lib/auth/session'
+import { requireSession } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 
 /**
  * Customer (Firma) lifecycle: create and edit.
  *
- * A customer is an `Organization`. Only the agency team manages them — the same gate that
- * guards card assignment, so who owns a card and who exists as a customer stay in sync.
+ * A customer is an `Organization`. Single-operator setup: any logged-in user may manage
+ * customers — there is no agency/owner gate here.
  */
 
 /** Empty form fields arrive as '' and are stored as NULL, not as blank strings. */
@@ -30,20 +30,12 @@ const customerInputSchema = z.object({
 
 export type CustomerInput = z.infer<typeof customerInputSchema>
 
-async function assertAgency(): Promise<string | null> {
-  const session = await requireSession()
-  if (!(await isAgency(session.userId))) return null
-  return session.userId
-}
-
 export async function createCustomerAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   return guarded(async () => {
     const parsed = customerInputSchema.safeParse(input)
     if (!parsed.success) return fromZodError(parsed.error)
 
-    if (!(await assertAgency())) {
-      return fail('Nur das Agentur-Team darf Kunden anlegen.', 'forbidden')
-    }
+    await requireSession()
 
     const org = await prisma.organization.create({
       data: {
@@ -74,9 +66,7 @@ export async function updateCustomerAction(
     const parsed = customerInputSchema.safeParse(input)
     if (!parsed.success) return fromZodError(parsed.error)
 
-    if (!(await assertAgency())) {
-      return fail('Nur das Agentur-Team darf Kunden bearbeiten.', 'forbidden')
-    }
+    await requireSession()
 
     const existing = await prisma.organization.findFirst({
       where: { id: idParsed.data },

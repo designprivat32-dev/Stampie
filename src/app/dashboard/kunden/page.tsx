@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getSession, isAgency } from '@/lib/auth/session'
-import { accessibleOrgIds } from '@/lib/cards/card-service'
+import { getSession } from '@/lib/auth/session'
 import { listCustomerRecords } from '@/lib/customers/customer-service'
 import { CustomersView } from './_components/customers-view'
 
@@ -10,16 +9,14 @@ export const dynamic = 'force-dynamic'
 /**
  * Customer overview.
  *
- * Agency members see and manage every customer; a customer login sees only its own
- * organisation. The split happens in `accessibleOrgIds`, which returns null for agency.
+ * Single-operator setup: whoever is logged in may manage every customer — there is no
+ * agency/owner split here. (Auth is a stub, and this dashboard is only used by us.)
  */
 export default async function KundenPage() {
   const session = await getSession()
   if (!session) redirect('/')
 
-  const agency = await isAgency(session.userId)
-  const orgIds = await accessibleOrgIds(session.userId)
-  const customers = await listCustomerRecords(orgIds)
+  const customers = await listCustomerRecords(null)
 
   return (
     <div className="min-h-dvh bg-canvas">
@@ -36,14 +33,12 @@ export default async function KundenPage() {
               </Link>
             </nav>
           </div>
-          <span className="text-[12px] text-ink-3">
-            {agency ? 'Agentur-Zugang' : session.email}
-          </span>
+          <span className="text-[12px] text-ink-3">{session.email}</span>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-6">
-        <CustomersView customers={customers} canManage={agency} />
+        <CustomersView customers={customers} canManage />
       </main>
     </div>
   )
