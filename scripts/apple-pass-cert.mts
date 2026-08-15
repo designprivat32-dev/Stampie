@@ -24,9 +24,11 @@ const KEY = resolve(DIR, 'pass.key')
 const CSR = resolve(DIR, 'pass.csr')
 const P12 = resolve(DIR, 'pass.p12')
 
-const [command, ...args] = process.argv.slice(2)
+// Dispatch lives at the bottom of the file: `let` bindings below it would otherwise be in
+// their temporal dead zone while a command runs.
+async function main(): Promise<void> {
+  const [command, ...args] = process.argv.slice(2)
 
-try {
   switch (command) {
     case 'csr':
       await generateCsr()
@@ -44,9 +46,6 @@ try {
       usage()
       process.exit(command ? 1 : 0)
   }
-} catch (error) {
-  console.error(`\n✖ ${error instanceof Error ? error.message : String(error)}\n`)
-  process.exit(1)
 }
 
 function usage(): void {
@@ -66,17 +65,47 @@ function usage(): void {
   )
 }
 
+/**
+ * Git for Windows ships OpenSSL but does not put it on the PATH of a normal PowerShell
+ * session, so `openssl` resolves only inside Git Bash. Rather than making the shell part
+ * of the instructions, look in the places it actually installs to.
+ */
+function findOpenssl(): string {
+  const candidates = [
+    'openssl',
+    ...(process.platform === 'win32'
+      ? [
+          `${process.env.ProgramFiles ?? 'C:\\Program Files'}\\Git\\usr\\bin\\openssl.exe`,
+          `${process.env.ProgramFiles ?? 'C:\\Program Files'}\\Git\\mingw64\\bin\\openssl.exe`,
+          `${process.env.LOCALAPPDATA ?? ''}\\Programs\\Git\\usr\\bin\\openssl.exe`,
+          `${process.env.ProgramFiles ?? 'C:\\Program Files'}\\OpenSSL-Win64\\bin\\openssl.exe`,
+        ]
+      : []),
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      execFileSync(candidate, ['version'], { stdio: 'ignore' })
+      return candidate
+    } catch {
+      // next candidate
+    }
+  }
+
+  throw new Error(
+    'OpenSSL not found. It ships with Git for Windows — install Git, or run ' +
+      '`winget install ShiningLight.OpenSSL.Light`.',
+  )
+}
+
+let opensslPath: string | null = null
+
 function openssl(argv: string[], input?: Buffer): Buffer {
+  opensslPath ??= findOpenssl()
   try {
-    return execFileSync('openssl', argv, { input, maxBuffer: 32 * 1024 * 1024 })
+    return execFileSync(opensslPath, argv, { input, maxBuffer: 32 * 1024 * 1024 })
   } catch (error) {
     const stderr = (error as { stderr?: Buffer }).stderr?.toString().trim()
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error(
-        'OpenSSL not found. On Windows it ships with Git for Windows — run this from Git Bash, ' +
-          'or install it with `winget install ShiningLight.OpenSSL.Light`.',
-      )
-    }
     throw new Error(`openssl ${argv[0]} failed${stderr ? `:\n${stderr}` : ''}`)
   }
 }
@@ -237,4 +266,11 @@ async function check(): Promise<void> {
     process.exit(1)
   }
   console.log('✓ Certificate opens, and the ids match the environment.\n')
+}
+
+try {
+  await main()
+} catch (error) {
+  console.error(`\n✖ ${error instanceof Error ? error.message : String(error)}\n`)
+  process.exit(1)
 }
