@@ -26,6 +26,12 @@ const customerInputSchema = z.object({
   street: z.preprocess(emptyToNull, z.string().trim().max(160).nullable()),
   postalCode: z.preprocess(emptyToNull, z.string().trim().max(20).nullable()),
   city: z.preprocess(emptyToNull, z.string().trim().max(120).nullable()),
+  // Prefill sources for the card designer's back fields. A pass published to a customer
+  // needs an imprint and a privacy link, so capturing them once per customer beats typing
+  // them into every card.
+  website: z.preprocess(emptyToNull, z.string().trim().url('Bitte eine vollständige URL angeben.').max(200).nullable()),
+  imprintUrl: z.preprocess(emptyToNull, z.string().trim().url('Bitte eine vollständige URL angeben.').max(200).nullable()),
+  privacyUrl: z.preprocess(emptyToNull, z.string().trim().url('Bitte eine vollständige URL angeben.').max(200).nullable()),
 })
 
 export type CustomerInput = z.infer<typeof customerInputSchema>
@@ -45,6 +51,9 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
         street: parsed.data.street,
         postalCode: parsed.data.postalCode,
         city: parsed.data.city,
+        website: parsed.data.website,
+        imprintUrl: parsed.data.imprintUrl,
+        privacyUrl: parsed.data.privacyUrl,
       },
       select: { id: true },
     })
@@ -83,6 +92,9 @@ export async function updateCustomerAction(
         street: parsed.data.street,
         postalCode: parsed.data.postalCode,
         city: parsed.data.city,
+        website: parsed.data.website,
+        imprintUrl: parsed.data.imprintUrl,
+        privacyUrl: parsed.data.privacyUrl,
       },
     })
 

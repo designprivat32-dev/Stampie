@@ -27,7 +27,6 @@ const createInputSchema = z.object({
    */
   kind: cardKindSchema.default('STAMP'),
   orgId: z.string().cuid().nullable().default(null),
-  locationId: z.string().cuid().nullable().default(null),
   /** Optional industry preset, so a new card is not born blank. */
   templateId: z.string().max(40).nullable().default(null),
 })
@@ -35,7 +34,6 @@ const createInputSchema = z.object({
 const assignInputSchema = z.object({
   cardId: z.string().cuid(),
   orgId: z.string().cuid().nullable(),
-  locationId: z.string().cuid().nullable().default(null),
 })
 
 export async function listCardsAction(): Promise<ActionResult<CardSummary[]>> {
@@ -47,7 +45,7 @@ export async function listCardsAction(): Promise<ActionResult<CardSummary[]>> {
 }
 
 export async function listCustomersAction(): Promise<
-  ActionResult<Array<{ id: string; name: string; locations: Array<{ id: string; name: string }> }>>
+  ActionResult<Array<{ id: string; name: string }>>
 > {
   return guarded(async () => {
     const session = await requireSession()
@@ -78,14 +76,6 @@ export async function createCardAction(input: unknown): Promise<ActionResult<{ c
 
     const orgId = parsed.data.orgId ?? (orgIds !== null ? (orgIds[0] ?? null) : null)
 
-    if (parsed.data.locationId) {
-      const location = await prisma.location.findFirst({
-        where: { id: parsed.data.locationId, ...(orgId ? { orgId } : {}) },
-        select: { id: true },
-      })
-      if (!location) return fail('Diese Filiale gehört nicht zum gewählten Betrieb.', 'validation')
-    }
-
     // Templates set stamp colours, icons and texts — none of which a coupon has, so a
     // coupon starts from the defaults even if a template was picked.
     const template =
@@ -99,7 +89,6 @@ export async function createCardAction(input: unknown): Promise<ActionResult<{ c
         name: parsed.data.name.trim(),
         kind: parsed.data.kind,
         orgId,
-        locationId: parsed.data.locationId,
         createdBy: session.userId,
         designs: { create: { status: 'DRAFT', ...designToRow(design) } },
       },
@@ -131,17 +120,9 @@ export async function assignCardAction(input: unknown): Promise<ActionResult<nul
       if (!org) return fail('Dieser Betrieb wurde nicht gefunden.', 'not_found')
     }
 
-    if (parsed.data.locationId) {
-      const location = await prisma.location.findFirst({
-        where: { id: parsed.data.locationId, orgId: parsed.data.orgId ?? undefined },
-        select: { id: true },
-      })
-      if (!location) return fail('Diese Filiale gehört nicht zum gewählten Betrieb.', 'validation')
-    }
-
     await prisma.card.update({
       where: { id: parsed.data.cardId },
-      data: { orgId: parsed.data.orgId, locationId: parsed.data.locationId },
+      data: { orgId: parsed.data.orgId },
     })
 
     revalidatePath('/dashboard/karten')

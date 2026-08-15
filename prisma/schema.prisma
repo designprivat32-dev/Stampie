@@ -1,7 +1,7 @@
 // Stampie — digital wallet stamp cards.
 // Scope of this schema: everything the card designer needs. Auth/billing tables are
 // stubbed here (Organization/User/Membership) and will be replaced by the real auth
-// schema later; every query in the app goes through assertLocationAccess() regardless.
+// schema later; every query in the app goes through assertCardAccess() regardless.
 
 generator client {
   provider = "prisma-client-js"
@@ -18,26 +18,43 @@ datasource db {
 
 // ---------------------------------------------------------------- tenancy (stub)
 
+/// A customer (Firma). Also the unit of tenancy: who owns a card, and therefore who may
+/// stamp it.
+///
+/// There used to be a `Location` model between customer and card, meant for chains with
+/// several branches. Nothing ever created one — there was no form for it, only the seed —
+/// so every self-created customer offered an empty "Filiale" dropdown and no way to fill
+/// it. The master data it held moved here.
 model Organization {
-  id        String       @id @default(cuid())
-  name      String
-  // Contact details of the customer (Firma). All optional so an org can exist before the
-  // agency has captured them.
+  id   String @id @default(cuid())
+  name String
+
+  // Contact and legal details. All optional so a customer can exist before the agency has
+  // captured them; the card designer offers them as prefills, it never requires them.
   phone      String?
   email      String?
   street     String?
   postalCode String?
   city       String?
+  website    String?
+  imprintUrl String?
+  privacyUrl String?
+
+  /// OpeningHours[] — see src/types/customer.ts
+  openingHours Json   @default("[]")
+  /// Prefills the wallet's location trigger: the pass surfaces on the lock screen nearby.
+  latitude     Float?
+  longitude    Float?
+
   createdAt DateTime     @default(now())
-  locations Location[]
   members   Membership[]
   cards     Card[]
 }
 
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  name        String?
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  name               String?
   // --- App-Login (Betriebs-App). Nullable, weil bestehende/Agentur-Nutzer keins brauchen.
   ///
   /// Indiziert, aber bewusst nicht `@unique` — aus demselben Grund wie bei
@@ -49,13 +66,13 @@ model User {
   /// aus ihm ab (`<username>@login.stampie.local`), und `email` *ist* unique. Ein zweiter
   /// Nutzer mit demselben Benutzernamen scheitert damit an der Datenbank, nicht erst an
   /// einer Prüfung im Anwendungscode.
-  username          String?
-  passwordHash      String?
+  username           String?
+  passwordHash       String?
   /// Beim ersten Login muss das von uns vergebene Start-Passwort geändert werden.
-  mustChangePassword Boolean @default(false)
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
-  appSessions AppSession[]
+  mustChangePassword Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  memberships        Membership[]
+  appSessions        AppSession[]
 
   @@index([username])
 }
@@ -91,35 +108,7 @@ model Membership {
   @@index([orgId])
 }
 
-// ---------------------------------------------------------------- location
-
-model Location {
-  id    String       @id @default(cuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-
-  name       String
-  street     String?
-  postalCode String?
-  city       String?
-  phone      String?
-  website    String?
-  email      String?
-
-  /// OpeningHours[] — see src/types/location.ts
-  openingHours Json   @default("[]")
-  latitude     Float?
-  longitude    Float?
-
-  imprintUrl String?
-  privacyUrl String?
-
-  createdAt DateTime @default(now())
-
-  cards Card[]
-
-  @@index([orgId])
-}
+// ---------------------------------------------------------------- cards
 
 /// What kind of pass a card issues. Fixed when the card is created — the wallet pass type
 /// (loyalty vs. offer) is baked into every pass already in a customer's wallet, so it
@@ -139,10 +128,6 @@ model Card {
   orgId String?
   org   Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
 
-  /// Optional branch, used to prefill address and opening hours in the designer.
-  locationId String?
-  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   createdBy  String
@@ -155,7 +140,6 @@ model Card {
   assets   Asset[]
 
   @@index([orgId, archivedAt])
-  @@index([locationId])
 }
 
 // ---------------------------------------------------------------- assets
@@ -193,7 +177,7 @@ model Asset {
 /// to the rows that reference them removes the dependency entirely; swap `STORAGE_DRIVER`
 /// to `s3` once volume justifies it.
 model AssetBlob {
-  /// Full storage key including the variant suffix, e.g. `locations/x/logo/y@2x.png`.
+  /// Full storage key including the variant suffix, e.g. `cards/x/logo/y@2x.png`.
   key         String   @id
   data        Bytes
   contentType String   @default("image/png")
@@ -231,24 +215,24 @@ model CardDesign {
   rewardText       String  @default("")
 
   // --- texts
-  programName String  @default("")
-  cardTitle   String?
+  programName       String  @default("")
+  cardTitle         String?
   /// Overrides the organisation name as the pass issuer. Null = use the organisation's.
   issuerDisplayName String?
-  stampLabel  String  @default("Stempel")
+  stampLabel        String  @default("Stempel")
   /// BackField[] — discriminated union, see src/types/card-design.ts
-  backFields  Json    @default("[]")
+  backFields        Json    @default("[]")
 
   // --- coupon fields. Used twice: as the card itself when Card.kind is COUPON, and as
   //     the reward a full stamp card hands out when rewardCouponEnabled is set.
   /// STAMP only: a full card issues a coupon pass instead of just a line of reward text.
   rewardCouponEnabled Boolean @default(false)
   /// Google OfferClass.title — required for a coupon, e.g. "20 % auf alles".
-  offerTitle       String?
-  offerDetails     String?
-  offerFinePrint   String?
+  offerTitle          String?
+  offerDetails        String?
+  offerFinePrint      String?
   /// Google OfferClass.redemptionChannel: INSTORE | ONLINE | BOTH
-  redemptionChannel String @default("INSTORE")
+  redemptionChannel   String  @default("INSTORE")
 
   // --- Google Wallet optional labels
   accountNameLabel String?

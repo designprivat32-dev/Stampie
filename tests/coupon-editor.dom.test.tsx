@@ -7,7 +7,7 @@ import { CardEditorProvider } from '@/stores/card-editor-provider'
 import { TooltipProvider } from '@/components/ui/misc'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import type { CardKind } from '@/lib/cards/schema'
-import type { LocationSummary } from '@/types/location'
+import type { CustomerSummary } from '@/types/customer'
 
 afterEach(cleanup)
 
@@ -19,10 +19,9 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver
 
-const location: LocationSummary = {
-  id: 'loc_1',
+const customer: CustomerSummary = {
+  id: 'cseedorg00000000000000001',
   name: 'Café Nord',
-  organizationName: 'Nordstadt Betriebe GmbH',
   street: null,
   postalCode: null,
   city: null,
@@ -41,7 +40,7 @@ function Editor({ kind }: { kind: CardKind }) {
     <CardEditorProvider init={{ cardId: 'cloc00000000000000000001', kind, design: DEFAULT_CARD_DESIGN }}>
       {/* Platform badges render tooltips, which the real shell also provides. */}
       <TooltipProvider>
-        <EditorTabs location={location} />
+        <EditorTabs customer={customer} />
         <PreviewControls onExport={async () => {}} />
       </TooltipProvider>
     </CardEditorProvider>

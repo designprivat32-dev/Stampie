@@ -7,11 +7,17 @@ export interface OpeningHours {
   closes: string
 }
 
-/** The master data the card designer prefills from. */
-export interface LocationSummary {
-  id: string
+/**
+ * The customer's master data, as the card designer sees it.
+ *
+ * Everything here is a *prefill source*, never a requirement: the buttons in the designer
+ * copy these values into the pass, and a card whose customer has none of them is designed
+ * by typing the texts directly.
+ */
+export interface CustomerSummary {
+  /** Null while the card has not been handed to a customer yet. */
+  id: string | null
   name: string
-  organizationName: string
   street: string | null
   postalCode: string | null
   city: string | null
@@ -35,8 +41,8 @@ const WEEKDAY_LABELS: Record<number, string> = {
   7: 'So',
 }
 
-export function formatAddress(location: LocationSummary): string {
-  const lines = [location.street, [location.postalCode, location.city].filter(Boolean).join(' ')]
+export function formatAddress(customer: CustomerSummary): string {
+  const lines = [customer.street, [customer.postalCode, customer.city].filter(Boolean).join(' ')]
   return lines.filter((l) => l && l.trim().length > 0).join('\n')
 }
 

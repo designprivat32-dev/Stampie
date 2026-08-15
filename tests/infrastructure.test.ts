@@ -6,7 +6,7 @@ import sharp from 'sharp'
 import { z } from 'zod'
 import { rateLimit, resetRateLimits } from '@/lib/rate-limit'
 import { fail, fromZodError, guarded, ok } from '@/lib/action-result'
-import { LocationAccessError, UnauthorizedError } from '@/lib/auth/session'
+import { CardAccessError, UnauthorizedError } from '@/lib/auth/session'
 import { assetKey, variantKey } from '@/lib/storage'
 import { FsStorageAdapter } from '@/lib/storage/fs-adapter'
 import { getMailer, setMailer, testCardMail, type MailMessage } from '@/lib/mail'
@@ -80,7 +80,7 @@ describe('action result envelope', () => {
 
   it('reports a missing location as not_found so ids cannot be probed', async () => {
     const result = await guarded(async () => {
-      throw new LocationAccessError()
+      throw new CardAccessError()
     })
     expect(result.success === false && result.error.code).toBe('not_found')
   })

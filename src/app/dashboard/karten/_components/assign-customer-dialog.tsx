@@ -18,7 +18,6 @@ import { assignCardAction } from '@/actions/cards'
 import type { CardSummary, CustomerOption } from '@/lib/cards/card-service'
 
 const NO_CUSTOMER = '__none__'
-const NO_LOCATION = '__none__'
 
 /**
  * Assignment is what decides who may stamp. Taking a card back therefore also takes the
@@ -35,18 +34,14 @@ export function AssignCustomerDialog({
 }) {
   const router = useRouter()
   const [orgId, setOrgId] = React.useState<string>(NO_CUSTOMER)
-  const [locationId, setLocationId] = React.useState<string>(NO_LOCATION)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (!card) return
     setOrgId(card.orgId ?? NO_CUSTOMER)
-    setLocationId(NO_LOCATION)
     setError(null)
   }, [card])
-
-  const locations = customers.find((c) => c.id === orgId)?.locations ?? []
 
   const submit = async () => {
     if (!card) return
@@ -56,7 +51,6 @@ export function AssignCustomerDialog({
       const result = await assignCardAction({
         cardId: card.id,
         orgId: orgId === NO_CUSTOMER ? null : orgId,
-        locationId: locationId === NO_LOCATION ? null : locationId,
       })
       if (!result.success) {
         setError(result.error.message)
@@ -78,19 +72,13 @@ export function AssignCustomerDialog({
           <DialogTitle>Karte zuweisen</DialogTitle>
           <DialogDescription>
             Der zugewiesene Betrieb darf diese Karte stempeln. Ohne Zuweisung kann niemand
-            stempeln — auch das Agentur-Team nicht.
+            stempeln — auch die Verwaltung nicht.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <Field label="Kunde" htmlFor="assign-org">
-            <Select
-              value={orgId}
-              onValueChange={(value) => {
-                setOrgId(value)
-                setLocationId(NO_LOCATION)
-              }}
-            >
+            <Select value={orgId} onValueChange={setOrgId}>
               <SelectTrigger id="assign-org">
                 <SelectValue />
               </SelectTrigger>
@@ -104,24 +92,6 @@ export function AssignCustomerDialog({
               </SelectContent>
             </Select>
           </Field>
-
-          {locations.length > 0 ? (
-            <Field label="Filiale" htmlFor="assign-location" hint="Optional.">
-              <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger id="assign-location">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_LOCATION}>Keine</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : null}
 
           {orgId === NO_CUSTOMER && card?.issuedCount ? (
             <p className="rounded-md border border-warn/40 bg-warn-soft px-3 py-2 text-[12px] leading-snug text-warn-ink">

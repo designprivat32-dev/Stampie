@@ -8,7 +8,7 @@ import { GoogleWalletTab } from './tabs/google-wallet-tab'
 import { ProgramTab } from './tabs/program-tab'
 import { TextsTab } from './tabs/texts-tab'
 import { useCardEditor } from '@/stores/card-editor-provider'
-import type { LocationSummary } from '@/types/location'
+import type { CustomerSummary } from '@/types/customer'
 
 /**
  * Which tabs exist depends on the card kind, and the rule is not cosmetic: a tab is shown
@@ -21,7 +21,7 @@ import type { LocationSummary } from '@/types/location'
  *
  * Both kinds reach the coupon editor, because a stamp card can hand one out as its reward.
  */
-export function EditorTabs({ location }: { location: LocationSummary }) {
+export function EditorTabs({ customer }: { customer: CustomerSummary }) {
   const kind = useCardEditor((s) => s.kind)
   const isStamp = kind === 'STAMP'
 
@@ -49,7 +49,7 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
           <CouponTab />
         </TabsContent>
         <TabsContent value="texts">
-          <TextsTab location={location} />
+          <TextsTab customer={customer} />
         </TabsContent>
         {isStamp ? (
           <TabsContent value="google">
@@ -57,7 +57,7 @@ export function EditorTabs({ location }: { location: LocationSummary }) {
           </TabsContent>
         ) : null}
         <TabsContent value="advanced">
-          <AdvancedTab location={location} />
+          <AdvancedTab customer={customer} />
         </TabsContent>
       </div>
     </Tabs>

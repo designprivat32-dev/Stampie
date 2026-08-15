@@ -39,6 +39,9 @@ export function CustomerDialog({
   const [street, setStreet] = React.useState('')
   const [postalCode, setPostalCode] = React.useState('')
   const [city, setCity] = React.useState('')
+  const [website, setWebsite] = React.useState('')
+  const [imprintUrl, setImprintUrl] = React.useState('')
+  const [privacyUrl, setPrivacyUrl] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({})
@@ -51,6 +54,9 @@ export function CustomerDialog({
     setStreet(editing?.street ?? '')
     setPostalCode(editing?.postalCode ?? '')
     setCity(editing?.city ?? '')
+    setWebsite(editing?.website ?? '')
+    setImprintUrl(editing?.imprintUrl ?? '')
+    setPrivacyUrl(editing?.privacyUrl ?? '')
     setError(null)
     setFieldErrors({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,7 +67,7 @@ export function CustomerDialog({
     setError(null)
     setFieldErrors({})
     try {
-      const payload = { name, phone, email, street, postalCode, city }
+      const payload = { name, phone, email, street, postalCode, city, website, imprintUrl, privacyUrl }
       const result =
         state?.mode === 'edit'
           ? await updateCustomerAction(state.customer.id, payload)
@@ -153,6 +159,41 @@ export function CustomerDialog({
                 maxLength={120}
                 placeholder="Berlin"
                 onChange={(e) => setCity(e.target.value)}
+              />
+            </Field>
+          </div>
+
+          {/*
+            Links, not decoration: a published pass has to carry an imprint and a privacy
+            link, and the designer offers exactly these as one-click back fields.
+          */}
+          <Field label="Website" htmlFor="cust-website" error={fieldErrors.website}>
+            <Input
+              id="cust-website"
+              value={website}
+              maxLength={200}
+              placeholder="https://cafe-nord.de"
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Impressum" htmlFor="cust-imprint" error={fieldErrors.imprintUrl}>
+              <Input
+                id="cust-imprint"
+                value={imprintUrl}
+                maxLength={200}
+                placeholder="https://cafe-nord.de/impressum"
+                onChange={(e) => setImprintUrl(e.target.value)}
+              />
+            </Field>
+            <Field label="Datenschutz" htmlFor="cust-privacy" error={fieldErrors.privacyUrl}>
+              <Input
+                id="cust-privacy"
+                value={privacyUrl}
+                maxLength={200}
+                placeholder="https://cafe-nord.de/datenschutz"
+                onChange={(e) => setPrivacyUrl(e.target.value)}
               />
             </Field>
           </div>

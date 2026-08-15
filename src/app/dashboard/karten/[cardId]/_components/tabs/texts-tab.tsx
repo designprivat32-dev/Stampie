@@ -10,10 +10,10 @@ import { BackFieldsEditor } from '../back-fields-editor'
 import { PlatformSupportBadge } from '../platform-support-badge'
 import { newFieldId } from '@/lib/cards/defaults'
 import { LEGAL_LABELS, type BackField } from '@/lib/cards/schema'
-import { formatAddress, formatOpeningHours, type LocationSummary } from '@/types/location'
+import { formatAddress, formatOpeningHours, type CustomerSummary } from '@/types/customer'
 import { useCardEditor } from '@/stores/card-editor-provider'
 
-export function TextsTab({ location }: { location: LocationSummary }) {
+export function TextsTab({ customer }: { customer: CustomerSummary }) {
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
   const addBackField = useCardEditor((s) => s.addBackField)
@@ -28,7 +28,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
         key: 'address',
         label: 'Adresse',
         build: () => {
-          const value = formatAddress(location)
+          const value = formatAddress(customer)
           return value ? { id: newFieldId(), type: 'address', label: 'Adresse', value } : null
         },
       },
@@ -36,7 +36,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
         key: 'hours',
         label: 'Öffnungszeiten',
         build: () => {
-          const value = formatOpeningHours(location.openingHours)
+          const value = formatOpeningHours(customer.openingHours)
           return value ? { id: newFieldId(), type: 'hours', label: 'Öffnungszeiten', value } : null
         },
       },
@@ -44,21 +44,21 @@ export function TextsTab({ location }: { location: LocationSummary }) {
         key: 'phone',
         label: 'Telefon',
         build: () =>
-          location.phone
-            ? { id: newFieldId(), type: 'phone', label: 'Telefon', value: location.phone }
+          customer.phone
+            ? { id: newFieldId(), type: 'phone', label: 'Telefon', value: customer.phone }
             : null,
       },
       {
         key: 'website',
         label: 'Website',
         build: () =>
-          location.website
-            ? { id: newFieldId(), type: 'url', label: 'Website', value: location.website }
+          customer.website
+            ? { id: newFieldId(), type: 'url', label: 'Website', value: customer.website }
             : null,
       },
     ]
     return items.filter((i) => i.build() !== null)
-  }, [location])
+  }, [customer])
 
   const missingLegal = (['imprint', 'privacy'] as const).filter((k) => !legalKinds.has(k))
 
@@ -86,7 +86,7 @@ export function TextsTab({ location }: { location: LocationSummary }) {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {missingLegal.map((kind) => {
-                const suggested = kind === 'imprint' ? location.imprintUrl : location.privacyUrl
+                const suggested = kind === 'imprint' ? customer.imprintUrl : customer.privacyUrl
                 return (
                   // Short label so both fit on one row; the full wording stays for screen
                   // readers, where "Impressum" alone would not say what the button does.
@@ -120,13 +120,13 @@ export function TextsTab({ location }: { location: LocationSummary }) {
           <Field
             label="Aussteller"
             htmlFor="issuer-display-name"
-            hint={`Steht auf der Google-Karte ganz oben. Leer = „${location.organizationName}“.`}
+            hint={`Steht auf der Google-Karte ganz oben. Leer = „${customer.name}“.`}
           >
             <Input
               id="issuer-display-name"
               value={design.issuerDisplayName ?? ''}
               maxLength={40}
-              placeholder={location.organizationName}
+              placeholder={customer.name}
               onChange={(e) => patch({ issuerDisplayName: e.target.value || null })}
             />
           </Field>

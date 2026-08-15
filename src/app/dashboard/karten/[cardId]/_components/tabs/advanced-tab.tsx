@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { GeoLocationsEditor } from '../geo-locations-editor'
 import { PlatformSupportBadge } from '../platform-support-badge'
 import { BARCODE_FORMATS, type BarcodeFormat } from '@/lib/cards/schema'
-import type { LocationSummary } from '@/types/location'
+import type { CustomerSummary } from '@/types/customer'
 import { useCardEditor } from '@/stores/card-editor-provider'
 
 const BARCODE_LABELS: Record<BarcodeFormat, string> = {
@@ -18,7 +18,7 @@ const BARCODE_LABELS: Record<BarcodeFormat, string> = {
   AZTEC: 'Aztec',
 }
 
-export function AdvancedTab({ location }: { location: LocationSummary }) {
+export function AdvancedTab({ customer }: { customer: CustomerSummary }) {
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
 
@@ -54,7 +54,7 @@ export function AdvancedTab({ location }: { location: LocationSummary }) {
         description="Karte erscheint am Sperrbildschirm, wenn der Kunde in der Nähe ist."
         action={<PlatformSupportBadge field="geoLocations" />}
       >
-        <GeoLocationsEditor location={location} />
+        <GeoLocationsEditor customer={customer} />
       </PanelSection>
 
       <PanelSection title="Gültigkeit">

@@ -3,34 +3,18 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 /**
- * Development seed: one organisation, one user, two locations, a handful of issued passes
+ * Development seed: two customers, one user, a handful of issued passes
  * so the publish dialog has a realistic "affected cards" number.
  */
 async function main() {
+  // The customer carries its own master data — the designer prefills addresses, opening
+  // hours and legal links from here. (There used to be a separate `Location` model for it;
+  // nothing ever created one, so the fields moved onto the customer.)
   const org = await prisma.organization.upsert({
     where: { id: 'cseedorg00000000000000001' },
     update: {},
-    create: { id: 'cseedorg00000000000000001', name: 'Nordstadt Betriebe GmbH' },
-  })
-
-  const user = await prisma.user.upsert({
-    where: { email: 'demo@stampie.de' },
-    update: {},
-    create: { email: 'demo@stampie.de', name: 'Demo Nutzer' },
-  })
-
-  await prisma.membership.upsert({
-    where: { userId_orgId: { userId: user.id, orgId: org.id } },
-    update: {},
-    create: { userId: user.id, orgId: org.id, role: 'OWNER' },
-  })
-
-  const cafe = await prisma.location.upsert({
-    where: { id: 'cseedlocationcafe00000001' },
-    update: {},
     create: {
-      id: 'cseedlocationcafe00000001',
-      orgId: org.id,
+      id: 'cseedorg00000000000000001',
       name: 'Café Nord',
       street: 'Hauptstraße 12',
       postalCode: '20095',
@@ -53,12 +37,12 @@ async function main() {
     },
   })
 
-  await prisma.location.upsert({
-    where: { id: 'cseedlocationbarber000001' },
+  // A second customer, so the assignment dropdown has something to choose between.
+  await prisma.organization.upsert({
+    where: { id: 'cseedorg00000000000000002' },
     update: {},
     create: {
-      id: 'cseedlocationbarber000001',
-      orgId: org.id,
+      id: 'cseedorg00000000000000002',
       name: 'Barbier Altona',
       street: 'Große Bergstraße 4',
       postalCode: '22767',
@@ -77,6 +61,18 @@ async function main() {
         { weekday: 6, opens: '09:00', closes: '16:00' },
       ],
     },
+  })
+
+  const user = await prisma.user.upsert({
+    where: { email: 'demo@stampie.de' },
+    update: {},
+    create: { email: 'demo@stampie.de', name: 'Demo Nutzer' },
+  })
+
+  await prisma.membership.upsert({
+    where: { userId_orgId: { userId: user.id, orgId: org.id } },
+    update: {},
+    create: { userId: user.id, orgId: org.id, role: 'OWNER' },
   })
 
   // An agency account that sees every card but may not stamp, next to the shop owner.
@@ -98,7 +94,6 @@ async function main() {
       id: 'ccardcafenord000000000001',
       name: 'Kaffeekarte Café Nord',
       orgId: org.id,
-      locationId: cafe.id,
       createdBy: user.id,
       designs: {
         create: {

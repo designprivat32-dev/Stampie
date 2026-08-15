@@ -195,7 +195,6 @@ function CardTile({
             <p className="flex items-center gap-1 truncate text-[12px] text-ink-3">
               <Building2 className="size-3 shrink-0" />
               {card.orgName ?? 'Nicht zugewiesen'}
-              {card.locationName ? ` · ${card.locationName}` : ''}
             </p>
           </Link>
           {card.archivedAt ? (

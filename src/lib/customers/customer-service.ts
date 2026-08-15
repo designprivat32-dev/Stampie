@@ -15,6 +15,9 @@ export interface CustomerRecord {
   street: string | null
   postalCode: string | null
   city: string | null
+  website: string | null
+  imprintUrl: string | null
+  privacyUrl: string | null
   /** How many cards belong to this customer. */
   cardCount: number
   createdAt: string
@@ -36,6 +39,9 @@ export async function listCustomerRecords(orgIds: string[] | null): Promise<Cust
       street: true,
       postalCode: true,
       city: true,
+      website: true,
+      imprintUrl: true,
+      privacyUrl: true,
       createdAt: true,
       _count: { select: { cards: true } },
     },
@@ -49,6 +55,9 @@ export async function listCustomerRecords(orgIds: string[] | null): Promise<Cust
     street: r.street,
     postalCode: r.postalCode,
     city: r.city,
+    website: r.website,
+    imprintUrl: r.imprintUrl,
+    privacyUrl: r.privacyUrl,
     cardCount: r._count.cards,
     createdAt: r.createdAt.toISOString(),
   }))

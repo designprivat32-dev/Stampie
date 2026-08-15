@@ -25,7 +25,7 @@ import { VersionHistoryDialog } from './dialogs/version-history-dialog'
 import { useAutosave } from '@/hooks/use-autosave'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { useCardEditor, useTemporal } from '@/stores/card-editor-provider'
-import type { LocationSummary } from '@/types/location'
+import type { CustomerSummary } from '@/types/customer'
 import { cn } from '@/lib/utils'
 
 /**
@@ -37,14 +37,14 @@ import { cn } from '@/lib/utils'
  */
 export function CardEditorShell({
   cardName,
-  location,
+  customer,
   userEmail,
   publishedVersion,
   suggestTemplate,
   canStamp,
 }: {
   cardName: string
-  location: LocationSummary
+  customer: CustomerSummary
   userEmail: string
   publishedVersion: number | null
   /** Whether the template picker should greet the owner — true only on an untouched card. */
@@ -85,8 +85,7 @@ export function CardEditorShell({
               <div className="min-w-0">
                 <h1 className="truncate text-[15px] font-semibold text-ink">{cardName}</h1>
                 <p className="truncate text-[12px] text-ink-3">
-                  {location.organizationName}
-                  {location.name !== location.organizationName ? ` · ${location.name}` : ''}
+                  {customer.id ? customer.name : 'Noch keinem Kunden zugewiesen'}
                 </p>
               </div>
             </div>
@@ -171,7 +170,7 @@ export function CardEditorShell({
             <div className="max-h-[70vh] overflow-y-auto border-t border-line bg-canvas px-4 lg:hidden">
               <PreviewPane
                 cardId={cardId}
-                organizationName={location.organizationName || location.name}
+                organizationName={customer.name}
 
               />
             </div>
@@ -180,14 +179,14 @@ export function CardEditorShell({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="flex min-h-0 w-full flex-col border-line bg-surface lg:w-[420px] lg:shrink-0 lg:border-r">
-            <EditorTabs location={location} />
+            <EditorTabs customer={customer} />
           </div>
 
           <main className="hidden min-w-0 flex-1 px-8 lg:block">
             <div className="scrollbar-slim sticky top-[57px] h-[calc(100dvh-57px)] overflow-y-auto">
               <PreviewPane
                 cardId={cardId}
-                organizationName={location.organizationName || location.name}
+                organizationName={customer.name}
 
               />
             </div>

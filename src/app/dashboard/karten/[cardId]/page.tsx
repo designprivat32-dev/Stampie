@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation'
 import { CardEditorShell } from './_components/card-editor-shell'
 import { CardEditorProvider } from '@/stores/card-editor-provider'
-import { assertCardAccess, LocationAccessError, UnauthorizedError } from '@/lib/auth/session'
+import { assertCardAccess, CardAccessError, UnauthorizedError } from '@/lib/auth/session'
 import { prisma } from '@/lib/db'
 import { loadOrCreateDraft } from '@/lib/cards/repository'
 import { isPristineDesign } from '@/lib/cards/defaults'
 import { getStorage, variantKey } from '@/lib/storage'
-import type { LocationSummary, OpeningHours } from '@/types/location'
+import type { CustomerSummary, OpeningHours } from '@/types/customer'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +16,8 @@ export const dynamic = 'force-dynamic'
  * Access is checked before any design data is touched, and a card the user cannot reach
  * produces a 404 rather than a 403 — a guessed id must not reveal whether it exists.
  *
- * The branch is optional: a card can be designed long before anyone decides which shop or
- * which address it belongs to, so the master data used for prefilling may simply be empty.
+ * The customer is optional: a card can be designed long before anyone decides who gets it,
+ * so the master data used for prefilling may simply be empty.
  */
 export default async function KartePage({ params }: { params: Promise<{ cardId: string }> }) {
   const { cardId } = await params
@@ -26,40 +26,37 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
   try {
     access = await assertCardAccess(cardId)
   } catch (e) {
-    if (e instanceof LocationAccessError || e instanceof UnauthorizedError) notFound()
+    if (e instanceof CardAccessError || e instanceof UnauthorizedError) notFound()
     throw e
   }
 
   const [card, draft] = await Promise.all([
     prisma.card.findFirst({
       where: { id: access.cardId },
-      include: {
-        org: { select: { name: true } },
-        location: true,
-      },
+      include: { org: true },
     }),
     loadOrCreateDraft(access.cardId),
   ])
 
   if (!card) notFound()
 
-  const branch = card.location
-  const location: LocationSummary = {
-    id: branch?.id ?? card.id,
-    name: branch?.name ?? card.name,
-    organizationName: card.org?.name ?? card.name,
-    street: branch?.street ?? null,
-    postalCode: branch?.postalCode ?? null,
-    city: branch?.city ?? null,
-    phone: branch?.phone ?? null,
-    website: branch?.website ?? null,
-    email: branch?.email ?? null,
-    imprintUrl: branch?.imprintUrl ?? null,
-    privacyUrl: branch?.privacyUrl ?? null,
-    latitude: branch?.latitude ?? null,
-    longitude: branch?.longitude ?? null,
-    openingHours: Array.isArray(branch?.openingHours)
-      ? (branch.openingHours as unknown as OpeningHours[])
+  const org = card.org
+  const customer: CustomerSummary = {
+    id: org?.id ?? null,
+    // Falls back to the card's own name so the header is never blank on an unassigned card.
+    name: org?.name ?? card.name,
+    street: org?.street ?? null,
+    postalCode: org?.postalCode ?? null,
+    city: org?.city ?? null,
+    phone: org?.phone ?? null,
+    website: org?.website ?? null,
+    email: org?.email ?? null,
+    imprintUrl: org?.imprintUrl ?? null,
+    privacyUrl: org?.privacyUrl ?? null,
+    latitude: org?.latitude ?? null,
+    longitude: org?.longitude ?? null,
+    openingHours: Array.isArray(org?.openingHours)
+      ? (org.openingHours as unknown as OpeningHours[])
       : [],
   }
 
@@ -77,7 +74,7 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
     <CardEditorProvider init={{ cardId: card.id, kind: card.kind, design: draft.design, assetUrls }}>
       <CardEditorShell
         cardName={card.name}
-        location={location}
+        customer={customer}
         userEmail={access.session.email}
         publishedVersion={draft.publishedVersion}
         // Templates carry stamp goals and icons, so they only make sense for a stamp card.

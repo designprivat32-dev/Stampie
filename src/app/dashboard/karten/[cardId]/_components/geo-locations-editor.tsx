@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { newFieldId } from '@/lib/cards/defaults'
 import { MAX_GEO_LOCATIONS } from '@/lib/cards/schema'
-import type { LocationSummary } from '@/types/location'
+import type { CustomerSummary } from '@/types/customer'
 import { useCardEditor } from '@/stores/card-editor-provider'
 
 /**
@@ -19,14 +19,14 @@ import { useCardEditor } from '@/stores/card-editor-provider'
  * decision for the platform, not for this panel — the "Standort übernehmen" button covers
  * the case that actually occurs (the shop itself).
  */
-export function GeoLocationsEditor({ location }: { location: LocationSummary }) {
+export function GeoLocationsEditor({ customer }: { customer: CustomerSummary }) {
   const geoLocations = useCardEditor((s) => s.design.geoLocations)
   const addGeoLocation = useCardEditor((s) => s.addGeoLocation)
   const updateGeoLocation = useCardEditor((s) => s.updateGeoLocation)
   const removeGeoLocation = useCardEditor((s) => s.removeGeoLocation)
 
   const atLimit = geoLocations.length >= MAX_GEO_LOCATIONS
-  const hasCoordinates = location.latitude !== null && location.longitude !== null
+  const hasCoordinates = customer.latitude !== null && customer.longitude !== null
 
   return (
     <div className="space-y-3">
@@ -40,7 +40,7 @@ export function GeoLocationsEditor({ location }: { location: LocationSummary }) 
                 value={geo.label}
                 maxLength={60}
                 aria-label="Bezeichnung des Standorts"
-                placeholder="Filiale Innenstadt"
+                placeholder="Laden Innenstadt"
                 onChange={(e) => updateGeoLocation(geo.id, { label: e.target.value })}
               />
               <Button
@@ -134,9 +134,9 @@ export function GeoLocationsEditor({ location }: { location: LocationSummary }) 
           onClick={() =>
             addGeoLocation({
               id: newFieldId(),
-              label: location.name,
-              latitude: location.latitude ?? 52.520008,
-              longitude: location.longitude ?? 13.404954,
+              label: customer.name,
+              latitude: customer.latitude ?? 52.520008,
+              longitude: customer.longitude ?? 13.404954,
               maxDistance: 150,
               relevantText: 'Deine Stempelkarte ist bereit',
             })

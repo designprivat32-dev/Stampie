@@ -4,7 +4,7 @@ import { Palette } from 'lucide-react'
 import { TillView } from './_components/till-view'
 import {
   assertCardAccess,
-  LocationAccessError,
+  CardAccessError,
   StampPermissionError,
   UnauthorizedError,
 } from '@/lib/auth/session'
@@ -28,7 +28,7 @@ export default async function StempelnPage({
   try {
     access = await assertCardAccess(cardId)
   } catch (e) {
-    if (e instanceof LocationAccessError || e instanceof UnauthorizedError) notFound()
+    if (e instanceof CardAccessError || e instanceof UnauthorizedError) notFound()
     throw e
   }
 

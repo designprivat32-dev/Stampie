@@ -1,5 +1,5 @@
 import { ZodError } from 'zod'
-import { LocationAccessError, StampPermissionError, UnauthorizedError } from '@/lib/auth/session'
+import { CardAccessError, StampPermissionError, UnauthorizedError } from '@/lib/auth/session'
 
 /**
  * One response envelope for every server action, so the client always destructures the
@@ -61,7 +61,7 @@ export async function guarded<T>(fn: () => Promise<ActionResult<T>>): Promise<Ac
     if (e instanceof ZodError) return fromZodError(e)
     if (e instanceof UnauthorizedError) return fail(e.message, 'forbidden')
     if (e instanceof StampPermissionError) return fail(e.message, 'forbidden')
-    if (e instanceof LocationAccessError) return fail(e.message, 'not_found')
+    if (e instanceof CardAccessError) return fail(e.message, 'not_found')
     // eslint-disable-next-line no-console
     console.error('[action]', e)
     return fail('Da ist etwas schiefgelaufen. Bitte erneut versuchen.', 'internal')

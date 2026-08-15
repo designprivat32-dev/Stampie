@@ -23,7 +23,6 @@ import type { CardKind } from '@/lib/cards/schema'
 import type { CustomerOption } from '@/lib/cards/card-service'
 
 const NO_CUSTOMER = '__none__'
-const NO_LOCATION = '__none__'
 const NO_TEMPLATE = '__none__'
 
 const CARD_KIND_OPTIONS: ReadonlyArray<{
@@ -66,7 +65,6 @@ export function NewCardDialog({
   const [name, setName] = React.useState('')
   const [kind, setKind] = React.useState<CardKind>('STAMP')
   const [orgId, setOrgId] = React.useState<string>(NO_CUSTOMER)
-  const [locationId, setLocationId] = React.useState<string>(NO_LOCATION)
   const [templateId, setTemplateId] = React.useState<string>(NO_TEMPLATE)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -76,12 +74,9 @@ export function NewCardDialog({
     setName('')
     setKind('STAMP')
     setOrgId(canChooseCustomer ? NO_CUSTOMER : (customers[0]?.id ?? NO_CUSTOMER))
-    setLocationId(NO_LOCATION)
     setTemplateId(NO_TEMPLATE)
     setError(null)
   }, [open, canChooseCustomer, customers])
-
-  const locations = customers.find((c) => c.id === orgId)?.locations ?? []
 
   const submit = async () => {
     setBusy(true)
@@ -91,7 +86,6 @@ export function NewCardDialog({
         name: name.trim(),
         kind,
         orgId: orgId === NO_CUSTOMER ? null : orgId,
-        locationId: locationId === NO_LOCATION ? null : locationId,
         templateId: templateId === NO_TEMPLATE ? null : templateId,
       })
       if (!result.success) {
@@ -113,8 +107,8 @@ export function NewCardDialog({
         <DialogHeader>
           <DialogTitle>Neue Karte</DialogTitle>
           <DialogDescription>
-            Nach dem Anlegen geht es direkt in den Designer. Kunde und Filiale lassen sich
-            jederzeit nachtragen.
+            Nach dem Anlegen geht es direkt in den Designer. Der Kunde lässt sich jederzeit
+            nachtragen.
           </DialogDescription>
         </DialogHeader>
 
@@ -173,13 +167,7 @@ export function NewCardDialog({
 
           {canChooseCustomer ? (
             <Field label="Kunde" htmlFor="card-org" hint="Bestimmt, wer stempeln darf.">
-              <Select
-                value={orgId}
-                onValueChange={(value) => {
-                  setOrgId(value)
-                  setLocationId(NO_LOCATION)
-                }}
-              >
+              <Select value={orgId} onValueChange={setOrgId}>
                 <SelectTrigger id="card-org">
                   <SelectValue placeholder="Noch nicht zuweisen" />
                 </SelectTrigger>
@@ -188,28 +176,6 @@ export function NewCardDialog({
                   {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : null}
-
-          {locations.length > 0 ? (
-            <Field
-              label="Filiale"
-              htmlFor="card-location"
-              hint="Optional — füllt Adresse und Öffnungszeiten vor."
-            >
-              <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger id="card-location">
-                  <SelectValue placeholder="Keine" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_LOCATION}>Keine</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

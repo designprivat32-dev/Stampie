@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
-import { assertCardAccess, LocationAccessError, UnauthorizedError } from '@/lib/auth/session'
+import { assertCardAccess, CardAccessError, UnauthorizedError } from '@/lib/auth/session'
 import { renderStripCached } from '@/lib/cards/strip-service'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import {
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     await assertCardAccess(q.card)
   } catch (e) {
     if (e instanceof UnauthorizedError) return new NextResponse(null, { status: 401 })
-    if (e instanceof LocationAccessError) return new NextResponse(null, { status: 404 })
+    if (e instanceof CardAccessError) return new NextResponse(null, { status: 404 })
     throw e
   }
 

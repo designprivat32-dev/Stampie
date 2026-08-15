@@ -16,7 +16,6 @@ export interface CardSummary {
   name: string
   orgId: string | null
   orgName: string | null
-  locationName: string | null
   createdAt: string
   archivedAt: string | null
   isPublished: boolean
@@ -78,7 +77,6 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       createdAt: true,
       archivedAt: true,
       org: { select: { name: true } },
-      location: { select: { name: true } },
       designs: {
         select: {
           status: true,
@@ -121,7 +119,6 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       name: row.name,
       orgId: row.orgId,
       orgName: row.org?.name ?? null,
-      locationName: row.location?.name ?? null,
       createdAt: row.createdAt.toISOString(),
       archivedAt: row.archivedAt?.toISOString() ?? null,
       isPublished: published !== undefined,
@@ -148,7 +145,6 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
 export interface CustomerOption {
   id: string
   name: string
-  locations: Array<{ id: string; name: string }>
 }
 
 /** Organisations a card can be assigned to. */
@@ -156,7 +152,7 @@ export async function listCustomers(orgIds: string[] | null): Promise<CustomerOp
   const rows = await prisma.organization.findMany({
     where: orgIds ? { id: { in: orgIds } } : {},
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, locations: { select: { id: true, name: true } } },
+    select: { id: true, name: true },
   })
   return rows
 }

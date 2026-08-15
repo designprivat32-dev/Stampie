@@ -5,9 +5,9 @@ import { prisma } from '@/lib/db'
  * STUB. The real auth layer lands separately; everything downstream only ever talks to
  * this module, so swapping the implementation is a one-file change.
  *
- * The important part is not the stub — it is `assertLocationAccess`. Every server action
- * and every page load goes through it, and every Prisma query additionally filters by
- * `locationId`, so no design is reachable through a guessed id.
+ * The important part is not the stub — it is `assertCardAccess`. Every server action and
+ * every page load goes through it, and every Prisma query additionally filters by
+ * `cardId`, so no design is reachable through a guessed id.
  */
 
 export interface Session {
@@ -24,13 +24,13 @@ export class UnauthorizedError extends Error {
 }
 
 /**
- * Thrown both when the location does not exist and when the user has no access to it —
- * the caller turns this into a 404 so a guessed id cannot be used to probe for existence.
+ * Thrown both when the card does not exist and when the user has no access to it — the
+ * caller turns this into a 404 so a guessed id cannot be used to probe for existence.
  */
-export class LocationAccessError extends Error {
-  constructor(message = 'Standort nicht gefunden.') {
+export class CardAccessError extends Error {
+  constructor(message = 'Karte nicht gefunden.') {
     super(message)
-    this.name = 'LocationAccessError'
+    this.name = 'CardAccessError'
   }
 }
 
@@ -46,12 +46,6 @@ export async function requireSession(): Promise<Session> {
   const session = await getSession()
   if (!session) throw new UnauthorizedError()
   return session
-}
-
-export interface LocationAccess {
-  session: Session
-  locationId: string
-  orgId: string
 }
 
 export type MemberRole = 'OWNER' | 'MEMBER' | 'AGENCY'
@@ -114,7 +108,7 @@ export async function assertCardAccess(cardId: string): Promise<CardAccess> {
     where: { id: cardId },
     select: { id: true, orgId: true },
   })
-  if (!card) throw new LocationAccessError('Karte nicht gefunden.')
+  if (!card) throw new CardAccessError('Karte nicht gefunden.')
 
   if (await isAdminSession(session.userId)) {
     // Single-operator setup: the operator also runs the till, so they may stamp assigned
@@ -122,13 +116,13 @@ export async function assertCardAccess(cardId: string): Promise<CardAccess> {
     return { session, cardId: card.id, orgId: card.orgId, role: 'AGENCY', canStamp: card.orgId !== null }
   }
 
-  if (!card.orgId) throw new LocationAccessError('Karte nicht gefunden.')
+  if (!card.orgId) throw new CardAccessError('Karte nicht gefunden.')
 
   const membership = await prisma.membership.findFirst({
     where: { userId: session.userId, orgId: card.orgId },
     select: { role: true },
   })
-  if (!membership) throw new LocationAccessError('Karte nicht gefunden.')
+  if (!membership) throw new CardAccessError('Karte nicht gefunden.')
 
   return {
     session,
@@ -149,24 +143,4 @@ export async function assertStampAccess(cardId: string): Promise<CardAccess> {
     )
   }
   return access
-}
-
-/**
- * The tenancy gate. Resolves the location *through the membership table*, so a location
- * belonging to another organisation simply does not resolve.
- */
-export async function assertLocationAccess(locationId: string): Promise<LocationAccess> {
-  const session = await requireSession()
-
-  const location = await prisma.location.findFirst({
-    where: {
-      id: locationId,
-      org: { members: { some: { userId: session.userId } } },
-    },
-    select: { id: true, orgId: true },
-  })
-
-  if (!location) throw new LocationAccessError()
-
-  return { session, locationId: location.id, orgId: location.orgId }
 }

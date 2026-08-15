@@ -79,7 +79,7 @@ dokumentiert sind:
 | `npm test` | Vitest, komplette Suite |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:push` | Schema in die Datenbank schreiben |
-| `npm run db:seed` | Demo-Organisation, zwei Filialen, eine Karte, 137 ausgegebene Karten |
+| `npm run db:seed` | Zwei Demo-Kunden, eine Karte, 137 ausgegebene Karten |
 
 Zusätzlich, rein für die visuelle Kontrolle der Symbolbibliothek:
 
@@ -92,7 +92,6 @@ npx tsx scripts/gen-preview.mts ./tmp
 ```
 Organization (= Kunde)
   ├─ Membership   Nutzer + Rolle
-  ├─ Location     Filialen (Stammdaten, Geo)
   └─ Card         beliebig viele Stempelkarten
        ├─ CardDesign   1 Entwurf + 1 veröffentlicht
        ├─ Asset        Logo, Icon, Hero

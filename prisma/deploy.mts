@@ -18,6 +18,18 @@
  * pusht, weil dort die Entwicklungsdatenbank gemeint ist.
  */
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+
+/**
+ * Handgeschriebene Schritte, die vor dem Schema-Abgleich laufen müssen.
+ *
+ * `prisma db push` weigert sich, etwas zu verwerfen, ohne `--accept-data-loss` zu
+ * verlangen — zu Recht. Wo ein Verwerfen tatsächlich gewollt ist, steht es hier als SQL,
+ * begrenzt auf genau die betroffenen Objekte, statt das Flag pauschal zu setzen.
+ *
+ * Jede Datei ist idempotent und kann entfernt werden, sobald sie überall gelaufen ist.
+ */
+const PRE_PUSH_SQL = ['prisma/sql/001-drop-location.sql']
 
 const env = process.env.VERCEL_ENV ?? 'development'
 const isolatedPreview = process.env.PREVIEW_DB_IS_ISOLATED === '1'
@@ -29,6 +41,12 @@ if (!mayTouchDatabase) {
       'sich die Datenbank mit Production. Details: prisma/deploy.mts',
   )
   process.exit(0)
+}
+
+for (const file of PRE_PUSH_SQL) {
+  if (!existsSync(file)) continue
+  console.log(`[deploy] ${file}`)
+  run('npx', ['prisma', 'db', 'execute', '--file', file, '--schema', 'prisma/schema.prisma'])
 }
 
 run('npx', ['prisma', 'db', 'push', '--skip-generate'])
