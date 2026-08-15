@@ -8,7 +8,7 @@
     "dev:db": "tsx scripts/dev-db.mts",
     "db:setup": "prisma db push --skip-generate && tsx prisma/seed.ts",
     "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma db push --skip-generate && tsx prisma/seed.ts && next build",
+    "vercel-build": "prisma generate && tsx prisma/deploy.mts && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
