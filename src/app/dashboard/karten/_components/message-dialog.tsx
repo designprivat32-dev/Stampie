@@ -20,7 +20,6 @@ import {
   listCardMessagesAction,
   type CardMessageSummary,
 } from '@/actions/messages'
-import { useCardEditor } from '@/stores/card-editor-provider'
 
 const MAX = 150
 
@@ -33,13 +32,18 @@ const MAX = 150
  * keeps its delivery result next to it.
  */
 export function MessageDialog({
+  cardId,
   open,
   onOpenChange,
 }: {
+  /**
+   * Passed in rather than read from the editor store: this belongs to running a card, not
+   * to designing one, so it opens from the card overview where no such store exists.
+   */
+  cardId: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const cardId = useCardEditor((s) => s.cardId)
 
   const [messages, setMessages] = React.useState<CardMessageSummary[] | null>(null)
   const [headline, setHeadline] = React.useState('')

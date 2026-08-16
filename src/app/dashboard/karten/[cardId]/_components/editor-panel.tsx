@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { ChevronDown, LayoutTemplate, Send } from 'lucide-react'
+import { ChevronDown, LayoutTemplate } from 'lucide-react'
 import { BrandingBackground, BrandingEssentials } from './tabs/branding-tab'
 import { ProgramAppearance, ProgramEssentials } from './tabs/program-tab'
 import { CouponTab } from './tabs/coupon-tab'
@@ -27,12 +27,10 @@ import type { CustomerSummary } from '@/types/customer'
 export function EditorPanel({
   customer,
   onOpenTemplates,
-  onOpenMessages,
 }: {
   customer: CustomerSummary
   /** Opens the template picker, which the shell owns because it also opens on its own. */
   onOpenTemplates: () => void
-  onOpenMessages: () => void
 }) {
   const isStamp = useCardEditor((s) => s.kind === 'STAMP')
 
@@ -67,16 +65,6 @@ export function EditorPanel({
             </Button>
           </PanelSection>
         ) : null}
-        <PanelSection
-          title="Nachricht an Inhaber"
-          description="Erscheint auf dem Sperrbildschirm aller, die diese Karte im Wallet haben."
-        >
-          <Button variant="secondary" size="sm" onClick={onOpenMessages}>
-            <Send />
-            Nachricht schreiben
-          </Button>
-        </PanelSection>
-
         <AdvancedTab customer={customer} />
       </Advanced>
     </div>

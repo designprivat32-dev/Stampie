@@ -3,11 +3,12 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, Building2, Plus, QrCode, Users } from 'lucide-react'
+import { Archive, Building2, Plus, QrCode, Send, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Spinner } from '@/components/ui/misc'
 import { NewCardDialog } from './new-card-dialog'
 import { AssignCustomerDialog } from './assign-customer-dialog'
+import { MessageDialog } from './message-dialog'
 import { archiveCardAction } from '@/actions/cards'
 import { stripPreviewUrl } from '@/lib/cards/preview-url'
 import type { CardSummary, CustomerOption } from '@/lib/cards/card-service'
@@ -36,6 +37,7 @@ export function CardGrid({
   const router = useRouter()
   const [creating, setCreating] = React.useState(false)
   const [assigning, setAssigning] = React.useState<CardSummary | null>(null)
+  const [messaging, setMessaging] = React.useState<CardSummary | null>(null)
   const [busyId, setBusyId] = React.useState<string | null>(null)
 
   const handleArchive = async (card: CardSummary) => {
@@ -88,6 +90,7 @@ export function CardGrid({
               canStamp={canStamp}
               busy={busyId === card.id}
               onAssign={() => setAssigning(card)}
+              onMessage={() => setMessaging(card)}
               onArchive={() => void handleArchive(card)}
             />
           ))}
@@ -114,6 +117,13 @@ export function CardGrid({
         customers={customers}
         onOpenChange={(open) => !open && setAssigning(null)}
       />
+      {messaging ? (
+        <MessageDialog
+          cardId={messaging.id}
+          open
+          onOpenChange={(open) => !open && setMessaging(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -124,6 +134,7 @@ function CardTile({
   canStamp,
   busy,
   onAssign,
+  onMessage,
   onArchive,
 }: {
   card: CardSummary
@@ -131,6 +142,7 @@ function CardTile({
   canStamp: boolean
   busy: boolean
   onAssign: () => void
+  onMessage: () => void
   onArchive: () => void
 }) {
   const preview = card.preview
@@ -227,6 +239,17 @@ function CardTile({
                 <QrCode />
                 Stempeln
               </Link>
+            </Button>
+          ) : null}
+
+          {/*
+            Only where someone actually holds the card. A message to nobody is a button
+            that can only disappoint.
+          */}
+          {card.issuedCount > 0 ? (
+            <Button variant="ghost" size="sm" onClick={onMessage}>
+              <Send />
+              Nachricht
             </Button>
           ) : null}
 

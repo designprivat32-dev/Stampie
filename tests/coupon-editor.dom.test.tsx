@@ -40,7 +40,7 @@ function Editor({ kind }: { kind: CardKind }) {
     <CardEditorProvider init={{ cardId: 'cloc00000000000000000001', kind, design: DEFAULT_CARD_DESIGN }}>
       {/* Platform badges render tooltips, which the real shell also provides. */}
       <TooltipProvider>
-        <EditorPanel customer={customer} onOpenTemplates={() => {}} onOpenMessages={() => {}} />
+        <EditorPanel customer={customer} onOpenTemplates={() => {}} />
         <PreviewControls onExport={async () => {}} />
       </TooltipProvider>
     </CardEditorProvider>
@@ -114,6 +114,15 @@ describe('the long editor page', () => {
     expect(screen.getByText('Barcode')).toBeTruthy()
   })
 
+  it('keeps messaging out of the designer entirely', () => {
+    render(<Editor kind="STAMP" />)
+    fireEvent.click(screen.getByRole('button', { name: /Erweitert/ }))
+
+    // Writing to customers is running the card, not designing it — it lives in the card
+    // overview, where a card that nobody holds does not offer it at all.
+    expect(screen.queryByRole('button', { name: /Nachricht/ })).toBeNull()
+  })
+
   it('puts the required things above the decorative ones', () => {
     render(<Editor kind="STAMP" />)
     const order = document.body.textContent ?? ''
@@ -136,7 +145,7 @@ describe('the template picker', () => {
         init={{ cardId: 'cloc00000000000000000001', kind: 'STAMP', design: DEFAULT_CARD_DESIGN }}
       >
         <TooltipProvider>
-          <EditorPanel customer={customer} onOpenTemplates={onOpenTemplates} onOpenMessages={() => {}} />
+          <EditorPanel customer={customer} onOpenTemplates={onOpenTemplates} />
         </TooltipProvider>
       </CardEditorProvider>,
     )
@@ -153,7 +162,7 @@ describe('the template picker', () => {
         init={{ cardId: 'cloc00000000000000000001', kind: 'COUPON', design: DEFAULT_CARD_DESIGN }}
       >
         <TooltipProvider>
-          <EditorPanel customer={customer} onOpenTemplates={() => {}} onOpenMessages={() => {}} />
+          <EditorPanel customer={customer} onOpenTemplates={() => {}} />
         </TooltipProvider>
       </CardEditorProvider>,
     )
