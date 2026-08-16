@@ -65,6 +65,23 @@ export async function pushAppleWalletUpdateForCard(cardId: string): Promise<Card
   })
   if (passes.length === 0) return empty
 
+  /*
+   * Mark the passes as changed before knocking.
+   *
+   * Publishing writes a new CardDesign row; the IssuedPass rows are untouched. But the
+   * device answers a push by asking "which of my passes changed since <tag>", and that
+   * question is answered from `IssuedPass.updatedAt`. Without this the list comes back
+   * empty, the device concludes nothing happened, and Apple logs it as a spurious push —
+   * which is exactly what happened before this line existed.
+   *
+   * Semantically honest, not a trick: the pass really did change. The bundle is rebuilt
+   * from the published design on every fetch, so its content is new from this moment.
+   */
+  await prisma.issuedPass.updateMany({
+    where: { cardId, appleRegistrations: { some: {} } },
+    data: { updatedAt: new Date() },
+  })
+
   const summary = { ...empty }
 
   for (let i = 0; i < passes.length; i += PUSH_BATCH_SIZE) {

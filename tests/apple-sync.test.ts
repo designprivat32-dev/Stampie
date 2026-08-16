@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const findMany = vi.fn()
+const updateMany = vi.fn()
 const findFirst = vi.fn()
 const deleteRegistration = vi.fn()
 const readAppleWalletCredentials = vi.fn()
@@ -10,6 +11,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     issuedPass: {
       findMany: (...a: unknown[]) => findMany(...a),
+      updateMany: (...a: unknown[]) => updateMany(...a),
       findFirst: (...a: unknown[]) => findFirst(...a),
     },
     appleDeviceRegistration: { delete: (...a: unknown[]) => deleteRegistration(...a) },
@@ -36,6 +38,7 @@ const CREDENTIALS = {
 
 beforeEach(() => {
   findMany.mockReset()
+  updateMany.mockReset().mockResolvedValue({ count: 0 })
   findFirst.mockReset()
   deleteRegistration.mockReset()
   sendPassUpdatePush.mockReset()
@@ -57,6 +60,41 @@ describe('pushAppleWalletUpdateForCard', () => {
 
     expect(summary).toEqual({ passes: 2, devices: 2, failed: 0 })
     expect(sendPassUpdatePush).toHaveBeenCalledTimes(2)
+  })
+
+  it('marks the passes as changed, or the device finds nothing and calls it spurious', async () => {
+    findMany.mockResolvedValue([{ serial: 'K-1' }])
+    findFirst.mockResolvedValue({ id: 'p1', appleRegistrations: [{ id: 'r1', pushToken: 't1' }] })
+    sendPassUpdatePush.mockResolvedValue({ ok: true })
+
+    await pushAppleWalletUpdateForCard('card-1')
+
+    // Publishing writes a CardDesign row; the pass rows are untouched. The device answers
+    // a push by asking which of its passes changed since a tag, and that is read from
+    // IssuedPass.updatedAt — so the push alone reaches nobody.
+    expect(updateMany).toHaveBeenCalledTimes(1)
+    const call = updateMany.mock.calls[0]?.[0]
+    expect(call.where).toMatchObject({ cardId: 'card-1', appleRegistrations: { some: {} } })
+    expect(call.data.updatedAt).toBeInstanceOf(Date)
+  })
+
+  it('marks them before knocking, never after', async () => {
+    const order: string[] = []
+    findMany.mockResolvedValue([{ serial: 'K-1' }])
+    findFirst.mockResolvedValue({ id: 'p1', appleRegistrations: [{ id: 'r1', pushToken: 't1' }] })
+    updateMany.mockImplementation(async () => {
+      order.push('mark')
+      return { count: 1 }
+    })
+    sendPassUpdatePush.mockImplementation(async () => {
+      order.push('push')
+      return { ok: true }
+    })
+
+    await pushAppleWalletUpdateForCard('card-1')
+
+    // A device can come back within milliseconds. Marking afterwards would race it.
+    expect(order).toEqual(['mark', 'push'])
   })
 
   it('only looks at passes an iPhone actually registered for', async () => {
