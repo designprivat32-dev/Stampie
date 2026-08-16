@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AdvancedTab } from './tabs/advanced-tab'
 import { BrandingTab } from './tabs/branding-tab'
 import { CouponTab } from './tabs/coupon-tab'
-import { GoogleWalletTab } from './tabs/google-wallet-tab'
 import { ProgramTab } from './tabs/program-tab'
 import { TextsTab } from './tabs/texts-tab'
 import { useCardEditor } from '@/stores/card-editor-provider'
@@ -32,7 +31,6 @@ export function EditorTabs({ customer }: { customer: CustomerSummary }) {
         {isStamp ? <TabsTrigger value="program">Stempel</TabsTrigger> : null}
         <TabsTrigger value="coupon">Gutschein</TabsTrigger>
         <TabsTrigger value="texts">Texte</TabsTrigger>
-        {isStamp ? <TabsTrigger value="google">Google Wallet</TabsTrigger> : null}
         <TabsTrigger value="advanced">Erweitert</TabsTrigger>
       </TabsList>
 
@@ -51,11 +49,6 @@ export function EditorTabs({ customer }: { customer: CustomerSummary }) {
         <TabsContent value="texts">
           <TextsTab customer={customer} />
         </TabsContent>
-        {isStamp ? (
-          <TabsContent value="google">
-            <GoogleWalletTab />
-          </TabsContent>
-        ) : null}
         <TabsContent value="advanced">
           <AdvancedTab customer={customer} />
         </TabsContent>

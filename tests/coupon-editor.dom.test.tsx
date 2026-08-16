@@ -71,9 +71,8 @@ describe('editor for a coupon card', () => {
     expect(screen.queryByRole('tab', { name: 'Stempel' })).toBeNull()
   })
 
-  // Every field in that tab is a LoyaltyClass field; buildOfferClass reads none of them,
-  // so on a coupon they are controls that change nothing about the pass.
-  it('has no Google Wallet tab — its fields are loyalty-only', () => {
+  // The tab is gone for every card kind now, not just for coupons.
+  it('has no Google Wallet tab', () => {
     render(<Editor kind="COUPON" />)
     expect(screen.queryByRole('tab', { name: 'Google Wallet' })).toBeNull()
   })
@@ -113,8 +112,8 @@ describe('editor for a stamp card', () => {
     expect(screen.getByRole('tab', { name: 'Gutschein' })).toBeTruthy()
   })
 
-  it('keeps the Google Wallet tab, where those fields do reach the pass', () => {
+  it('has no Google Wallet tab either — it was removed from the editor', () => {
     render(<Editor kind="STAMP" />)
-    expect(screen.getByRole('tab', { name: 'Google Wallet' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'Google Wallet' })).toBeNull()
   })
 })
