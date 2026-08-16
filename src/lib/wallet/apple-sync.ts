@@ -24,6 +24,66 @@ export type AppleSyncResult =
   | { status: 'no_devices' }
   | { status: 'error'; message: string }
 
+/**
+ * How many phones are pushed at once when a whole card is republished.
+ *
+ * Each push is its own HTTP/2 connection to Apple. Firing a thousand at once would open a
+ * thousand sockets and, on a serverless runtime, likely hit a file-descriptor or memory
+ * ceiling long before Apple complains. Batching keeps it boring.
+ */
+const PUSH_BATCH_SIZE = 20
+
+export interface CardPushSummary {
+  /** Passes that had at least one iPhone registered. */
+  passes: number
+  /** Individual devices reached. */
+  devices: number
+  failed: number
+}
+
+/**
+ * Tells every iPhone holding *any* pass of this card that the design changed.
+ *
+ * Publishing a new design is the other event that makes an installed pass stale — the pass
+ * endpoint rebuilds from the currently published design, so the new look is already
+ * waiting there; without this nobody ever goes and asks for it. Until this existed a shop
+ * could change its colours and see nothing happen on real phones until the next stamp
+ * happened to knock.
+ *
+ * Best-effort, like the single-pass version: the design is published and saved before this
+ * runs, and a phone that is off must not turn a successful publish into an error.
+ */
+export async function pushAppleWalletUpdateForCard(cardId: string): Promise<CardPushSummary> {
+  const empty: CardPushSummary = { passes: 0, devices: 0, failed: 0 }
+  if (!readAppleWalletCredentials()) return empty
+
+  // Only passes an iPhone actually registered for. A card handed out a thousand times but
+  // never added to Wallet has nothing to push to.
+  const passes = await prisma.issuedPass.findMany({
+    where: { cardId, appleRegistrations: { some: {} } },
+    select: { serial: true },
+  })
+  if (passes.length === 0) return empty
+
+  const summary = { ...empty }
+
+  for (let i = 0; i < passes.length; i += PUSH_BATCH_SIZE) {
+    const batch = passes.slice(i, i + PUSH_BATCH_SIZE)
+    const results = await Promise.all(batch.map((p) => pushAppleWalletUpdate(p.serial)))
+
+    for (const result of results) {
+      if (result.status === 'updated') {
+        summary.passes++
+        summary.devices += result.devices
+      } else if (result.status === 'error') {
+        summary.failed++
+      }
+    }
+  }
+
+  return summary
+}
+
 export async function pushAppleWalletUpdate(serial: string): Promise<AppleSyncResult> {
   const credentials = readAppleWalletCredentials()
   if (!credentials) return { status: 'not_configured' }

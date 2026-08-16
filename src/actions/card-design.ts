@@ -24,6 +24,7 @@ import {
 import { applyTemplate, getTemplate } from '@/lib/cards/templates'
 import { invalidateStripCache } from '@/lib/cards/strip-service'
 import { syncGoogleClass } from '@/lib/wallet/google-sync'
+import { pushAppleWalletUpdateForCard } from '@/lib/wallet/apple-sync'
 import { cardKind, issuerName } from '@/lib/cards/card-service'
 
 /**
@@ -83,6 +84,13 @@ export async function publishAction(input: unknown): Promise<ActionResult<Publis
 
     // Cards already in a wallet follow the class, so publishing has to reach it too.
     await syncGoogleClass(cardId, validated.data, await issuerName(cardId), kind)
+
+    // Apple has no class to update — every installed pass has to be knocked on
+    // individually, or the new design sits on the server and reaches nobody until that
+    // customer happens to collect a stamp. Awaited rather than left running: a promise
+    // that outlives the response is not guaranteed to finish on a serverless runtime, and
+    // a publish that silently reached half the phones is worse than one that took a moment.
+    await pushAppleWalletUpdateForCard(cardId)
 
     revalidatePath(`/dashboard/karten/${cardId}`)
 
