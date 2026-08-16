@@ -24,10 +24,13 @@ export function PublishDialog({
   open,
   onOpenChange,
   onPublished,
+  isFirstPublish,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onPublished: (version: number) => void
+  /** First release versus a change to something already in customers' wallets. */
+  isFirstPublish: boolean
 }) {
   const cardId = useCardEditor((s) => s.cardId)
   const design = useCardEditor((s) => s.design)
@@ -67,7 +70,7 @@ export function PublishDialog({
       onPublished(result.data.version)
       onOpenChange(false)
     } catch {
-      setErrors(['Veröffentlichen fehlgeschlagen. Bitte erneut versuchen.'])
+      setErrors([`${isFirstPublish ? 'Veröffentlichen' : 'Aktualisieren'} fehlgeschlagen. Bitte erneut versuchen.`])
     } finally {
       setBusy(false)
     }
@@ -77,7 +80,7 @@ export function PublishDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Karte veröffentlichen</DialogTitle>
+          <DialogTitle>{isFirstPublish ? 'Karte veröffentlichen' : 'Karte aktualisieren'}</DialogTitle>
           <DialogDescription>
             Die Änderungen gelten sofort — auch für Karten, die bereits ausgegeben wurden.
           </DialogDescription>
@@ -137,7 +140,7 @@ export function PublishDialog({
             disabled={busy || (lowContrast && !confirmContrast)}
           >
             {busy ? <Spinner /> : <Check />}
-            Jetzt veröffentlichen
+            {isFirstPublish ? 'Jetzt veröffentlichen' : 'Jetzt aktualisieren'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,13 +5,10 @@ import Link from 'next/link'
 import {
   ArrowLeft,
   ChevronDown,
-  History,
-  LayoutTemplate,
   Nfc,
-  QrCode,
   Redo2,
+  RefreshCw,
   Rocket,
-  Smartphone,
   Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,8 +19,6 @@ import { SaveStatusIndicator } from './save-status-indicator'
 import { PublishDialog } from './dialogs/publish-dialog'
 import { TemplateDialog } from './dialogs/template-dialog'
 import { HandoutDialog } from './dialogs/handout-dialog'
-import { TestCardDialog } from './dialogs/test-card-dialog'
-import { VersionHistoryDialog } from './dialogs/version-history-dialog'
 import { useAutosave } from '@/hooks/use-autosave'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { useCardEditor, useTemporal } from '@/stores/card-editor-provider'
@@ -40,34 +35,24 @@ import { cn } from '@/lib/utils'
 export function CardEditorShell({
   cardName,
   customer,
-  userEmail,
   publishedVersion,
   suggestTemplate,
-  canStamp,
 }: {
   cardName: string
   customer: CustomerSummary
-  userEmail: string
   publishedVersion: number | null
   /** Whether the template picker should greet the owner — true only on an untouched card. */
   suggestTemplate: boolean
-  /** Agency accounts design but never book stamps, so they get no till link. */
-  canStamp: boolean
 }) {
   useAutosave()
   useUndoShortcuts()
 
   const cardId = useCardEditor((state) => state.cardId)
-  const kind = useCardEditor((state) => state.kind)
-  const isStamp = kind === 'STAMP'
-
   const { canUndo, canRedo, undo, redo } = useTemporal()
 
   const [templateOpen, setTemplateOpen] = React.useState(suggestTemplate)
-  const [testCardOpen, setTestCardOpen] = React.useState(false)
   const [handoutOpen, setHandoutOpen] = React.useState(false)
   const [publishOpen, setPublishOpen] = React.useState(false)
-  const [versionsOpen, setVersionsOpen] = React.useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = React.useState(false)
   const [version, setVersion] = React.useState(publishedVersion)
 
@@ -124,38 +109,18 @@ export function CardEditorShell({
                 <Redo2 />
               </Button>
 
-              {/* Templates set stamp goal, icon and reward text — a coupon has none. */}
-              {isStamp ? (
-                <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(true)}>
-                  <LayoutTemplate />
-                  Vorlagen
-                </Button>
-              ) : null}
-              <Button variant="ghost" size="sm" onClick={() => setVersionsOpen(true)}>
-                <History />
-                Versionen
-              </Button>
-
-              {canStamp ? (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/dashboard/karten/${cardId}/stempeln`}>
-                    <QrCode />
-                    Stempeln
-                  </Link>
-                </Button>
-              ) : null}
-
-              <Button variant="ghost" size="sm" onClick={() => setHandoutOpen(true)}>
+              <Button variant="secondary" size="sm" onClick={() => setHandoutOpen(true)}>
                 <Nfc />
                 Ausgeben
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => setTestCardOpen(true)}>
-                <Smartphone />
-                Testkarte aufs Handy
-              </Button>
+              {/*
+                Erstveröffentlichung und Änderung sind zwei verschiedene Handlungen: beim
+                ersten Mal geht die Karte überhaupt erst an Kunden, danach greift jede
+                Änderung in etwas ein, das bereits in Wallets liegt. Der Knopf benennt das.
+              */}
               <Button variant="primary" size="sm" onClick={() => setPublishOpen(true)}>
-                <Rocket />
-                Veröffentlichen
+                {version === null ? <Rocket /> : <RefreshCw />}
+                {version === null ? 'Veröffentlichen' : 'Aktualisieren'}
               </Button>
             </div>
           </div>
@@ -203,17 +168,12 @@ export function CardEditorShell({
 
       <TemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
       <HandoutDialog open={handoutOpen} onOpenChange={setHandoutOpen} />
-      <TestCardDialog
-        open={testCardOpen}
-        onOpenChange={setTestCardOpen}
-        defaultEmail={userEmail}
-      />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}
         onPublished={(next) => setVersion(next)}
+        isFirstPublish={version === null}
       />
-      <VersionHistoryDialog open={versionsOpen} onOpenChange={setVersionsOpen} />
     </TooltipProvider>
   )
 }

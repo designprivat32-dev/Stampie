@@ -4,6 +4,7 @@ import * as React from 'react'
 import { afterEach } from 'vitest'
 import { ContrastWarning } from '@/app/dashboard/karten/[cardId]/_components/contrast-warning'
 import { ColorField } from '@/app/dashboard/karten/[cardId]/_components/color-field'
+import { PublishDialog } from '@/app/dashboard/karten/[cardId]/_components/dialogs/publish-dialog'
 import { CardEditorProvider, useCardEditorStore } from '@/stores/card-editor-provider'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import { contrastRatio } from '@/lib/color/contrast'
@@ -144,5 +145,38 @@ describe('ColorField', () => {
     )
     expect((screen.getByLabelText('Textfarbe') as HTMLInputElement).type).toBe('text')
     expect((screen.getByLabelText('Textfarbe — Farbwähler') as HTMLInputElement).type).toBe('color')
+  })
+})
+
+/**
+ * First release and later change are different acts: the first hands the card to customers
+ * at all, every later one reaches into passes already sitting in wallets. The button says
+ * which of the two it is, and the dialog behind it has to agree — a button reading
+ * "Aktualisieren" that opens "Karte veröffentlichen" reads like the wrong dialog opened.
+ */
+describe('publish dialog wording', () => {
+  it('offers to publish while the card has never been released', () => {
+    render(
+      <Harness>
+        <PublishDialog open onOpenChange={() => {}} onPublished={() => {}} isFirstPublish />
+      </Harness>,
+    )
+    expect(screen.getByText('Karte veröffentlichen')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Jetzt veröffentlichen' })).toBeTruthy()
+  })
+
+  it('offers to update once a version is out', () => {
+    render(
+      <Harness>
+        <PublishDialog
+          open
+          onOpenChange={() => {}}
+          onPublished={() => {}}
+          isFirstPublish={false}
+        />
+      </Harness>,
+    )
+    expect(screen.getByText('Karte aktualisieren')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Jetzt aktualisieren' })).toBeTruthy()
   })
 })

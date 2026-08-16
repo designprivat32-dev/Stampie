@@ -75,7 +75,6 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
       <CardEditorShell
         cardName={card.name}
         customer={customer}
-        userEmail={access.session.email}
         publishedVersion={draft.publishedVersion}
         // Templates carry stamp goals and icons, so they only make sense for a stamp card.
         suggestTemplate={
@@ -83,7 +82,6 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
           draft.publishedVersion === null &&
           isPristineDesign(draft.design)
         }
-        canStamp={access.canStamp}
       />
     </CardEditorProvider>
   )
