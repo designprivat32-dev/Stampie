@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, TooltipProvider } from '@/components/ui/misc'
-import { EditorTabs } from './editor-tabs'
+import { EditorPanel } from './editor-panel'
 import { PreviewPane } from './preview/preview-pane'
 import { SaveStatusIndicator } from './save-status-indicator'
 import { PublishDialog } from './dialogs/publish-dialog'
@@ -151,7 +151,7 @@ export function CardEditorShell({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="flex min-h-0 w-full flex-col border-line bg-surface lg:w-[420px] lg:shrink-0 lg:border-r">
-            <EditorTabs customer={customer} />
+            <EditorPanel customer={customer} />
           </div>
 
           <main className="hidden min-w-0 flex-1 px-8 lg:block">

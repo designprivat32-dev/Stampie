@@ -13,7 +13,7 @@ import { isSupportedOn } from '@/lib/cards/platform-support'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import type { PaletteSuggestion } from '@/lib/color/extract-palette'
 
-export function BrandingTab() {
+export function BrandingEssentials() {
   const cardId = useCardEditor((s) => s.cardId)
   const design = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
@@ -177,26 +177,42 @@ export function BrandingTab() {
         </div>
       </PanelSection>
 
-      {/*
-        The background image is composited *into* the stamp strip by the renderer, so it
-        has nowhere to go on a coupon — that pass carries no strip at all.
-      */}
-      {isStamp ? (
-        <PanelSection title="Hintergrundbild" action={<PlatformSupportBadge field="hero" />}>
-          <AssetUpload
-            kind="HERO"
-            assetId={design.heroAssetId}
-            label="Hintergrundbild"
-            hint="Optional · 1032 × 336 (3:1) · hinter der Stempelreihe"
-            aspect={1032 / 336}
-            previewClassName="h-12 w-24"
-            cropTitle="Hintergrundbild zuschneiden"
-            cropDescription="Google Wallet zeigt das Bild im Verhältnis 3:1. Apple Wallet nutzt einen deutlich schmaleren Ausschnitt."
-            onUploaded={(asset) => patch({ heroAssetId: asset.id })}
-            onCleared={() => patch({ heroAssetId: null })}
-          />
-        </PanelSection>
-      ) : null}
     </div>
+  )
+}
+
+/**
+ * Split out from the essentials above so the long editor page can put it where it belongs:
+ * a background image is decoration, and it was sitting between the icon and the colours —
+ * both of which publishing actually requires.
+ */
+export function BrandingBackground() {
+  const design = useCardEditor((s) => s.design)
+  const patch = useCardEditor((s) => s.patch)
+  const isStamp = useCardEditor((s) => s.kind === 'STAMP')
+
+  return (
+    <>
+      {/*
+      The background image is composited *into* the stamp strip by the renderer, so it
+      has nowhere to go on a coupon — that pass carries no strip at all.
+    */}
+    {isStamp ? (
+      <PanelSection title="Hintergrundbild" action={<PlatformSupportBadge field="hero" />}>
+        <AssetUpload
+          kind="HERO"
+          assetId={design.heroAssetId}
+          label="Hintergrundbild"
+          hint="Optional · 1032 × 336 (3:1) · hinter der Stempelreihe"
+          aspect={1032 / 336}
+          previewClassName="h-12 w-24"
+          cropTitle="Hintergrundbild zuschneiden"
+          cropDescription="Google Wallet zeigt das Bild im Verhältnis 3:1. Apple Wallet nutzt einen deutlich schmaleren Ausschnitt."
+          onUploaded={(asset) => patch({ heroAssetId: asset.id })}
+          onCleared={() => patch({ heroAssetId: null })}
+        />
+      </PanelSection>
+    ) : null}
+    </>
   )
 }

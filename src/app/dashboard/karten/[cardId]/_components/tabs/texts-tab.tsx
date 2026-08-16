@@ -70,7 +70,7 @@ export function TextsTab({ customer }: { customer: CustomerSummary }) {
         live was the thing hardest to see.
       */}
       <PanelSection
-        title="Pflichtangaben"
+        title="Impressum & Datenschutz"
         description="Ohne diese Links ist Veröffentlichen gesperrt."
       >
         {missingLegal.length === 0 ? (

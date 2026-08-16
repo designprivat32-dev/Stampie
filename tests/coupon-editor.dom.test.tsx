@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import * as React from 'react'
-import { EditorTabs } from '@/app/dashboard/karten/[cardId]/_components/editor-tabs'
+import { EditorPanel } from '@/app/dashboard/karten/[cardId]/_components/editor-panel'
 import { PreviewControls } from '@/app/dashboard/karten/[cardId]/_components/preview/preview-controls'
 import { CardEditorProvider } from '@/stores/card-editor-provider'
 import { TooltipProvider } from '@/components/ui/misc'
@@ -40,7 +40,7 @@ function Editor({ kind }: { kind: CardKind }) {
     <CardEditorProvider init={{ cardId: 'cloc00000000000000000001', kind, design: DEFAULT_CARD_DESIGN }}>
       {/* Platform badges render tooltips, which the real shell also provides. */}
       <TooltipProvider>
-        <EditorTabs customer={customer} />
+        <EditorPanel customer={customer} />
         <PreviewControls onExport={async () => {}} />
       </TooltipProvider>
     </CardEditorProvider>
@@ -48,9 +48,10 @@ function Editor({ kind }: { kind: CardKind }) {
 }
 
 /**
- * Stamp controls are scattered across four unrelated components, so hiding one tab is not
- * enough — this renders the whole editor surface at once and asserts a coupon offers no
- * stamp anything. It exists because exactly that regression shipped once.
+ * Stamp controls are scattered across four unrelated components, and the editor is now one
+ * long page — every section renders at once, with no tab left to hide behind. That makes
+ * this the load-bearing test for coupons: if a stamp control leaks in, the shop sees it.
+ * It exists because exactly that regression shipped once.
  */
 describe('editor for a coupon card', () => {
   const STAMP_CONTROLS = [
@@ -66,36 +67,16 @@ describe('editor for a coupon card', () => {
     expect(screen.queryByText(labelText)).toBeNull()
   })
 
-  it('has no tab named Stempel', () => {
+  it('shows no stamp section at all', () => {
     render(<Editor kind="COUPON" />)
-    expect(screen.queryByRole('tab', { name: 'Stempel' })).toBeNull()
+    expect(screen.queryByText('Anzahl Stempel')).toBeNull()
+    expect(screen.queryByText('Stempel-Symbol')).toBeNull()
   })
 
-  // The tab is gone for every card kind now, not just for coupons.
-  it('has no Google Wallet tab', () => {
+  it('still groups what a coupon does have', () => {
     render(<Editor kind="COUPON" />)
-    expect(screen.queryByRole('tab', { name: 'Google Wallet' })).toBeNull()
-  })
-
-  it('leaves exactly the four tabs whose fields reach an offer pass', () => {
-    render(<Editor kind="COUPON" />)
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
-      'Branding',
-      'Gutschein',
-      'Texte',
-      'Erweitert',
-    ])
-  })
-
-  it('offers the coupon tab', () => {
-    render(<Editor kind="COUPON" />)
-    expect(screen.getByRole('tab', { name: 'Gutschein' })).toBeTruthy()
-  })
-
-  it('keeps branding, texts and the advanced tab — those apply to both kinds', () => {
-    render(<Editor kind="COUPON" />)
-    for (const name of ['Branding', 'Texte', 'Erweitert']) {
-      expect(screen.getByRole('tab', { name })).toBeTruthy()
+    for (const heading of ['Pflichtangaben', 'Gestaltung', 'Erweitert']) {
+      expect(screen.getByText(heading)).toBeTruthy()
     }
   })
 })
@@ -103,17 +84,41 @@ describe('editor for a coupon card', () => {
 describe('editor for a stamp card', () => {
   it('still offers every stamp control', () => {
     render(<Editor kind="STAMP" />)
-    expect(screen.getByRole('tab', { name: 'Stempel' })).toBeTruthy()
+    expect(screen.getByText('Anzahl Stempel')).toBeTruthy()
     expect(screen.getByText('Stempel simulieren')).toBeTruthy()
   })
 
-  it('reaches the coupon tab too — a full card can hand one out', () => {
+  it('reaches the coupon settings too — a full card can hand one out', () => {
     render(<Editor kind="STAMP" />)
-    expect(screen.getByRole('tab', { name: 'Gutschein' })).toBeTruthy()
+    expect(screen.getByText('Belohnung als Gutschein')).toBeTruthy()
   })
 
-  it('has no Google Wallet tab either — it was removed from the editor', () => {
+  it('has no Google Wallet section left', () => {
     render(<Editor kind="STAMP" />)
-    expect(screen.queryByRole('tab', { name: 'Google Wallet' })).toBeNull()
+    // Only the section is gone. Platform badges still name the wallet, and should — they
+    // tell the shop which setting reaches which pass.
+    expect(screen.queryByRole('heading', { name: 'Google Wallet' })).toBeNull()
+  })
+})
+
+/**
+ * The point of the split: what publishing demands sits at the top, what only decorates sits
+ * below, and the settings a shop touches once a year are folded away until asked for.
+ */
+describe('the long editor page', () => {
+  it('keeps the advanced settings collapsed until opened', () => {
+    render(<Editor kind="STAMP" />)
+
+    expect(screen.queryByText('Barcode')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Erweitert/ }))
+    expect(screen.getByText('Barcode')).toBeTruthy()
+  })
+
+  it('puts the required things above the decorative ones', () => {
+    render(<Editor kind="STAMP" />)
+    const order = document.body.textContent ?? ''
+
+    expect(order.indexOf('Pflichtangaben')).toBeLessThan(order.indexOf('Gestaltung'))
+    expect(order.indexOf('Gestaltung')).toBeLessThan(order.indexOf('Erweitert'))
   })
 })

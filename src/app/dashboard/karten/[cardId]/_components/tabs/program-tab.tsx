@@ -16,7 +16,7 @@ const EMPTY_STYLE_LABELS: Record<(typeof EMPTY_STAMP_STYLES)[number], { label: s
     dashed: { label: 'Gestrichelt', hint: 'Gestrichelter Kreis' },
   }
 
-export function ProgramTab() {
+export function ProgramEssentials() {
   const liveDesign = useCardEditor((s) => s.design)
   const patch = useCardEditor((s) => s.patch)
   const setSimulatedStamps = useCardEditor((s) => s.setSimulatedStamps)
@@ -65,6 +65,21 @@ export function ProgramTab() {
         </Field>
       </PanelSection>
 
+    </div>
+  )
+}
+
+/**
+ * The look of the stamp row, split from the two settings publishing insists on (how many
+ * stamps, and what the full card is worth). Choosing a coffee cup over a star changes
+ * nothing about whether the card can go out.
+ */
+export function ProgramAppearance() {
+  const liveDesign = useCardEditor((s) => s.design)
+  const patch = useCardEditor((s) => s.patch)
+
+  return (
+    <>
       <PanelSection title="Stempel-Symbol">
         <StampIconPicker />
       </PanelSection>
@@ -87,6 +102,6 @@ export function ProgramTab() {
           ))}
         </RadioGroup>
       </PanelSection>
-    </div>
+    </>
   )
 }
