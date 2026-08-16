@@ -151,7 +151,7 @@ export function CardEditorShell({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="flex min-h-0 w-full flex-col border-line bg-surface lg:w-[420px] lg:shrink-0 lg:border-r">
-            <EditorPanel customer={customer} />
+            <EditorPanel customer={customer} onOpenTemplates={() => setTemplateOpen(true)} />
           </div>
 
           <main className="hidden min-w-0 flex-1 px-8 lg:block">

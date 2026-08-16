@@ -1,12 +1,14 @@
 'use client'
 
 import * as React from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, LayoutTemplate } from 'lucide-react'
 import { BrandingBackground, BrandingEssentials } from './tabs/branding-tab'
 import { ProgramAppearance, ProgramEssentials } from './tabs/program-tab'
 import { CouponTab } from './tabs/coupon-tab'
 import { TextsTab } from './tabs/texts-tab'
 import { AdvancedTab } from './tabs/advanced-tab'
+import { Button } from '@/components/ui/button'
+import { InfoHint, PanelSection } from '@/components/ui/misc'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import { cn } from '@/lib/utils'
 import type { CustomerSummary } from '@/types/customer'
@@ -22,12 +24,19 @@ import type { CustomerSummary } from '@/types/customer'
  * "Erweitert" stays collapsed. Barcode format, location alerts, expiry and sharing are
  * settings a shop touches once a year, and they were taking up a tab of their own.
  */
-export function EditorPanel({ customer }: { customer: CustomerSummary }) {
+export function EditorPanel({
+  customer,
+  onOpenTemplates,
+}: {
+  customer: CustomerSummary
+  /** Opens the template picker, which the shell owns because it also opens on its own. */
+  onOpenTemplates: () => void
+}) {
   const isStamp = useCardEditor((s) => s.kind === 'STAMP')
 
   return (
     <div className="divide-y divide-line">
-      <Group title="Pflichtangaben" hint="Ohne diese Angaben ist Veröffentlichen gesperrt.">
+      <Group title="Pflichtangaben" hint="Ohne diese Angaben bleibt Veröffentlichen gesperrt.">
         <TextsTab customer={customer} />
         {isStamp ? <ProgramEssentials /> : null}
         <BrandingEssentials />
@@ -40,6 +49,22 @@ export function EditorPanel({ customer }: { customer: CustomerSummary }) {
       </Group>
 
       <Advanced>
+        {/*
+          Templates overwrite colours, symbol and texts in one go. That belongs with the
+          settings you reach for deliberately, not next to the fields it would overwrite.
+          Only for stamp cards — a template carries a stamp goal and a reward.
+        */}
+        {isStamp ? (
+          <PanelSection
+            title="Vorlage"
+            description="Setzt Farben, Symbol und Texte neu. Logo, Rückseite und Standorte bleiben."
+          >
+            <Button variant="secondary" size="sm" onClick={onOpenTemplates}>
+              <LayoutTemplate />
+              Vorlage wählen
+            </Button>
+          </PanelSection>
+        ) : null}
         <AdvancedTab customer={customer} />
       </Advanced>
     </div>
@@ -57,9 +82,9 @@ function Group({
 }) {
   return (
     <section className="px-4 py-5">
-      <header className="mb-1">
+      <header className="mb-1 flex items-center gap-1.5">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink-2">{title}</h2>
-        <p className="text-[12px] leading-snug text-ink-3">{hint}</p>
+        <InfoHint>{hint}</InfoHint>
       </header>
       {children}
     </section>
@@ -82,13 +107,8 @@ function Advanced({ children }: { children: React.ReactNode }) {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between py-3 text-left"
       >
-        <span>
-          <span className="block text-[13px] font-semibold uppercase tracking-wide text-ink-2">
-            Erweitert
-          </span>
-          <span className="block text-[12px] text-ink-3">
-            Barcode, Standort-Benachrichtigung, Gültigkeit, Teilen
-          </span>
+        <span className="text-[13px] font-semibold uppercase tracking-wide text-ink-2">
+          Erweitert
         </span>
         <ChevronDown
           className={cn('size-4 shrink-0 text-ink-3 transition-transform', open && 'rotate-180')}

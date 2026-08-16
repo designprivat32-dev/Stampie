@@ -26,6 +26,39 @@ export function Tooltip({ content, children }: { content: React.ReactNode; child
   )
 }
 
+/**
+ * An explanation folded into a hoverable mark.
+ *
+ * Every hint used to sit on screen as its own grey line under a heading or a field. Read
+ * once, ignored forever, and together they made a form of eight controls look like a
+ * manual. The text is still there for whoever wants it — it just no longer competes with
+ * the thing it describes.
+ *
+ * The button element is deliberate: Radix opens the tooltip on focus too, so the text
+ * stays reachable without a mouse.
+ *
+ * It brings its own provider. `Field` is used in dialogs that have none, and a Radix
+ * tooltip without one throws — a hint on a form field must not be able to take a dialog
+ * down. Nested providers are supported and cost nothing but context.
+ */
+export function InfoHint({ children }: { children: React.ReactNode }) {
+  if (!children) return null
+
+  return (
+    <TooltipProvider>
+      <Tooltip content={children}>
+        <button
+          type="button"
+          aria-label="Hinweis"
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line text-[10px] font-semibold leading-none text-ink-3 transition-colors hover:border-ink-3 hover:text-ink-2"
+        >
+          i
+        </button>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 // ------------------------------------------------------------------ popover
 
 export const Popover = PopoverPrimitive.Root
@@ -122,9 +155,9 @@ export function PanelSection({
   return (
     <section className="space-y-3 border-b border-line px-5 py-5 last:border-b-0">
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-0.5">
+        <div className="flex items-center gap-1.5">
           <h3 className="text-[13px] font-semibold uppercase tracking-wide text-ink-2">{title}</h3>
-          {description ? <p className="text-[12px] leading-snug text-ink-3">{description}</p> : null}
+          <InfoHint>{description}</InfoHint>
         </div>
         {action}
       </div>

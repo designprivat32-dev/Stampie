@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import * as LabelPrimitive from '@radix-ui/react-label'
+import { InfoHint } from './misc'
 import { cn } from '@/lib/utils'
 
 export const Label = React.forwardRef<
@@ -49,11 +50,13 @@ export function Field({
   return (
     <div className={cn('space-y-1.5', className)}>
       <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={htmlFor}>{label}</Label>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor={htmlFor}>{label}</Label>
+          <InfoHint>{hint}</InfoHint>
+        </div>
         {action}
       </div>
       {children}
-      {hint ? <FieldHint>{hint}</FieldHint> : null}
       <FieldError>{error}</FieldError>
     </div>
   )

@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import * as React from 'react'
 import { EditorPanel } from '@/app/dashboard/karten/[cardId]/_components/editor-panel'
@@ -40,7 +40,7 @@ function Editor({ kind }: { kind: CardKind }) {
     <CardEditorProvider init={{ cardId: 'cloc00000000000000000001', kind, design: DEFAULT_CARD_DESIGN }}>
       {/* Platform badges render tooltips, which the real shell also provides. */}
       <TooltipProvider>
-        <EditorPanel customer={customer} />
+        <EditorPanel customer={customer} onOpenTemplates={() => {}} />
         <PreviewControls onExport={async () => {}} />
       </TooltipProvider>
     </CardEditorProvider>
@@ -120,5 +120,45 @@ describe('the long editor page', () => {
 
     expect(order.indexOf('Pflichtangaben')).toBeLessThan(order.indexOf('Gestaltung'))
     expect(order.indexOf('Gestaltung')).toBeLessThan(order.indexOf('Erweitert'))
+  })
+})
+
+/**
+ * The template picker lost its place in the header. It overwrites colours, symbol and texts
+ * at once, so it sits under Erweitert now — reachable, but not next to the fields it would
+ * overwrite, and only where a template means anything.
+ */
+describe('the template picker', () => {
+  it('waits under Erweitert on a stamp card', () => {
+    const onOpenTemplates = vi.fn()
+    render(
+      <CardEditorProvider
+        init={{ cardId: 'cloc00000000000000000001', kind: 'STAMP', design: DEFAULT_CARD_DESIGN }}
+      >
+        <TooltipProvider>
+          <EditorPanel customer={customer} onOpenTemplates={onOpenTemplates} />
+        </TooltipProvider>
+      </CardEditorProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: /Vorlage wählen/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Erweitert/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Vorlage wählen/ }))
+    expect(onOpenTemplates).toHaveBeenCalledTimes(1)
+  })
+
+  it('is absent for a coupon, which no template describes', () => {
+    render(
+      <CardEditorProvider
+        init={{ cardId: 'cloc00000000000000000001', kind: 'COUPON', design: DEFAULT_CARD_DESIGN }}
+      >
+        <TooltipProvider>
+          <EditorPanel customer={customer} onOpenTemplates={() => {}} />
+        </TooltipProvider>
+      </CardEditorProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Erweitert/ }))
+    expect(screen.queryByRole('button', { name: /Vorlage wählen/ })).toBeNull()
   })
 })

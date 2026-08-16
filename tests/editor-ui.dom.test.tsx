@@ -4,6 +4,7 @@ import * as React from 'react'
 import { afterEach } from 'vitest'
 import { ContrastWarning } from '@/app/dashboard/karten/[cardId]/_components/contrast-warning'
 import { ColorField } from '@/app/dashboard/karten/[cardId]/_components/color-field'
+import { Field } from '@/components/ui/label'
 import { PublishDialog } from '@/app/dashboard/karten/[cardId]/_components/dialogs/publish-dialog'
 import { CardEditorProvider, useCardEditorStore } from '@/stores/card-editor-provider'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
@@ -178,5 +179,44 @@ describe('publish dialog wording', () => {
     )
     expect(screen.getByText('Karte aktualisieren')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Jetzt aktualisieren' })).toBeTruthy()
+  })
+})
+
+/**
+ * Hints moved from a grey line under each control into a hoverable mark. The mark is a
+ * Radix tooltip, and Radix throws when one is rendered without a provider — while `Field`
+ * is used in dialogs that have none. So the mark carries its own provider, and this is the
+ * test that says so: rendered bare, with nothing wrapped around it.
+ */
+describe('field hints', () => {
+  it('render outside any tooltip provider without throwing', () => {
+    expect(() =>
+      render(
+        <Field label="Name" hint="Nur intern sichtbar.">
+          <input />
+        </Field>,
+      ),
+    ).not.toThrow()
+  })
+
+  it('keep the text out of the layout until asked for', () => {
+    render(
+      <Field label="Name" hint="Nur intern sichtbar.">
+        <input />
+      </Field>,
+    )
+
+    expect(screen.queryByText('Nur intern sichtbar.')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Hinweis' })).toBeTruthy()
+  })
+
+  it('show no mark at all when there is nothing to explain', () => {
+    render(
+      <Field label="Name">
+        <input />
+      </Field>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Hinweis' })).toBeNull()
   })
 })
