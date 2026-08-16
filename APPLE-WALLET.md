@@ -120,8 +120,17 @@ Log als `[apple-wallet] …` ausgegeben:
 
 ## Automatische Aktualisierung
 
-Ein neuer Stempel erreicht ein bereits installiertes iPhone-Wallet von selbst. Dahinter
-steht der PassKit-Web-Service unter `/api/apple-passkit`:
+Zwei Ereignisse erreichen ein bereits installiertes iPhone-Wallet von selbst:
+
+| Ereignis | Wirkung |
+|---|---|
+| Stempel gebucht | Push an die betroffene Karte |
+| Neues Design veröffentlicht | Push an alle Karten dieser Kartenvorlage, in Blöcken zu 20 |
+
+Apple kennt keine Klasse, die man wie bei Google einmal aktualisiert — jede Karte muss
+einzeln geweckt werden. Deshalb die Blöcke: jeder Push ist eine eigene HTTP/2-Verbindung.
+
+Dahinter steht der PassKit-Web-Service unter `/api/apple-passkit`:
 
 | Endpunkt | Wer ruft auf | Wofür |
 |---|---|---|
@@ -131,14 +140,19 @@ steht der PassKit-Web-Service unter `/api/apple-passkit`:
 | `GET /v1/passes/<passTypeId>/<serial>` | Wallet danach | frisch gebautes `.pkpass` |
 | `POST /v1/log` | Wallet bei Problemen | landet im Serverlog als `[apple-passkit]` |
 
-Beim Stempeln geht ein leerer Push an APNs (`api.push.apple.com`), authentifiziert per
+Der Abrufpunkt baut den Pass jedes Mal neu und nimmt dabei das **aktuell veröffentlichte**
+Design. Die Karte im Wallet kann also nicht hinter dem Stand zurückbleiben, sobald das
+Gerät einmal nachgefragt hat.
+
+Der Push selbst ist leer und geht an APNs (`api.push.apple.com`), authentifiziert per
 mTLS mit **demselben** Pass-Zertifikat, das auch die Pässe signiert — Apple knüpft beides
 an dieselbe Pass Type ID. Es ist also **kein zweites Zertifikat** nötig. Das Gerät holt
 sich daraufhin den neuen Pass, Stempelreihe inklusive.
 
-Der Push ist bewusst „best effort": der Stempel ist gebucht und protokolliert, bevor er
-losgeht. Ein ausgeschaltetes Handy darf keinen Scan an der Kasse fehlschlagen lassen —
-es kostet nur eine veraltete Karte, bis Wallet das nächste Mal nachfragt.
+Der Push ist bewusst „best effort": Stempel wie Veröffentlichung sind gespeichert, bevor
+er losgeht. Ein ausgeschaltetes Handy darf weder einen Scan an der Kasse noch eine
+Veröffentlichung fehlschlagen lassen — es kostet nur eine veraltete Karte, bis Wallet das
+nächste Mal nachfragt.
 
 Nur signierte Pässe bekommen `webServiceURL`. Ohne Zertifikat gäbe es keine
 Push-Identität, und ein Pass würde eine Aktualisierung versprechen, die nie kommt.
