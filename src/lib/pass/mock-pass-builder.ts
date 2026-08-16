@@ -54,6 +54,7 @@ export class MockPassBuilder implements PassBuilder {
       teamIdentifier: this.config.teamIdentifier,
       barcodeMessage: this.barcodeMessage(serial),
       kind: design.kind,
+      message: design.message ?? null,
       webService: authenticationToken
         ? { url: applePassKitBaseUrl(), authenticationToken }
         : null,

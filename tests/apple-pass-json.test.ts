@@ -300,3 +300,34 @@ describe('buildPassJson for a coupon', () => {
     expect(p.expirationDate).toContain('2030-06-01')
   })
 })
+
+/**
+ * The one detail the whole messaging feature hangs on. iOS shows a lock-screen message
+ * only when a changed field carries a `changeMessage` containing `%@`; without it the pass
+ * updates in silence and the shop is left wondering why nobody saw the announcement.
+ */
+describe('the message field', () => {
+  it('carries a change message with the placeholder iOS requires', () => {
+    const pass = buildPassJson(design(), {
+      ...ctx,
+      message: 'Heute doppelte Stempel.',
+    })
+
+    const field = pass.storeCard?.backFields.find((f) => f.key === 'message')
+    expect(field?.value).toBe('Heute doppelte Stempel.')
+    expect(field?.changeMessage).toContain('%@')
+  })
+
+  it('sits first on the back, where an opened pass shows it', () => {
+    const pass = buildPassJson(design(), { ...ctx, message: 'Neu hier.' })
+
+    expect(pass.storeCard?.backFields[0]?.key).toBe('message')
+  })
+
+  it('leaves no empty field behind when there is no message', () => {
+    for (const message of [null, undefined, '   ']) {
+      const pass = buildPassJson(design(), { ...ctx, message })
+      expect(pass.storeCard?.backFields.some((f) => f.key === 'message')).toBe(false)
+    }
+  })
+})

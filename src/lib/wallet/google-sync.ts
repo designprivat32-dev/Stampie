@@ -216,3 +216,57 @@ export async function syncGoogleStampCount(
     return { status: 'error', message: e instanceof Error ? e.message : 'unknown' }
   }
 }
+
+/**
+ * Sends a message to everyone holding a card of this programme.
+ *
+ * Google's counterpart to Apple's changed-field trick, and much the better one: the message
+ * goes on the *class*, so a single call reaches every holder instead of one push per pass.
+ * `TEXT_AND_NOTIFY` is what makes it a notification — plain `TEXT` only files it on the
+ * back of the pass, where nobody would look without being told.
+ *
+ * Coupons live under a different resource, same as everywhere else in this file.
+ */
+export async function sendGoogleWalletMessage(
+  cardId: string,
+  message: { headline: string | null; body: string },
+  kind: CardKind = 'STAMP',
+): Promise<GoogleSyncResult> {
+  const credentials = readGoogleWalletCredentials()
+  if (!credentials) return { status: 'not_configured' }
+
+  const classId = `${credentials.issuerId}.card_${cardId}`
+  const resource = kind === 'COUPON' ? 'offerClass' : 'loyaltyClass'
+
+  try {
+    const accessToken = await getAccessToken(credentials.clientEmail, credentials.privateKey)
+    const response = await fetch(
+      `${WALLET_API}/${resource}/${encodeURIComponent(classId)}/addMessage`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: {
+            header: message.headline ?? undefined,
+            body: message.body,
+            messageType: 'TEXT_AND_NOTIFY',
+          },
+        }),
+      },
+    )
+
+    if (response.status === 404) return { status: 'not_found' }
+    if (!response.ok) {
+      const detail = `${response.status} ${await response.text()}`
+      // eslint-disable-next-line no-console
+      console.error(`[google-wallet] message for ${classId} failed: ${detail}`)
+      return { status: 'error', message: detail }
+    }
+    return { status: 'updated' }
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : 'unknown'
+    // eslint-disable-next-line no-console
+    console.error(`[google-wallet] message for ${classId} threw: ${detail}`)
+    return { status: 'error', message: detail }
+  }
+}

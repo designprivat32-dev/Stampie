@@ -27,6 +27,12 @@ export interface PassField {
   value: string
   textAlignment?: 'PKTextAlignmentLeft' | 'PKTextAlignmentCenter' | 'PKTextAlignmentRight' | 'PKTextAlignmentNatural'
   attributedValue?: string
+  /**
+   * What iOS shows on the lock screen when this field's value changes. Must contain `%@`,
+   * which is replaced by the new value — without it the pass updates silently, which is
+   * the whole difference between a message arriving and not arriving.
+   */
+  changeMessage?: string
 }
 
 export interface PassBarcode {
@@ -109,6 +115,14 @@ export interface BuildPassJsonContext {
   /** Defaults to the stamp card so existing callers keep their behaviour. */
   kind?: CardKind
   /**
+   * The shop's current message to pass holders, or null.
+   *
+   * Apple has no channel for free-form pushes — a notification exists only as the side
+   * effect of a *field* changing. So the message is a field, and the notification follows
+   * from writing a new value into it.
+   */
+  message?: string | null
+  /**
    * The PassKit web service, so an installed pass can be pushed a fresh stamp count
    * instead of sitting stale until the customer deletes and re-adds it. Omitted entirely
    * when either half is missing — a `webServiceURL` with no token would let anyone who
@@ -189,6 +203,16 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
       key: 'fine-print',
       label: 'Einlösebedingungen',
       value: design.offerFinePrint.trim(),
+    })
+  }
+
+  // Sits first on the back so the newest message is the first thing an opened pass shows.
+  if (ctx.message?.trim()) {
+    backFields.unshift({
+      key: 'message',
+      label: 'Neuigkeit',
+      value: ctx.message.trim(),
+      changeMessage: '%@',
     })
   }
 

@@ -25,7 +25,9 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       stamps: true,
       kind: true,
       cardId: true,
-      card: { select: { name: true, org: { select: { name: true } } } },
+      card: {
+        select: { name: true, activeMessage: true, org: { select: { name: true } } },
+      },
     },
   })
   if (!pass) return null
@@ -46,6 +48,7 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       currentStamps: pass.stamps,
       assets,
       appleAuthToken,
+      message: pass.card.activeMessage,
     },
     pass.serial,
   )

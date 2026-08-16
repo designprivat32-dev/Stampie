@@ -44,6 +44,11 @@ export interface CardDesign extends CardDesignInput {
    * updates — correct for a throwaway test card, and the only option without a certificate.
    */
   appleAuthToken?: string | null
+  /**
+   * The shop's current message to pass holders. Carried on the pass rather than pushed
+   * separately, because Apple has no separate channel — see `buildPassJson`.
+   */
+  message?: string | null
 }
 
 export interface PassAssets {

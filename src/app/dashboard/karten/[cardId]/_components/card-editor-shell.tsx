@@ -19,6 +19,7 @@ import { SaveStatusIndicator } from './save-status-indicator'
 import { PublishDialog } from './dialogs/publish-dialog'
 import { TemplateDialog } from './dialogs/template-dialog'
 import { HandoutDialog } from './dialogs/handout-dialog'
+import { MessageDialog } from './dialogs/message-dialog'
 import { useAutosave } from '@/hooks/use-autosave'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { useCardEditor, useTemporal } from '@/stores/card-editor-provider'
@@ -52,6 +53,7 @@ export function CardEditorShell({
 
   const [templateOpen, setTemplateOpen] = React.useState(suggestTemplate)
   const [handoutOpen, setHandoutOpen] = React.useState(false)
+  const [messagesOpen, setMessagesOpen] = React.useState(false)
   const [publishOpen, setPublishOpen] = React.useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = React.useState(false)
   const [version, setVersion] = React.useState(publishedVersion)
@@ -151,7 +153,11 @@ export function CardEditorShell({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="flex min-h-0 w-full flex-col border-line bg-surface lg:w-[420px] lg:shrink-0 lg:border-r">
-            <EditorPanel customer={customer} onOpenTemplates={() => setTemplateOpen(true)} />
+            <EditorPanel
+              customer={customer}
+              onOpenTemplates={() => setTemplateOpen(true)}
+              onOpenMessages={() => setMessagesOpen(true)}
+            />
           </div>
 
           <main className="hidden min-w-0 flex-1 px-8 lg:block">
@@ -168,6 +174,7 @@ export function CardEditorShell({
 
       <TemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
       <HandoutDialog open={handoutOpen} onOpenChange={setHandoutOpen} />
+      <MessageDialog open={messagesOpen} onOpenChange={setMessagesOpen} />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}

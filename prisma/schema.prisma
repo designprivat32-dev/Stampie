@@ -155,6 +155,15 @@ model Card {
   /// sich ändern lassen, ohne dafür eine neue Version auszurollen.
   handoutGreeting String?
 
+  /// Die zuletzt versendete Nachricht, wie sie auf der Karte steht.
+  ///
+  /// Liegt hier und nicht nur in `CardMessage`, weil der Pass bei *jedem* Abruf neu
+  /// gebaut wird: das Feld muss ohne Suche nach dem jüngsten Versand lesbar sein.
+  /// Apple zeigt eine Benachrichtigung nur, wenn sich der Feldwert ändert — deshalb ist
+  /// genau dieser Wert die Wahrheit darüber, was das Telefon schon gesehen hat.
+  activeMessage   String?
+  activeMessageAt DateTime?
+
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   createdBy  String
@@ -166,8 +175,43 @@ model Card {
   tokens   TestCardToken[]
   assets   Asset[]
 
+  messages CardMessage[]
+
   @@index([orgId, archivedAt])
   @@index([nfcCode])
+}
+
+/// Eine Nachricht an alle, die diese Karte im Wallet haben.
+///
+/// Beide Wallets können das von Haus aus, auf verschiedenen Wegen: Apple zeigt eine
+/// Meldung, wenn sich ein Feld mit `changeMessage` ändert, Google hat dafür einen
+/// eigenen Endpunkt. Ein zusätzlicher Push-Dienst wird also nicht gebraucht.
+model CardMessage {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  /// Nur Google zeigt eine Überschrift. Bei Apple ist der Text alles, was ankommt.
+  headline String?
+  /// Apple kappt die Meldung bei 150 Zeichen, deshalb ist das auch hier die Grenze.
+  body     String
+
+  /// Wann sie raus soll. Vergangenheit heißt "beim nächsten Lauf".
+  scheduledFor DateTime
+  sentAt       DateTime?
+
+  /// Was der Versand erreicht hat — sichtbar in der Oberfläche, damit ein stiller
+  /// Fehlschlag nicht wie ein erfolgreicher Versand aussieht.
+  appleDevices Int     @default(0)
+  googleSynced Boolean @default(false)
+  error        String?
+
+  createdAt DateTime @default(now())
+  createdBy String
+
+  /// Der Lauf sucht genau danach: fällig und noch nicht raus.
+  @@index([sentAt, scheduledFor])
+  @@index([cardId, createdAt])
 }
 
 // ---------------------------------------------------------------- assets
@@ -376,8 +420,8 @@ model IssuedPass {
 
   createdAt DateTime @default(now())
 
-  events              StampEvent[]
-  appleRegistrations  AppleDeviceRegistration[]
+  events             StampEvent[]
+  appleRegistrations AppleDeviceRegistration[]
 
   @@index([cardId, isTest])
   @@index([claimToken])

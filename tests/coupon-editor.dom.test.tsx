@@ -40,7 +40,7 @@ function Editor({ kind }: { kind: CardKind }) {
     <CardEditorProvider init={{ cardId: 'cloc00000000000000000001', kind, design: DEFAULT_CARD_DESIGN }}>
       {/* Platform badges render tooltips, which the real shell also provides. */}
       <TooltipProvider>
-        <EditorPanel customer={customer} onOpenTemplates={() => {}} />
+        <EditorPanel customer={customer} onOpenTemplates={() => {}} onOpenMessages={() => {}} />
         <PreviewControls onExport={async () => {}} />
       </TooltipProvider>
     </CardEditorProvider>
@@ -136,7 +136,7 @@ describe('the template picker', () => {
         init={{ cardId: 'cloc00000000000000000001', kind: 'STAMP', design: DEFAULT_CARD_DESIGN }}
       >
         <TooltipProvider>
-          <EditorPanel customer={customer} onOpenTemplates={onOpenTemplates} />
+          <EditorPanel customer={customer} onOpenTemplates={onOpenTemplates} onOpenMessages={() => {}} />
         </TooltipProvider>
       </CardEditorProvider>,
     )
@@ -153,7 +153,7 @@ describe('the template picker', () => {
         init={{ cardId: 'cloc00000000000000000001', kind: 'COUPON', design: DEFAULT_CARD_DESIGN }}
       >
         <TooltipProvider>
-          <EditorPanel customer={customer} onOpenTemplates={() => {}} />
+          <EditorPanel customer={customer} onOpenTemplates={() => {}} onOpenMessages={() => {}} />
         </TooltipProvider>
       </CardEditorProvider>,
     )
