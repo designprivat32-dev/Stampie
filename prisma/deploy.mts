@@ -33,6 +33,7 @@ const PRE_PUSH_SQL = [
   'prisma/sql/001-drop-location.sql',
   'prisma/sql/002-drop-card-archive.sql',
   'prisma/sql/003-remove-demo-seed.sql',
+  'prisma/sql/004-remove-orphan-passes.sql',
 ]
 
 const env = process.env.VERCEL_ENV ?? 'development'
