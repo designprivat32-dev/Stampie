@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireAppUser } from '@/lib/auth/app-session'
-import { decideStamp, extractSerial, formatCooldown } from '@/lib/cards/stamping'
+import {
+  MAX_STAMPS_PER_BOOKING,
+  decideStamp,
+  extractSerial,
+  formatCooldown,
+} from '@/lib/cards/stamping'
 import { rateLimit } from '@/lib/rate-limit'
 import { pushAppleWalletUpdate } from '@/lib/wallet/apple-sync'
 
@@ -16,7 +21,14 @@ export const runtime = 'nodejs'
  * server, never trusted to the app.
  */
 
-const bodySchema = z.object({ scanned: z.string().min(1).max(400) })
+const bodySchema = z.object({
+  scanned: z.string().min(1).max(400),
+  /**
+   * Wie viele Stempel diese Buchung vergibt — drei Kaffee auf einmal sind ein Vorgang.
+   * Ohne Angabe einer, damit ältere App-Versionen unverändert weiterlaufen.
+   */
+  count: z.number().int().min(1).max(MAX_STAMPS_PER_BOOKING).default(1),
+})
 
 export async function POST(request: Request): Promise<Response> {
   const appUser = await requireAppUser(request)
@@ -95,6 +107,7 @@ export async function POST(request: Request): Promise<Response> {
     stamps: pass.stamps,
     stampGoal: pass.stampGoal,
     lastStampAt: last?.createdAt ?? null,
+    requested: parsed.data.count,
   })
 
   if (!decision.ok) {
@@ -129,7 +142,9 @@ export async function POST(request: Request): Promise<Response> {
         passId: pass.id,
         cardId: pass.cardId,
         kind: 'STAMP',
-        delta: 1,
+        // Eine Buchung, ein Eintrag: die Prüfspur soll zeigen, was der Kassierer getan
+        // hat, nicht drei erfundene Einzelscans.
+        delta: decision.booked,
         balance: decision.nextBalance,
         stampedBy: appUser.userId,
       },
@@ -146,6 +161,8 @@ export async function POST(request: Request): Promise<Response> {
     serial,
     stamps: updated.stamps,
     stampGoal: updated.stampGoal,
+    /** Was wirklich gebucht wurde — am Ziel gedeckelt, kann also unter `count` liegen. */
+    booked: decision.booked,
     completesCard: decision.completesCard,
   })
 }

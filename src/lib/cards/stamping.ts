@@ -9,8 +9,11 @@
 /** A card cannot be stamped twice in quick succession — double scans are common. */
 export const STAMP_COOLDOWN_MS = 60_000
 
+/** Obergrenze einer einzelnen Buchung. Mehr als das ist an der Kasse ein Vertipper. */
+export const MAX_STAMPS_PER_BOOKING = 10
+
 export type StampDecision =
-  | { ok: true; nextBalance: number; completesCard: boolean }
+  | { ok: true; nextBalance: number; booked: number; completesCard: boolean }
   | { ok: false; reason: 'cooldown'; retryInMs: number }
   | { ok: false; reason: 'already_full' }
 
@@ -18,6 +21,15 @@ export interface StampState {
   stamps: number
   stampGoal: number
   lastStampAt: Date | null
+  /**
+   * Wie viele Stempel diese eine Buchung vergeben soll — drei Kaffee auf einmal sind ein
+   * Vorgang, nicht drei Scans. Ohne Angabe einer.
+   *
+   * Wird auf das gedeckelt, was bis zum Ziel noch passt: `booked` sagt danach, was
+   * tatsächlich gebucht wurde, damit die Kasse nicht mehr verspricht als auf der Karte
+   * landet.
+   */
+  requested?: number
 }
 
 export function decideStamp(state: StampState, now: Date = new Date()): StampDecision {
@@ -30,8 +42,14 @@ export function decideStamp(state: StampState, now: Date = new Date()): StampDec
     }
   }
 
-  const nextBalance = state.stamps + 1
-  return { ok: true, nextBalance, completesCard: nextBalance >= state.stampGoal }
+  const wanted = Math.min(Math.max(Math.trunc(state.requested ?? 1), 1), MAX_STAMPS_PER_BOOKING)
+  const nextBalance = Math.min(state.stamps + wanted, state.stampGoal)
+  return {
+    ok: true,
+    nextBalance,
+    booked: nextBalance - state.stamps,
+    completesCard: nextBalance >= state.stampGoal,
+  }
 }
 
 export type RedeemDecision = { ok: true; nextBalance: number } | { ok: false; reason: 'not_full' }

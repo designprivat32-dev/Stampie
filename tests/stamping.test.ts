@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_STAMPS_PER_BOOKING,
   STAMP_COOLDOWN_MS,
   decideRedeem,
   decideStamp,
@@ -12,7 +13,7 @@ const now = new Date('2026-08-04T12:00:00Z')
 describe('decideStamp', () => {
   it('books the first stamp on a fresh card', () => {
     const d = decideStamp({ stamps: 0, stampGoal: 10, lastStampAt: null }, now)
-    expect(d).toEqual({ ok: true, nextBalance: 1, completesCard: false })
+    expect(d).toEqual({ ok: true, nextBalance: 1, booked: 1, completesCard: false })
   })
 
   it('flags the stamp that completes the card', () => {
@@ -23,6 +24,42 @@ describe('decideStamp', () => {
   it('refuses to overfill', () => {
     const d = decideStamp({ stamps: 10, stampGoal: 10, lastStampAt: null }, now)
     expect(d).toEqual({ ok: false, reason: 'already_full' })
+  })
+
+  describe('mehrere Stempel in einer Buchung', () => {
+    it('books the requested number at once', () => {
+      const d = decideStamp({ stamps: 2, stampGoal: 10, lastStampAt: null, requested: 3 }, now)
+      expect(d).toEqual({ ok: true, nextBalance: 5, booked: 3, completesCard: false })
+    })
+
+    it('stops at the goal and reports what actually landed', () => {
+      // Die Kasse darf nicht mehr versprechen, als auf der Karte ankommt.
+      const d = decideStamp({ stamps: 8, stampGoal: 10, lastStampAt: null, requested: 5 }, now)
+      expect(d).toEqual({ ok: true, nextBalance: 10, booked: 2, completesCard: true })
+    })
+
+    it('caps a fat-fingered number at the per-booking limit', () => {
+      const d = decideStamp({ stamps: 0, stampGoal: 999, lastStampAt: null, requested: 400 }, now)
+      expect(d.ok && d.booked).toBe(MAX_STAMPS_PER_BOOKING)
+    })
+
+    it.each([0, -3, 0.5])('treats %s as a single stamp', (requested) => {
+      const d = decideStamp({ stamps: 0, stampGoal: 10, lastStampAt: null, requested }, now)
+      expect(d.ok && d.booked).toBe(1)
+    })
+
+    it('still refuses a full card, however many were asked for', () => {
+      const d = decideStamp({ stamps: 10, stampGoal: 10, lastStampAt: null, requested: 3 }, now)
+      expect(d).toEqual({ ok: false, reason: 'already_full' })
+    })
+
+    it('still respects the cooldown', () => {
+      const d = decideStamp(
+        { stamps: 1, stampGoal: 10, lastStampAt: new Date(now.getTime() - 5_000), requested: 3 },
+        now,
+      )
+      expect(!d.ok && d.reason).toBe('cooldown')
+    })
   })
 
   describe('cooldown — a double scan must not count twice', () => {
