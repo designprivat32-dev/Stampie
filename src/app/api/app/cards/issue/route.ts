@@ -1,28 +1,32 @@
 import { NextResponse } from 'next/server'
-import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireAppUser } from '@/lib/auth/app-session'
 import { appUrl } from '@/lib/app-url'
+import { newNfcCode } from '@/lib/cards/handout-service'
+import { loadPublishedDesign } from '@/lib/cards/repository'
 
 export const runtime = 'nodejs'
 
 /**
- * Issues a fresh customer pass for one of the business's cards and returns its serial + a
- * link. The business shows the resulting QR to a new customer; the same serial is what the
- * scanner books stamps against.
+ * Der Ausgabe-QR für einen neuen Kunden: der Link `/k/<code>` dieser Karte.
+ *
+ * Vorher stand hier etwas anderes — die Route legte selbst einen `IssuedPass` an und gab
+ * dessen `/s/<serial>` zurück. Das sah aus wie eine Ausgabe, war aber keine: `/s/` ist die
+ * Statusseite eines bestehenden Passes, ohne Wallet-Knöpfe. Der Kunde scannte, sah einen
+ * Zählerstand und hatte danach immer noch nichts im Wallet, während in der Datenbank eine
+ * Karte lag, die niemand besitzt.
+ *
+ * Der Ausgabe-Link kann dagegen genau das: er baut dem Telefon, das ihn öffnet, seinen
+ * eigenen Pass und bietet Apple und Google Wallet an. Derselbe Link steckt auf den
+ * NFC-Chips und dem Aufsteller an der Theke — die App zeigt ihn nur auf dem Bildschirm,
+ * damit ein Betrieb ohne Chip und ohne Aufkleber auskommt.
+ *
+ * Der Code wird beim ersten Mal geprägt und bleibt danach stehen: er ist derselbe, der auf
+ * gedruckten Aufklebern steht, und darf sich nicht bei jeder Ausgabe ändern.
  */
 
 const bodySchema = z.object({ cardId: z.string().cuid() })
-
-/** Uppercase, unambiguous serial (no 0/O/1/I). extractSerial accepts [A-Z0-9]{4,64}. */
-function randomSerial(length = 10): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const bytes = randomBytes(length)
-  let out = ''
-  for (const b of bytes) out += alphabet[b % alphabet.length]
-  return out
-}
 
 export async function POST(request: Request): Promise<Response> {
   const appUser = await requireAppUser(request)
@@ -40,11 +44,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const card = await prisma.card.findFirst({
     where: { id: parsed.data.cardId },
-    select: {
-      id: true,
-      orgId: true,
-      designs: { select: { status: true, version: true, stampGoal: true } },
-    },
+    select: { id: true, name: true, orgId: true, nfcCode: true },
   })
 
   // Gelöscht heißt gelöscht: die App hält womöglich noch eine Liste von vorhin in der Hand.
@@ -64,22 +64,28 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  const published = card.designs.find((d) => d.status === 'PUBLISHED')
-  const source = published ?? card.designs.find((d) => d.status === 'DRAFT') ?? null
-  const stampGoal = source?.stampGoal ?? 10
-  const designVersion = source?.version ?? 1
-
-  // Find a free serial.
-  let serial = randomSerial()
-  for (let i = 0; i < 10; i++) {
-    const taken = await prisma.issuedPass.findUnique({ where: { serial }, select: { id: true } })
-    if (!taken) break
-    serial = randomSerial()
+  // Ohne veröffentlichte Fassung landet der Kunde auf einer Fehlerseite. Das hier zu sagen
+  // ist besser, als ihn das an der Theke herausfinden zu lassen.
+  const design = await loadPublishedDesign(card.id)
+  if (!design) {
+    return NextResponse.json(
+      {
+        error: 'Diese Karte ist noch nicht veröffentlicht. Erst im Designer veröffentlichen.',
+        code: 'not_published',
+      },
+      { status: 409 },
+    )
   }
 
-  await prisma.issuedPass.create({
-    data: { serial, cardId: card.id, isTest: false, stamps: 0, designVersion, stampGoal },
-  })
+  const code = card.nfcCode ?? newNfcCode()
+  if (!card.nfcCode) {
+    await prisma.card.update({ where: { id: card.id }, data: { nfcCode: code } })
+  }
 
-  return NextResponse.json({ serial, url: `${appUrl()}/s/${serial}`, stampGoal })
+  return NextResponse.json({
+    cardId: card.id,
+    cardName: card.name,
+    url: `${appUrl()}/k/${code}`,
+    stampGoal: design.stampGoal,
+  })
 }

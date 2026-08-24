@@ -15,6 +15,7 @@ export async function GET(request: Request): Promise<Response> {
     select: {
       id: true,
       name: true,
+      nfcCode: true,
       designs: { select: { status: true, stampGoal: true, programName: true } },
     },
   })
@@ -28,6 +29,8 @@ export async function GET(request: Request): Promise<Response> {
       programName: source?.programName?.trim() || c.name,
       stampGoal: source?.stampGoal ?? 10,
       isPublished: published !== undefined,
+      /** Ob der Ausgabe-Link schon geprägt ist — die App zeigt sonst, dass er entsteht. */
+      hasHandout: c.nfcCode !== null,
     }
   })
 
