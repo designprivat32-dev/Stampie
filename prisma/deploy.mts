@@ -29,7 +29,7 @@ import { existsSync } from 'node:fs'
  *
  * Jede Datei ist idempotent und kann entfernt werden, sobald sie überall gelaufen ist.
  */
-const PRE_PUSH_SQL = ['prisma/sql/001-drop-location.sql']
+const PRE_PUSH_SQL = ['prisma/sql/001-drop-location.sql', 'prisma/sql/002-drop-card-archive.sql']
 
 const env = process.env.VERCEL_ENV ?? 'development'
 const isolatedPreview = process.env.PREVIEW_DB_IS_ISOLATED === '1'

@@ -3,13 +3,21 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, Building2, Plus, QrCode, Send, Users } from 'lucide-react'
+import { Building2, Plus, QrCode, Send, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Spinner } from '@/components/ui/misc'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { NewCardDialog } from './new-card-dialog'
 import { AssignCustomerDialog } from './assign-customer-dialog'
 import { MessageDialog } from './message-dialog'
-import { archiveCardAction } from '@/actions/cards'
+import { deleteCardAction } from '@/actions/cards'
 import { stripPreviewUrl } from '@/lib/cards/preview-url'
 import type { CardSummary, CustomerOption } from '@/lib/cards/card-service'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
@@ -38,12 +46,16 @@ export function CardGrid({
   const [creating, setCreating] = React.useState(false)
   const [assigning, setAssigning] = React.useState<CardSummary | null>(null)
   const [messaging, setMessaging] = React.useState<CardSummary | null>(null)
+  const [deleting, setDeleting] = React.useState<CardSummary | null>(null)
   const [busyId, setBusyId] = React.useState<string | null>(null)
 
-  const handleArchive = async (card: CardSummary) => {
+  // Löschen ist endgültig und nimmt die Pässe der Kunden mit — deshalb erst die Rückfrage,
+  // die beziffert, was daran hängt, und dann erst der Griff zur Aktion.
+  const handleDelete = async (card: CardSummary) => {
     setBusyId(card.id)
     try {
-      await archiveCardAction(card.id, card.archivedAt === null)
+      await deleteCardAction(card.id)
+      setDeleting(null)
       router.refresh()
     } finally {
       setBusyId(null)
@@ -91,7 +103,7 @@ export function CardGrid({
               busy={busyId === card.id}
               onAssign={() => setAssigning(card)}
               onMessage={() => setMessaging(card)}
-              onArchive={() => void handleArchive(card)}
+              onDelete={() => setDeleting(card)}
             />
           ))}
 
@@ -124,7 +136,64 @@ export function CardGrid({
           onOpenChange={(open) => !open && setMessaging(null)}
         />
       ) : null}
+      <DeleteCardDialog
+        card={deleting}
+        busy={deleting !== null && busyId === deleting.id}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        onConfirm={() => deleting && void handleDelete(deleting)}
+      />
     </div>
+  )
+}
+
+/**
+ * Die Rückfrage vor dem Löschen.
+ *
+ * Sie nennt beim Namen, was verschwindet — vor allem die Karten im Umlauf, denn die liegen
+ * bei Kunden im Wallet und lassen sich durch nichts wiederherstellen. Ohne diese Zahl wäre
+ * „Löschen?" eine Frage, die niemand beantworten kann.
+ */
+function DeleteCardDialog({
+  card,
+  busy,
+  onOpenChange,
+  onConfirm,
+}: {
+  card: CardSummary | null
+  busy: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}) {
+  return (
+    <Dialog open={card !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{card ? `„${card.name}" löschen?` : 'Karte löschen?'}</DialogTitle>
+          <DialogDescription>
+            {card && card.issuedCount > 0 ? (
+              <>
+                {card.issuedCount === 1
+                  ? 'Eine Karte ist im Umlauf'
+                  : `${card.issuedCount} Karten sind im Umlauf`}{' '}
+                — diese Pässe bleiben im Wallet der Kunden stehen, lassen sich aber nicht
+                mehr stempeln und nicht mehr aktualisieren.{' '}
+              </>
+            ) : null}
+            Design, Bilder, ausgegebene Karten und die gesamte Stempel-Historie werden
+            gelöscht. Das lässt sich nicht rückgängig machen.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+            Abbrechen
+          </Button>
+          <Button variant="danger" onClick={onConfirm} disabled={busy}>
+            {busy ? <Spinner /> : <Trash2 />}
+            Endgültig löschen
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -135,7 +204,7 @@ function CardTile({
   busy,
   onAssign,
   onMessage,
-  onArchive,
+  onDelete,
 }: {
   card: CardSummary
   canAssign: boolean
@@ -143,7 +212,7 @@ function CardTile({
   busy: boolean
   onAssign: () => void
   onMessage: () => void
-  onArchive: () => void
+  onDelete: () => void
 }) {
   const preview = card.preview
   const design = preview
@@ -162,12 +231,7 @@ function CardTile({
   const stamps = design ? Math.ceil(design.stampGoal * 0.6) : 0
 
   return (
-    <div
-      className={cn(
-        'flex flex-col overflow-hidden rounded-xl border border-line bg-surface',
-        card.archivedAt && 'opacity-60',
-      )}
-    >
+    <div className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
       <Link href={`/dashboard/karten/${card.id}`} className="block">
         <div style={{ backgroundColor: preview?.backgroundColor ?? '#1a1a1a' }}>
           <div className="flex items-center justify-between gap-2 px-3 pb-1.5 pt-2.5">
@@ -209,9 +273,7 @@ function CardTile({
               {card.orgName ?? 'Nicht zugewiesen'}
             </p>
           </Link>
-          {card.archivedAt ? (
-            <Badge tone="neutral">Archiviert</Badge>
-          ) : card.isPublished ? (
+          {card.isPublished ? (
             <Badge tone="ok">v{card.publishedVersion}</Badge>
           ) : (
             <Badge tone="neutral">Entwurf</Badge>
@@ -265,11 +327,11 @@ function CardTile({
             size="icon-sm"
             className="ml-auto"
             disabled={busy}
-            aria-label={card.archivedAt ? 'Wiederherstellen' : 'Archivieren'}
-            title={card.archivedAt ? 'Wiederherstellen' : 'Archivieren'}
-            onClick={onArchive}
+            aria-label="Löschen"
+            title="Löschen"
+            onClick={onDelete}
           >
-            {busy ? <Spinner /> : <Archive />}
+            {busy ? <Spinner /> : <Trash2 />}
           </Button>
         </div>
       </div>

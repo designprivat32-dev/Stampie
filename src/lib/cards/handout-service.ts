@@ -67,7 +67,7 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
   if (!code || code.length < 10 || code.length > 128) return null
 
   const card = await prisma.card.findFirst({
-    where: { nfcCode: code, archivedAt: null },
+    where: { nfcCode: code },
     select: {
       id: true,
       name: true,

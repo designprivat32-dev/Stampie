@@ -169,11 +169,13 @@ describe('resolveHandoutCode', () => {
     expect(await resolveHandoutCode('a'.repeat(22))).toBeNull()
   })
 
-  it('ignores archived cards', async () => {
+  it('has nothing to hand out once the card is deleted', async () => {
+    // Gelöschte Karten sind wirklich weg — die Suche findet nichts, statt einen
+    // Zwischenzustand ausblenden zu müssen.
     cardFindFirst.mockResolvedValue(null)
 
     expect(await resolveHandoutCode('a'.repeat(22))).toBeNull()
-    expect(cardFindFirst.mock.calls[0]?.[0].where).toMatchObject({ archivedAt: null })
+    expect(cardFindFirst.mock.calls[0]?.[0].where).toMatchObject({ nfcCode: 'a'.repeat(22) })
   })
 
   it('falls back to the card name when no customer is assigned', async () => {

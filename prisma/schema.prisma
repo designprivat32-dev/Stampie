@@ -164,9 +164,11 @@ model Card {
   activeMessage   String?
   activeMessageAt DateTime?
 
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  createdBy  String
+  /// Kein Archiv-Feld: eine Karte existiert oder sie ist gelöscht. Löschen räumt über die
+  /// Fremdschlüssel auch Designs, Bilder, Pässe und deren Historie ab — siehe
+  /// `prisma/sql/002-drop-card-archive.sql`.
+  createdAt DateTime @default(now())
+  createdBy String
 
   designs  CardDesign[]
   versions CardDesignVersion[]
@@ -177,7 +179,7 @@ model Card {
 
   messages CardMessage[]
 
-  @@index([orgId, archivedAt])
+  @@index([orgId])
   @@index([nfcCode])
 }
 

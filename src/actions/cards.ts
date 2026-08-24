@@ -12,7 +12,7 @@ import { getTemplate, templateAsDesign } from '@/lib/cards/templates'
 import { cardKindSchema } from '@/lib/cards/schema'
 
 /**
- * Card lifecycle: list, create, assign, archive.
+ * Card lifecycle: list, create, assign, delete.
  *
  * Everything here is scoped by what the caller may see. `accessibleOrgIds` returns null
  * for the dashboard operator, which the queries read as "no restriction"; customer logins
@@ -149,22 +149,25 @@ export async function renameCardAction(cardId: string, name: string): Promise<Ac
 }
 
 /**
- * Archiving rather than deleting: passes already in customers' wallets keep referring to
- * this card, and their history has to stay readable.
+ * Löscht die Karte — endgültig, ohne Zwischenzustand.
+ *
+ * Es gab hier einmal ein Archiv. Das hat mehr Schaden angerichtet als verhindert: die
+ * Karte verschwand aus allen Listen, ihre Pässe blieben aber stempelbar, und die Kasse
+ * meldete Erfolg für eine Buchung, die danach nirgends mehr auftauchte.
+ *
+ * Was mitgeht, weil die Fremdschlüssel auf `ON DELETE CASCADE` stehen: Designs und deren
+ * Versionen, Bilder, Nachrichten, Testkarten-Token, alle ausgegebenen Pässe samt
+ * Wallet-Registrierungen und die gesamte Stempel-Historie. Pässe, die Kunden im Wallet
+ * haben, aktualisieren sich danach nicht mehr — sie frieren auf ihrem letzten Stand ein.
+ * Deshalb fragt die Oberfläche vorher nach und nennt die Zahl der Karten im Umlauf.
  */
-export async function archiveCardAction(
-  cardId: string,
-  archived: boolean,
-): Promise<ActionResult<null>> {
+export async function deleteCardAction(cardId: string): Promise<ActionResult<null>> {
   return guarded(async () => {
     const parsed = z.object({ cardId: z.string().cuid() }).safeParse({ cardId })
     if (!parsed.success) return fromZodError(parsed.error)
 
     await assertCardAccess(parsed.data.cardId)
-    await prisma.card.update({
-      where: { id: parsed.data.cardId },
-      data: { archivedAt: archived ? new Date() : null },
-    })
+    await prisma.card.delete({ where: { id: parsed.data.cardId } })
 
     revalidatePath('/dashboard/karten')
     return ok(null)

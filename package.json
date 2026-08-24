@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:db": "tsx scripts/dev-db.mts",
-    "db:setup": "prisma db push --skip-generate && tsx prisma/seed.ts",
+    "db:setup": "tsx prisma/deploy.mts",
     "build": "prisma generate && next build",
     "vercel-build": "prisma generate && tsx prisma/deploy.mts && next build",
     "start": "next start",

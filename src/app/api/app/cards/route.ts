@@ -10,7 +10,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
   const cards = await prisma.card.findMany({
-    where: { orgId: appUser.orgId, archivedAt: null },
+    where: { orgId: appUser.orgId },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

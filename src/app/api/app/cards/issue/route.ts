@@ -39,14 +39,29 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return NextResponse.json({ error: 'Keine Karte angegeben.' }, { status: 400 })
 
   const card = await prisma.card.findFirst({
-    where: { id: parsed.data.cardId, orgId: appUser.orgId },
+    where: { id: parsed.data.cardId },
     select: {
       id: true,
+      orgId: true,
       designs: { select: { status: true, version: true, stampGoal: true } },
     },
   })
+
+  // Gelöscht heißt gelöscht: die App hält womöglich noch eine Liste von vorhin in der Hand.
+  // Sie bekommt einen eigenen Grund, damit sie die Liste nachziehen kann statt den Fehler
+  // als Rechteproblem auszugeben.
   if (!card) {
-    return NextResponse.json({ error: 'Diese Karte gehört nicht zu deinem Betrieb.' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Diese Karte gibt es nicht mehr. Sie wurde gelöscht.', code: 'not_found' },
+      { status: 404 },
+    )
+  }
+
+  if (card.orgId !== appUser.orgId) {
+    return NextResponse.json(
+      { error: 'Diese Karte gehört nicht zu deinem Betrieb.', code: 'forbidden' },
+      { status: 403 },
+    )
   }
 
   const published = card.designs.find((d) => d.status === 'PUBLISHED')

@@ -64,8 +64,21 @@ export async function POST(request: Request): Promise<Response> {
     },
   })
 
-  // Not found OR belongs to another business → same answer, so a guessed serial cannot probe.
-  if (!pass || pass.card.orgId !== appUser.orgId) {
+  // Der Pass ist weg — das Kartenprogramm wurde hart gelöscht (Cascade) oder der QR stammt
+  // aus einer anderen Welt. Eigene Antwort, weil „gibt es nicht mehr" an der Kasse etwas
+  // anderes bedeutet als „gehört jemand anderem": nur so kann die App den Kassierer davon
+  // abhalten, es dreimal zu versuchen.
+  if (!pass) {
+    return NextResponse.json(
+      {
+        error: 'Diese Karte gibt es nicht mehr. Sie wurde gelöscht und kann nicht gestempelt werden.',
+        code: 'not_found',
+      },
+      { status: 404 },
+    )
+  }
+
+  if (pass.card.orgId !== appUser.orgId) {
     return NextResponse.json(
       { error: 'Diese Karte gehört nicht zu deinem Betrieb.', code: 'forbidden' },
       { status: 403 },

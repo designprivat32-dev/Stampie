@@ -17,7 +17,6 @@ export interface CardSummary {
   orgId: string | null
   orgName: string | null
   createdAt: string
-  archivedAt: string | null
   isPublished: boolean
   publishedVersion: number | null
   /** Cards actually handed to customers. */
@@ -60,14 +59,12 @@ export async function issuerName(cardId: string): Promise<string> {
 export interface ListCardsOptions {
   /** Null means "every card", which only agency members are allowed to ask for. */
   orgIds: string[] | null
-  includeArchived?: boolean
 }
 
 export async function listCards(options: ListCardsOptions): Promise<CardSummary[]> {
   const rows = await prisma.card.findMany({
     where: {
       ...(options.orgIds ? { orgId: { in: options.orgIds } } : {}),
-      ...(options.includeArchived ? {} : { archivedAt: null }),
     },
     orderBy: { createdAt: 'desc' },
     select: {
@@ -75,7 +72,6 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       name: true,
       orgId: true,
       createdAt: true,
-      archivedAt: true,
       org: { select: { name: true } },
       designs: {
         select: {
@@ -120,7 +116,6 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       orgId: row.orgId,
       orgName: row.org?.name ?? null,
       createdAt: row.createdAt.toISOString(),
-      archivedAt: row.archivedAt?.toISOString() ?? null,
       isPublished: published !== undefined,
       publishedVersion: published?.version ?? null,
       issuedCount: issuedByCard.get(row.id) ?? 0,
