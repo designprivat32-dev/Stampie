@@ -29,7 +29,11 @@ import { existsSync } from 'node:fs'
  *
  * Jede Datei ist idempotent und kann entfernt werden, sobald sie überall gelaufen ist.
  */
-const PRE_PUSH_SQL = ['prisma/sql/001-drop-location.sql', 'prisma/sql/002-drop-card-archive.sql']
+const PRE_PUSH_SQL = [
+  'prisma/sql/001-drop-location.sql',
+  'prisma/sql/002-drop-card-archive.sql',
+  'prisma/sql/003-remove-demo-seed.sql',
+]
 
 const env = process.env.VERCEL_ENV ?? 'development'
 const isolatedPreview = process.env.PREVIEW_DB_IS_ISOLATED === '1'
@@ -50,7 +54,16 @@ for (const file of PRE_PUSH_SQL) {
 }
 
 run('npx', ['prisma', 'db', 'push', '--skip-generate'])
-run('npx', ['tsx', 'prisma/seed.ts'])
+
+// Demodaten gehören in die Entwicklung, nicht in den Betrieb. In Production hat der Seed
+// bei jedem Deploy eine erfundene „Kaffeekarte Café Nord" samt zweier Beispiel-Betriebe
+// wieder eingespielt — Karten, die niemand angelegt hat, in einer Übersicht, deren Zahlen
+// stimmen müssen.
+if (env === 'production') {
+  console.log('[deploy] Seed übersprungen: Demodaten gehören nicht in die Produktionsdatenbank.')
+} else {
+  run('npx', ['tsx', 'prisma/seed.ts'])
+}
 
 function run(command: string, args: string[]): void {
   const result = spawnSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32' })
