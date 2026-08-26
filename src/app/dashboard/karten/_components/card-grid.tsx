@@ -3,9 +3,10 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Building2, Plus, QrCode, Send, Trash2, Users } from 'lucide-react'
+import { Building2, MapPin, Plus, QrCode, Send, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Spinner } from '@/components/ui/misc'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import { NewCardDialog } from './new-card-dialog'
 import { AssignCustomerDialog } from './assign-customer-dialog'
 import { MessageDialog } from './message-dialog'
 import { deleteCardAction } from '@/actions/cards'
+import { setGeoNotificationsAction } from '@/actions/card-design'
 import { stripPreviewUrl } from '@/lib/cards/preview-url'
 import type { CardSummary, CustomerOption } from '@/lib/cards/card-service'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
@@ -197,6 +199,79 @@ function DeleteCardDialog({
   )
 }
 
+/**
+ * Der Standort-Schalter, dort wo die Karten stehen.
+ *
+ * Im Designer liegt er unter „Erweitert" — richtig für das Einrichten, falsch für den
+ * Betrieb: wer die Benachrichtigung für die Sommeraktion anschaltet und im Herbst wieder
+ * aus, will dafür keine Karte öffnen, kein Panel aufklappen und nichts veröffentlichen.
+ * Deshalb wirkt er hier sofort auf die ausgegebenen Karten.
+ */
+function GeoNotificationToggle({ card }: { card: CardSummary }) {
+  const router = useRouter()
+  const { enabled: serverEnabled, locationCount, canEnable } = card.geoNotifications
+  const [enabled, setEnabled] = React.useState(serverEnabled)
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  // Nach dem Neuladen gewinnt der Server: der Schalter zeigt nie einen Stand an, den die
+  // ausgegebenen Karten nicht haben.
+  React.useEffect(() => setEnabled(serverEnabled), [serverEnabled])
+
+  // Anschalten ginge ins Leere, solange weder Karte noch Stammdaten einen Standort kennen.
+  // Ausschalten bleibt immer erlaubt.
+  const blocked = !canEnable && !enabled
+
+  const toggle = async (next: boolean) => {
+    setEnabled(next)
+    setBusy(true)
+    setError(null)
+    const result = await setGeoNotificationsAction({ cardId: card.id, enabled: next })
+    setBusy(false)
+    if (!result.success) {
+      setEnabled(!next)
+      setError(result.error.message)
+      return
+    }
+    router.refresh()
+  }
+
+  const hint = blocked
+    ? 'Kein Standort hinterlegt'
+    : enabled
+      ? `${locationCount} ${locationCount === 1 ? 'Standort' : 'Standorte'} · Sperrbildschirm`
+      : 'Aus · Standorte bleiben gespeichert'
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
+            <MapPin className="size-3.5 shrink-0 text-ink-3" />
+            In der Nähe benachrichtigen
+          </p>
+          <p className="truncate pl-5 text-[11px] text-ink-3">{hint}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {busy ? <Spinner className="text-ink-3" /> : null}
+          <Switch
+            checked={enabled}
+            disabled={busy || blocked}
+            aria-label={`Standort-Benachrichtigung für ${card.name}`}
+            title={
+              blocked
+                ? 'Erst einen Standort im Designer unter „Erweitert" hinterlegen.'
+                : undefined
+            }
+            onCheckedChange={(next) => void toggle(next)}
+          />
+        </div>
+      </div>
+      {error ? <p className="text-[11px] text-warn-ink">{error}</p> : null}
+    </div>
+  )
+}
+
 function CardTile({
   card,
   canAssign,
@@ -289,6 +364,8 @@ function CardTile({
             <span className="text-ink-3">· {card.testCount} Test</span>
           ) : null}
         </p>
+
+        <GeoNotificationToggle card={card} />
 
         <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
           <Button variant="outline" size="sm" asChild>

@@ -1,5 +1,6 @@
 'use server'
 
+import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { assertCardAccess } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
@@ -15,17 +16,19 @@ import {
 } from '@/lib/cards/schema'
 import {
   countAffectedPasses,
+  geoLocationCount,
   listVersions,
   loadVersionSnapshot,
   publishDesign,
   saveDraft,
+  setGeoNotifications,
   type VersionSummary,
 } from '@/lib/cards/repository'
 import { applyTemplate, getTemplate } from '@/lib/cards/templates'
 import { invalidateStripCache } from '@/lib/cards/strip-service'
 import { syncGoogleClass } from '@/lib/wallet/google-sync'
 import { pushAppleWalletUpdateForCard } from '@/lib/wallet/apple-sync'
-import { cardKind, issuerName } from '@/lib/cards/card-service'
+import { cardKind, issuerName, organizationGeoSeed } from '@/lib/cards/card-service'
 
 /**
  * Every action re-validates against the same Zod schema the client uses. Client-side
@@ -99,6 +102,54 @@ export async function publishAction(input: unknown): Promise<ActionResult<Publis
       affectedPasses: result.affectedPasses,
       publishedAt: result.publishedAt.toISOString(),
     })
+  })
+}
+
+const geoNotificationsInputSchema = z.object({
+  cardId: z.string().cuid(),
+  enabled: z.boolean(),
+})
+
+/**
+ * Der Schalter aus der Kartenübersicht.
+ *
+ * Er greift ohne den Umweg über Entwurf und Veröffentlichen, weil er nichts am Aussehen
+ * der Karte ändert: entweder gehen die hinterlegten Standorte mit in den Pass oder nicht.
+ * Deshalb wandert er direkt auf beide Design-Zeilen und von dort in die Wallets — ein
+ * Schalter in einer Übersicht, der erst nach einem Veröffentlichen wirkt, wäre eine Lüge.
+ *
+ * Einschalten ohne hinterlegten Standort holt den Standort des Betriebs. Fehlt der auch,
+ * scheitert die Aktion mit Ansage, statt eine Benachrichtigung um nichts herum anzulegen.
+ */
+export async function setGeoNotificationsAction(input: unknown): Promise<ActionResult<null>> {
+  return guarded(async () => {
+    const parsed = geoNotificationsInputSchema.safeParse(input)
+    if (!parsed.success) return fromZodError(parsed.error)
+
+    const { cardId, enabled } = parsed.data
+    await assertCardAccess(cardId)
+
+    const seedLocation = enabled ? await organizationGeoSeed(cardId) : null
+    if (enabled && seedLocation === null && (await geoLocationCount(cardId)) === 0) {
+      return fail(
+        'Für diesen Betrieb ist kein Standort hinterlegt. Koordinaten im Designer unter „Erweitert" eintragen.',
+        'validation',
+      )
+    }
+
+    const published = await setGeoNotifications(cardId, { enabled, seedLocation })
+
+    // Karten im Umlauf folgen der veröffentlichten Fassung — die muss die Wallets erreichen,
+    // sonst benachrichtigt ein abgeschalteter Standort noch wochenlang weiter.
+    if (published !== null) {
+      await syncGoogleClass(cardId, published, await issuerName(cardId), await cardKind(cardId))
+      await pushAppleWalletUpdateForCard(cardId)
+    }
+
+    revalidatePath('/dashboard/karten')
+    revalidatePath(`/dashboard/karten/${cardId}`)
+
+    return ok(null)
   })
 }
 

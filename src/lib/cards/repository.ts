@@ -2,7 +2,8 @@ import 'server-only'
 import type { CardDesign as CardDesignRow, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { DEFAULT_CARD_DESIGN } from './defaults'
-import { cardDesignDraftSchema, type CardDesignInput } from './schema'
+import { z } from 'zod'
+import { cardDesignDraftSchema, geoLocationSchema, type CardDesignInput, type GeoLocation } from './schema'
 
 /**
  * Data access for card designs.
@@ -255,6 +256,72 @@ export async function loadVersionSnapshot(
   if (!row) return null
   const parsed = cardDesignDraftSchema.safeParse(row.snapshot)
   return parsed.success ? parsed.data : null
+}
+
+export interface GeoNotificationUpdate {
+  enabled: boolean
+  /** Seeds the first location on rows that have none — the shop's own coordinates. */
+  seedLocation: GeoLocation | null
+}
+
+/**
+ * Flips the location alert on the draft *and* the published design in one go.
+ *
+ * Deliberately no new version. The switch decides whether an already published design's
+ * locations are delivered; it changes nothing about how the card looks, and a version
+ * counter that ticks every time a shop switches the alert off over the winter tells the
+ * next reader nothing. Both rows move together so the designer does not show "aus" on a
+ * card that is still alerting.
+ *
+ * Returns the published design as it now stands — that is what has to reach the wallets —
+ * or null for a card that was never published, where there is nothing to push.
+ */
+export async function setGeoNotifications(
+  cardId: string,
+  update: GeoNotificationUpdate,
+): Promise<CardDesignInput | null> {
+  const rows = await prisma.cardDesign.findMany({
+    where: { cardId },
+    select: { id: true, geoLocations: true },
+  })
+
+  await prisma.$transaction(
+    rows.map((row) => {
+      const current = parseGeoLocations(row.geoLocations)
+      const geoLocations =
+        update.seedLocation && current.length === 0 ? [update.seedLocation] : current
+
+      return prisma.cardDesign.update({
+        where: { id: row.id },
+        data: {
+          geoNotificationsEnabled: update.enabled,
+          geoLocations: geoLocations as unknown as Prisma.InputJsonValue,
+        },
+      })
+    }),
+  )
+
+  return loadPublishedDesign(cardId)
+}
+
+/**
+ * How many locations the card carries, taken across both design rows.
+ *
+ * The switch in the overview asks before it writes: switching the alert on for a card that
+ * has no location anywhere would be an alert around nothing.
+ */
+export async function geoLocationCount(cardId: string): Promise<number> {
+  const rows = await prisma.cardDesign.findMany({
+    where: { cardId },
+    select: { geoLocations: true },
+  })
+  return rows.reduce((max, row) => Math.max(max, parseGeoLocations(row.geoLocations).length), 0)
+}
+
+/** A JSON column written by an older schema must not throw — it reads as "no locations". */
+function parseGeoLocations(value: unknown): GeoLocation[] {
+  const parsed = z.array(geoLocationSchema).safeParse(value)
+  return parsed.success ? parsed.data : []
 }
 
 export async function loadPublishedDesign(cardId: string): Promise<CardDesignInput | null> {

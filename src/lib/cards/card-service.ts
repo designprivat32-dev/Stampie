@@ -1,7 +1,8 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
 import { isAdminSession } from '@/lib/auth/session'
-import type { CardKind } from './schema'
+import { newFieldId } from './defaults'
+import { geoLocationSchema, type CardKind, type GeoLocation } from './schema'
 
 /**
  * Reads around the `Card` aggregate.
@@ -23,6 +24,16 @@ export interface CardSummary {
   issuedCount: number
   /** Test cards generated from the designer — counted apart so they never inflate the above. */
   testCount: number
+  /** The location alert, as far as the overview needs to draw a switch for it. */
+  geoNotifications: {
+    enabled: boolean
+    locationCount: number
+    /**
+     * False only where switching on would produce an alert around nothing: no location on
+     * the card and no coordinates in the customer's master data to seed one from.
+     */
+    canEnable: boolean
+  }
   /** Enough of the design to draw a preview tile. */
   preview: {
     backgroundColor: string
@@ -72,11 +83,13 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       name: true,
       orgId: true,
       createdAt: true,
-      org: { select: { name: true } },
+      org: { select: { name: true, latitude: true, longitude: true } },
       designs: {
         select: {
           status: true,
           version: true,
+          geoNotificationsEnabled: true,
+          geoLocations: true,
           backgroundColor: true,
           foregroundColor: true,
           labelColor: true,
@@ -109,6 +122,9 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
     const published = row.designs.find((d) => d.status === 'PUBLISHED')
     // The tile shows what the customer would get: published where it exists, else draft.
     const source = published ?? row.designs.find((d) => d.status === 'DRAFT') ?? null
+    const locationCount = countGeoLocations(source?.geoLocations)
+    const hasOrgCoordinates =
+      row.org !== null && row.org.latitude !== null && row.org.longitude !== null
 
     return {
       id: row.id,
@@ -120,6 +136,13 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       publishedVersion: published?.version ?? null,
       issuedCount: issuedByCard.get(row.id) ?? 0,
       testCount: testByCard.get(row.id) ?? 0,
+      geoNotifications: {
+        // Read from the same row as the preview: the published design where there is one,
+        // because that is what the cards in circulation actually follow.
+        enabled: source?.geoNotificationsEnabled ?? false,
+        locationCount,
+        canEnable: locationCount > 0 || hasOrgCoordinates,
+      },
       preview: source
         ? {
             backgroundColor: source.backgroundColor,
@@ -135,6 +158,35 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
         : null,
     }
   })
+}
+
+function countGeoLocations(value: unknown): number {
+  const parsed = geoLocationSchema.array().safeParse(value)
+  return parsed.success ? parsed.data.length : 0
+}
+
+/**
+ * The location the overview's switch seeds the first entry with: the shop itself.
+ *
+ * Null where the customer's master data has no coordinates — the designer may fall back to
+ * a pin someone can drag, a switch in a list cannot: nobody would see where it landed.
+ */
+export async function organizationGeoSeed(cardId: string): Promise<GeoLocation | null> {
+  const card = await prisma.card.findFirst({
+    where: { id: cardId },
+    select: { name: true, org: { select: { name: true, latitude: true, longitude: true } } },
+  })
+  const org = card?.org
+  if (!org || org.latitude === null || org.longitude === null) return null
+
+  return {
+    id: newFieldId(),
+    label: org.name,
+    latitude: org.latitude,
+    longitude: org.longitude,
+    maxDistance: 150,
+    relevantText: 'Deine Stempelkarte ist bereit',
+  }
 }
 
 export interface CustomerOption {
