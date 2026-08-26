@@ -17,6 +17,7 @@ import { Spinner } from '@/components/ui/misc'
 import { createCustomerAction, geocodeAddressAction, updateCustomerAction } from '@/actions/customers'
 import { MapPin, Search } from 'lucide-react'
 import type { CustomerRecord } from '@/lib/customers/customer-service'
+import type { GeocodeCandidate } from '@/lib/geo/geocode'
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; customer: CustomerRecord } | null
 
@@ -48,6 +49,8 @@ export function CustomerDialog({
   )
   /** Die gefundene Schreibweise der Adresse — nur zum Gegenlesen, nichts davon wird gespeichert. */
   const [foundLabel, setFoundLabel] = React.useState<string | null>(null)
+  /** Treffer, die nicht genau die eingetippte Adresse sind: erst anklicken, dann gilt einer. */
+  const [suggestions, setSuggestions] = React.useState<GeocodeCandidate[]>([])
   const [searching, setSearching] = React.useState(false)
   const [geoError, setGeoError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
@@ -71,6 +74,7 @@ export function CustomerDialog({
         : null,
     )
     setFoundLabel(null)
+    setSuggestions([])
     setGeoError(null)
     setError(null)
     setFieldErrors({})
@@ -123,19 +127,43 @@ export function CustomerDialog({
     setSearching(true)
     setGeoError(null)
     setFoundLabel(null)
+    setSuggestions([])
     try {
       const result = await geocodeAddressAction({ street, postalCode, city })
       if (!result.success) {
         setGeoError(result.error.message)
         return
       }
-      setCoordinates({ latitude: result.data.latitude, longitude: result.data.longitude })
-      setFoundLabel(result.data.label)
+
+      const [first] = result.data.candidates
+      if (result.data.exact && first) {
+        applyCandidate(first)
+        return
+      }
+      // Nicht genau gefunden: nichts übernehmen, sondern fragen. Ein Pin, den niemand
+      // gegengelesen hat, schickt später Benachrichtigungen an der falschen Straßenecke los.
+      setSuggestions(result.data.candidates)
     } catch {
       setGeoError('Die Adresse konnte nicht gesucht werden. Bitte erneut versuchen.')
     } finally {
       setSearching(false)
     }
+  }
+
+  /**
+   * Ein Vorschlag wird übernommen — samt Adresse.
+   *
+   * Wer „Hauptstr. 12, 10115" eingetippt hat und den Treffer in 10827 anklickt, will nicht
+   * anschließend die PLZ von Hand nachziehen. Die Stammdaten sollen zu dem Punkt passen,
+   * der gleich Benachrichtigungen auslöst.
+   */
+  function applyCandidate(candidate: GeocodeCandidate) {
+    setCoordinates({ latitude: candidate.latitude, longitude: candidate.longitude })
+    setFoundLabel(candidate.label)
+    setSuggestions([])
+    if (candidate.street) setStreet(candidate.street)
+    if (candidate.postalCode) setPostalCode(candidate.postalCode)
+    if (candidate.city) setCity(candidate.city)
   }
 
   const canSearch = postalCode.trim().length > 0 || city.trim().length > 0
@@ -258,6 +286,31 @@ export function CustomerDialog({
 
             {foundLabel ? (
               <p className="text-[12px] leading-snug text-ok">Gefunden: {foundLabel}</p>
+            ) : null}
+
+            {suggestions.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-[12px] text-ink-2">
+                  Diese Adresse gibt es so nicht. Meintest du:
+                </p>
+                <ul className="space-y-1">
+                  {suggestions.map((candidate) => (
+                    <li key={`${candidate.latitude},${candidate.longitude}`}>
+                      <button
+                        type="button"
+                        data-slot="control"
+                        onClick={() => applyCandidate(candidate)}
+                        className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-left text-[12px] leading-snug text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
+                      >
+                        {candidate.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] leading-snug text-ink-3">
+                  Ein Klick übernimmt den Punkt und rückt Straße, PLZ und Ort gerade.
+                </p>
+              </div>
             ) : null}
             {geoError ? (
               <p role="alert" className="text-[12px] leading-snug text-warn-ink">

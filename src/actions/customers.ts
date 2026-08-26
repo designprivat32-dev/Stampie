@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
-import { geocodeAddress, GeocodeError } from '@/lib/geo/geocode'
+import { geocodeAddress, GeocodeError, type GeocodeResult } from '@/lib/geo/geocode'
 
 /**
  * Customer (Firma) lifecycle: create and edit.
@@ -57,13 +57,14 @@ const geocodeInputSchema = z.object({
 /**
  * Adresssuche für den Kundendialog.
  *
- * Gibt den Treffer nur zurück, gespeichert wird er erst mit dem Kunden — wer eine Adresse
- * sucht, soll sehen, wo der Punkt landet, bevor daraus eine Benachrichtigung wird. Die
- * Adresse geht dabei an OpenStreetMap; das steht so auch im Dialog.
+ * Gibt nur zurück, gespeichert wird erst mit dem Kunden — wer eine Adresse sucht, soll
+ * sehen, wo der Punkt landet, bevor daraus eine Benachrichtigung wird. Wurde die Adresse
+ * nicht genau gefunden, kommen Vorschläge zurück statt einer Sackgasse; welcher davon
+ * stimmt, entscheidet der Mensch, nicht die Suche.
+ *
+ * Die eingetippte Adresse geht dabei an OpenStreetMap; das steht so auch im Dialog.
  */
-export async function geocodeAddressAction(
-  input: unknown,
-): Promise<ActionResult<{ latitude: number; longitude: number; label: string }>> {
+export async function geocodeAddressAction(input: unknown): Promise<ActionResult<GeocodeResult>> {
   return guarded(async () => {
     const parsed = geocodeInputSchema.safeParse(input)
     if (!parsed.success) return fromZodError(parsed.error)
@@ -71,14 +72,14 @@ export async function geocodeAddressAction(
     await requireSession()
 
     try {
-      const hit = await geocodeAddress(parsed.data)
-      if (!hit) {
+      const result = await geocodeAddress(parsed.data)
+      if (result.candidates.length === 0) {
         return fail(
-          'Zu dieser Adresse wurde nichts gefunden. Ort und PLZ prüfen, oder die Koordinaten im Designer von Hand eintragen.',
+          'Zu dieser Adresse wurde nichts gefunden — auch nicht in der Umgebung. Ort und PLZ prüfen, oder die Koordinaten im Designer von Hand eintragen.',
           'not_found',
         )
       }
-      return ok(hit)
+      return ok(result)
     } catch (error) {
       if (error instanceof GeocodeError) {
         return fail(`Der Adress-Suchdienst antwortet gerade nicht (${error.message}).`, 'internal')
