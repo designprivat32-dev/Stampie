@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
+import { geocodeAddress, GeocodeError } from '@/lib/geo/geocode'
 
 /**
  * Customer (Firma) lifecycle: create and edit.
@@ -32,9 +33,60 @@ const customerInputSchema = z.object({
   website: z.preprocess(emptyToNull, z.string().trim().url('Bitte eine vollständige URL angeben.').max(200).nullable()),
   imprintUrl: z.preprocess(emptyToNull, z.string().trim().url('Bitte eine vollständige URL angeben.').max(200).nullable()),
   privacyUrl: z.preprocess(emptyToNull, z.string().trim().url('Bitte eine vollständige URL angeben.').max(200).nullable()),
+
+  /**
+   * Koordinaten des Betriebs. Sie füttern die Standort-Benachrichtigung: der Designer und
+   * der Schalter in der Kartenübersicht legen den ersten Standort damit an.
+   *
+   * Nullable, weil ein Kunde lange vor seiner ersten Karte angelegt wird — und weil nicht
+   * jede Adresse gefunden wird. Eingetragen werden sie über die Adresssuche im Dialog,
+   * geprüft werden sie hier trotzdem: aus dem Formular kommt, was der Browser schickt.
+   */
+  latitude: z.preprocess(emptyToNull, z.coerce.number().min(-90).max(90).nullable().default(null)),
+  longitude: z.preprocess(emptyToNull, z.coerce.number().min(-180).max(180).nullable().default(null)),
 })
 
 export type CustomerInput = z.infer<typeof customerInputSchema>
+
+const geocodeInputSchema = z.object({
+  street: z.string().max(160).default(''),
+  postalCode: z.string().max(20).default(''),
+  city: z.string().max(120).default(''),
+})
+
+/**
+ * Adresssuche für den Kundendialog.
+ *
+ * Gibt den Treffer nur zurück, gespeichert wird er erst mit dem Kunden — wer eine Adresse
+ * sucht, soll sehen, wo der Punkt landet, bevor daraus eine Benachrichtigung wird. Die
+ * Adresse geht dabei an OpenStreetMap; das steht so auch im Dialog.
+ */
+export async function geocodeAddressAction(
+  input: unknown,
+): Promise<ActionResult<{ latitude: number; longitude: number; label: string }>> {
+  return guarded(async () => {
+    const parsed = geocodeInputSchema.safeParse(input)
+    if (!parsed.success) return fromZodError(parsed.error)
+
+    await requireSession()
+
+    try {
+      const hit = await geocodeAddress(parsed.data)
+      if (!hit) {
+        return fail(
+          'Zu dieser Adresse wurde nichts gefunden. Ort und PLZ prüfen, oder die Koordinaten im Designer von Hand eintragen.',
+          'not_found',
+        )
+      }
+      return ok(hit)
+    } catch (error) {
+      if (error instanceof GeocodeError) {
+        return fail(`Der Adress-Suchdienst antwortet gerade nicht (${error.message}).`, 'internal')
+      }
+      throw error
+    }
+  })
+}
 
 export async function createCustomerAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   return guarded(async () => {
@@ -54,6 +106,8 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
         website: parsed.data.website,
         imprintUrl: parsed.data.imprintUrl,
         privacyUrl: parsed.data.privacyUrl,
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
       },
       select: { id: true },
     })
@@ -95,6 +149,8 @@ export async function updateCustomerAction(
         website: parsed.data.website,
         imprintUrl: parsed.data.imprintUrl,
         privacyUrl: parsed.data.privacyUrl,
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
       },
     })
 

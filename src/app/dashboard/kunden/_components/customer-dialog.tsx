@@ -14,7 +14,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/misc'
-import { createCustomerAction, updateCustomerAction } from '@/actions/customers'
+import { createCustomerAction, geocodeAddressAction, updateCustomerAction } from '@/actions/customers'
+import { MapPin, Search } from 'lucide-react'
 import type { CustomerRecord } from '@/lib/customers/customer-service'
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; customer: CustomerRecord } | null
@@ -42,6 +43,13 @@ export function CustomerDialog({
   const [website, setWebsite] = React.useState('')
   const [imprintUrl, setImprintUrl] = React.useState('')
   const [privacyUrl, setPrivacyUrl] = React.useState('')
+  const [coordinates, setCoordinates] = React.useState<{ latitude: number; longitude: number } | null>(
+    null,
+  )
+  /** Die gefundene Schreibweise der Adresse — nur zum Gegenlesen, nichts davon wird gespeichert. */
+  const [foundLabel, setFoundLabel] = React.useState<string | null>(null)
+  const [searching, setSearching] = React.useState(false)
+  const [geoError, setGeoError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({})
@@ -57,6 +65,13 @@ export function CustomerDialog({
     setWebsite(editing?.website ?? '')
     setImprintUrl(editing?.imprintUrl ?? '')
     setPrivacyUrl(editing?.privacyUrl ?? '')
+    setCoordinates(
+      editing?.latitude !== null && editing?.latitude !== undefined && editing.longitude !== null
+        ? { latitude: editing.latitude, longitude: editing.longitude }
+        : null,
+    )
+    setFoundLabel(null)
+    setGeoError(null)
     setError(null)
     setFieldErrors({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,7 +82,19 @@ export function CustomerDialog({
     setError(null)
     setFieldErrors({})
     try {
-      const payload = { name, phone, email, street, postalCode, city, website, imprintUrl, privacyUrl }
+      const payload = {
+        name,
+        phone,
+        email,
+        street,
+        postalCode,
+        city,
+        website,
+        imprintUrl,
+        privacyUrl,
+        latitude: coordinates?.latitude ?? null,
+        longitude: coordinates?.longitude ?? null,
+      }
       const result =
         state?.mode === 'edit'
           ? await updateCustomerAction(state.customer.id, payload)
@@ -86,6 +113,32 @@ export function CustomerDialog({
       setBusy(false)
     }
   }
+
+  /**
+   * Adresse → Koordinaten. Der Treffer wird angezeigt, nicht stillschweigend übernommen:
+   * ein Pin, den niemand gegengelesen hat, schickt später Benachrichtigungen an der
+   * falschen Straßenecke los.
+   */
+  const searchCoordinates = async () => {
+    setSearching(true)
+    setGeoError(null)
+    setFoundLabel(null)
+    try {
+      const result = await geocodeAddressAction({ street, postalCode, city })
+      if (!result.success) {
+        setGeoError(result.error.message)
+        return
+      }
+      setCoordinates({ latitude: result.data.latitude, longitude: result.data.longitude })
+      setFoundLabel(result.data.label)
+    } catch {
+      setGeoError('Die Adresse konnte nicht gesucht werden. Bitte erneut versuchen.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const canSearch = postalCode.trim().length > 0 || city.trim().length > 0
 
   return (
     <Dialog open={state !== null} onOpenChange={onOpenChange}>
@@ -161,6 +214,60 @@ export function CustomerDialog({
                 onChange={(e) => setCity(e.target.value)}
               />
             </Field>
+          </div>
+
+          {/*
+            Die Koordinaten hängen an der Adresse, deshalb stehen sie hier und nicht in
+            einem eigenen Abschnitt. Ohne sie bleibt die Standort-Benachrichtigung der
+            Karten gesperrt — das sagt der Hinweis auch.
+          */}
+          <div className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
+                  <MapPin className="size-3.5 shrink-0 text-ink-3" />
+                  Standort für Benachrichtigungen
+                </p>
+                <p className="text-[12px] leading-snug text-ink-3">
+                  {coordinates
+                    ? `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`
+                    : 'Noch keine Koordinaten. Ohne sie kann die Karte niemanden in der Nähe benachrichtigen.'}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {coordinates ? (
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setCoordinates(null)
+                    setFoundLabel(null)
+                  }}>
+                    Entfernen
+                  </Button>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={searching || !canSearch}
+                  title={canSearch ? undefined : 'Erst PLZ oder Ort eintragen.'}
+                  onClick={() => void searchCoordinates()}
+                >
+                  {searching ? <Spinner /> : <Search />}
+                  Adresse suchen
+                </Button>
+              </div>
+            </div>
+
+            {foundLabel ? (
+              <p className="text-[12px] leading-snug text-ok">Gefunden: {foundLabel}</p>
+            ) : null}
+            {geoError ? (
+              <p role="alert" className="text-[12px] leading-snug text-warn-ink">
+                {geoError}
+              </p>
+            ) : null}
+            <p className="text-[11px] leading-snug text-ink-3">
+              Die Suche fragt OpenStreetMap. Dorthin geht dabei die eingetippte Adresse, sonst
+              nichts.
+            </p>
           </div>
 
           {/*

@@ -18,6 +18,9 @@ export interface CustomerRecord {
   website: string | null
   imprintUrl: string | null
   privacyUrl: string | null
+  /** Koordinaten des Betriebs, Quelle der Standort-Benachrichtigung. Null = nie gesucht. */
+  latitude: number | null
+  longitude: number | null
   /** How many cards belong to this customer. */
   cardCount: number
   createdAt: string
@@ -42,6 +45,8 @@ export async function listCustomerRecords(orgIds: string[] | null): Promise<Cust
       website: true,
       imprintUrl: true,
       privacyUrl: true,
+      latitude: true,
+      longitude: true,
       createdAt: true,
       _count: { select: { cards: true } },
     },
@@ -58,6 +63,8 @@ export async function listCustomerRecords(orgIds: string[] | null): Promise<Cust
     website: r.website,
     imprintUrl: r.imprintUrl,
     privacyUrl: r.privacyUrl,
+    latitude: r.latitude,
+    longitude: r.longitude,
     cardCount: r._count.cards,
     createdAt: r.createdAt.toISOString(),
   }))
