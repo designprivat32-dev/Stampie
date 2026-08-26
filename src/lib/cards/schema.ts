@@ -209,6 +209,14 @@ export const cardDesignDraftSchema = z
 
     // advanced
     barcodeFormat: barcodeFormatSchema,
+    /**
+     * Master switch for the location alert. Off keeps the coordinates but publishes none
+     * of them, so switching it back on does not mean typing every location in again.
+     *
+     * Defaults to on: the column arrived after cards were already carrying locations, and
+     * those must keep alerting. Without a location the flag does nothing either way.
+     */
+    geoNotificationsEnabled: z.boolean().default(true),
     geoLocations: z
       .array(geoLocationSchema)
       .max(MAX_GEO_LOCATIONS, `Apple Wallet erlaubt höchstens ${MAX_GEO_LOCATIONS} Standorte pro Karte.`),
@@ -255,6 +263,19 @@ export const cardDesignDraftSchema = z
   })
 
 export type CardDesignInput = z.infer<typeof cardDesignDraftSchema>
+
+/**
+ * The locations a pass may actually carry — the single place the master switch is read.
+ *
+ * Apple and Google each build their own class from the same design; asking them to check
+ * the flag themselves is how one of them ends up still alerting after it was switched off.
+ */
+export function activeGeoLocations(
+  design: Pick<CardDesignInput, 'geoNotificationsEnabled' | 'geoLocations'>,
+): GeoLocation[] {
+  if (!design.geoNotificationsEnabled) return []
+  return design.geoLocations.slice(0, MAX_GEO_LOCATIONS)
+}
 
 export const LEGAL_LABELS: Record<LegalKind, string> = {
   imprint: 'Impressum',

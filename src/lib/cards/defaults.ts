@@ -39,6 +39,7 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
   googleRewardsTierEnabled: false,
 
   barcodeFormat: 'QR',
+  geoNotificationsEnabled: true,
   geoLocations: [],
   expiresAt: null,
   shareable: true,

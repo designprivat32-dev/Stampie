@@ -100,6 +100,23 @@ describe('buildPassJson', () => {
     expect(buildPassJson(design(), ctx).locations).toBeUndefined()
   })
 
+  it('omits locations when the master switch is off, without dropping them from the design', () => {
+    const geo: GeoLocation[] = [
+      {
+        id: 'g0',
+        label: 'Laden',
+        latitude: 52,
+        longitude: 13,
+        maxDistance: 100,
+        relevantText: 'Da bist du ja',
+      },
+    ]
+    const off = design({ geoLocations: geo, geoNotificationsEnabled: false })
+    expect(buildPassJson(off, ctx).locations).toBeUndefined()
+    expect(off.geoLocations).toHaveLength(1)
+    expect(buildPassJson(design({ geoLocations: geo }), ctx).locations).toHaveLength(1)
+  })
+
   it('clamps the stamp counter to the goal', () => {
     const p = buildPassJson(design({ stampGoal: 5 }), { ...ctx, currentStamps: 99 })
     expect(storeCardOf(p).headerFields[0]!.value).toBe('5/5')
@@ -169,6 +186,23 @@ describe('google loyalty mapping', () => {
   it('maps barcode formats to Google names', () => {
     expect(buildLoyaltyObject(design({ barcodeFormat: 'CODE128' }), gctx).barcode.type).toBe('CODE_128')
     expect(buildLoyaltyObject(design({ barcodeFormat: 'PDF417' }), gctx).barcode.type).toBe('PDF_417')
+  })
+
+  it('drops the class locations when the master switch is off', () => {
+    const geo: GeoLocation[] = [
+      {
+        id: 'g0',
+        label: 'Laden',
+        latitude: 52,
+        longitude: 13,
+        maxDistance: 100,
+        relevantText: 'Da bist du ja',
+      },
+    ]
+    expect(buildLoyaltyClass(design({ geoLocations: geo }), gctx).locations).toHaveLength(1)
+    expect(
+      buildLoyaltyClass(design({ geoLocations: geo, geoNotificationsEnabled: false }), gctx).locations,
+    ).toBeUndefined()
   })
 
   it('reflects the shareable flag', () => {

@@ -37,6 +37,7 @@ const FILLED_DESIGN: CardDesignInput = {
   googleAccountNameEnabled: true,
   googleRewardsTierEnabled: true,
   barcodeFormat: 'CODE128',
+  geoNotificationsEnabled: false,
   shareable: false,
 }
 

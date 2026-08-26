@@ -5,7 +5,7 @@ import { Field, Label } from '@/components/ui/label'
 import { PanelSection } from '@/components/ui/misc'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { GeoLocationsEditor } from '../geo-locations-editor'
+import { defaultGeoLocation, GeoLocationsEditor } from '../geo-locations-editor'
 import { PlatformSupportBadge } from '../platform-support-badge'
 import { BARCODE_FORMATS, type BarcodeFormat } from '@/lib/cards/schema'
 import type { CustomerSummary } from '@/types/customer'
@@ -23,6 +23,21 @@ export function AdvancedTab({ customer }: { customer: CustomerSummary }) {
   const patch = useCardEditor((s) => s.patch)
 
   const expiresValue = design.expiresAt ? toDateInputValue(design.expiresAt) : ''
+
+  /**
+   * Der Hauptschalter für die Standort-Benachrichtigung.
+   *
+   * Einschalten ohne Standort wäre ein Schalter, der „an" sagt und nichts tut — deshalb
+   * zieht er beim ersten Mal den Standort des Betriebs herein. Ausschalten löscht nichts:
+   * die Standorte bleiben stehen und wandern nur in keinen Pass mehr.
+   */
+  const toggleGeoNotifications = (enabled: boolean) => {
+    if (enabled && design.geoLocations.length === 0) {
+      patch({ geoNotificationsEnabled: true, geoLocations: [defaultGeoLocation(customer)] })
+      return
+    }
+    patch({ geoNotificationsEnabled: enabled })
+  }
 
   return (
     <div>
@@ -52,9 +67,30 @@ export function AdvancedTab({ customer }: { customer: CustomerSummary }) {
       <PanelSection
         title="Standort-Benachrichtigung"
         description="Karte erscheint am Sperrbildschirm, wenn der Kunde in der Nähe ist."
-        action={<PlatformSupportBadge field="geoLocations" />}
+        action={
+          <div className="flex shrink-0 items-center gap-2">
+            <PlatformSupportBadge field="geoLocations" />
+            <Switch
+              id="geo-notifications"
+              aria-label="Standort-Benachrichtigung"
+              checked={design.geoNotificationsEnabled}
+              onCheckedChange={toggleGeoNotifications}
+            />
+          </div>
+        }
       >
-        <GeoLocationsEditor customer={customer} />
+        {design.geoNotificationsEnabled ? (
+          <GeoLocationsEditor customer={customer} />
+        ) : (
+          <p className="rounded-lg border border-dashed border-line px-3 py-6 text-center text-[12px] text-ink-3">
+            Aus. Kunden in der Nähe bekommen die Karte nicht auf den Sperrbildschirm.
+            {design.geoLocations.length > 0
+              ? ` ${design.geoLocations.length} hinterlegte${
+                  design.geoLocations.length === 1 ? 'r Standort bleibt' : ' Standorte bleiben'
+                } gespeichert.`
+              : ''}
+          </p>
+        )}
       </PanelSection>
 
       <PanelSection title="Gültigkeit">

@@ -133,6 +133,43 @@ describe('the long editor page', () => {
 })
 
 /**
+ * Der Hauptschalter der Standort-Benachrichtigung.
+ *
+ * Ohne ihn war „aus" gleichbedeutend mit „alle Standorte löschen" — wer die Karte im
+ * Winter nicht am Sperrbildschirm haben wollte, musste im Frühjahr jede Koordinate neu
+ * eintippen. Der Schalter trennt beides.
+ */
+describe('die Standort-Benachrichtigung', () => {
+  const openAdvanced = () => {
+    render(<Editor kind="STAMP" />)
+    fireEvent.click(screen.getByRole('button', { name: /Erweitert/ }))
+    return screen.getByRole('switch', { name: 'Standort-Benachrichtigung' })
+  }
+
+  it('blendet den Standort-Editor aus, wenn sie abgeschaltet wird', () => {
+    const toggle = openAdvanced()
+    expect(screen.getByRole('button', { name: /Standort/ })).toBeTruthy()
+
+    fireEvent.click(toggle)
+
+    expect(screen.queryByRole('button', { name: /Standort hinzufügen/ })).toBeNull()
+    expect(screen.getByText(/Kunden in der Nähe bekommen die Karte nicht/)).toBeTruthy()
+  })
+
+  it('legt beim Einschalten den ersten Standort an, statt „an" zu sagen und nichts zu tun', () => {
+    const toggle = openAdvanced()
+    expect(screen.queryAllByLabelText('Bezeichnung des Standorts')).toHaveLength(0)
+
+    fireEvent.click(toggle)
+    fireEvent.click(toggle)
+
+    const labels = screen.getAllByLabelText('Bezeichnung des Standorts')
+    expect(labels).toHaveLength(1)
+    expect((labels[0] as HTMLInputElement).value).toBe('Café Nord')
+  })
+})
+
+/**
  * The template picker lost its place in the header. It overwrites colours, symbol and texts
  * at once, so it sits under Erweitert now — reachable, but not next to the fields it would
  * overwrite, and only where a template means anything.

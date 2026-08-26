@@ -320,6 +320,14 @@ model CardDesign {
 
   // --- advanced
   barcodeFormat String    @default("QR")
+  /// Hauptschalter für die Standort-Benachrichtigung. Aus heißt: die Standorte bleiben
+  /// stehen, wandern aber in keinen Pass — sonst wäre Abschalten dasselbe wie Löschen und
+  /// jedes erneute Einschalten müsste alle Koordinaten neu eintippen.
+  ///
+  /// Standard `true`, damit bestehende Karten, die Standorte hinterlegt haben, nach dem
+  /// Hinzufügen der Spalte weiterhin benachrichtigen. Ohne Standort tut die Einstellung
+  /// ohnehin nichts.
+  geoNotificationsEnabled Boolean @default(true)
   /// GeoLocation[] — max. 10 entries (PassKit limit)
   geoLocations  Json      @default("[]")
   expiresAt     DateTime?

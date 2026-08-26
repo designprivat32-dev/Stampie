@@ -6,9 +6,25 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { newFieldId } from '@/lib/cards/defaults'
-import { MAX_GEO_LOCATIONS } from '@/lib/cards/schema'
+import { MAX_GEO_LOCATIONS, type GeoLocation } from '@/lib/cards/schema'
 import type { CustomerSummary } from '@/types/customer'
 import { useCardEditor } from '@/stores/card-editor-provider'
+
+/**
+ * The location a card gets when someone switches the alert on or presses "hinzufügen":
+ * the shop itself. Berlin's centre only stands in where the master data has no
+ * coordinates — a wrong pin the shop can drag beats an empty form it has to fill in.
+ */
+export function defaultGeoLocation(customer: CustomerSummary): GeoLocation {
+  return {
+    id: newFieldId(),
+    label: customer.name,
+    latitude: customer.latitude ?? 52.520008,
+    longitude: customer.longitude ?? 13.404954,
+    maxDistance: 150,
+    relevantText: 'Deine Stempelkarte ist bereit',
+  }
+}
 
 /**
  * Geo notifications. Apple allows at most 10 locations per pass, so the add button is
@@ -131,16 +147,7 @@ export function GeoLocationsEditor({ customer }: { customer: CustomerSummary }) 
           variant="outline"
           size="sm"
           disabled={atLimit}
-          onClick={() =>
-            addGeoLocation({
-              id: newFieldId(),
-              label: customer.name,
-              latitude: customer.latitude ?? 52.520008,
-              longitude: customer.longitude ?? 13.404954,
-              maxDistance: 150,
-              relevantText: 'Deine Stempelkarte ist bereit',
-            })
-          }
+          onClick={() => addGeoLocation(defaultGeoLocation(customer))}
         >
           <Plus />
           {hasCoordinates ? 'Standort des Betriebs übernehmen' : 'Standort hinzufügen'}

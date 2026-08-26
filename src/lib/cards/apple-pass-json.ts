@@ -1,8 +1,8 @@
 import { toPassKitRgb } from '@/lib/color/convert'
 import { resolveIssuerName } from './issuer'
 import {
+  activeGeoLocations,
   MAX_AUXILIARY_FIELDS,
-  MAX_GEO_LOCATIONS,
   MAX_HEADER_FIELDS,
   MAX_SECONDARY_FIELDS,
   type BarcodeFormat,
@@ -255,8 +255,9 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
     pass.logoText = design.cardTitle.trim()
   }
 
-  if (design.geoLocations.length > 0) {
-    pass.locations = design.geoLocations.slice(0, MAX_GEO_LOCATIONS).map((l) => ({
+  const locations = activeGeoLocations(design)
+  if (locations.length > 0) {
+    pass.locations = locations.map((l) => ({
       latitude: l.latitude,
       longitude: l.longitude,
       relevantText: l.relevantText || undefined,

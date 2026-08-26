@@ -1,6 +1,6 @@
 import { toGoogleHex } from '@/lib/color/convert'
 import { resolveIssuerName } from './issuer'
-import type { CardDesignInput } from './schema'
+import { activeGeoLocations, type CardDesignInput } from './schema'
 
 /**
  * CardDesign -> Google Wallet LoyaltyClass / LoyaltyObject.
@@ -150,8 +150,9 @@ export function buildLoyaltyClass(design: CardDesignInput, ctx: BuildGoogleConte
   if (ctx.heroUrl) cls.heroImage = image(ctx.heroUrl, 'Stempelkarte')
   if (textModules.length > 0) cls.textModulesData = textModules
   if (links.length > 0) cls.linksModuleData = { uris: links }
-  if (design.geoLocations.length > 0) {
-    cls.locations = design.geoLocations.map((l) => ({ latitude: l.latitude, longitude: l.longitude }))
+  const geoLocations = activeGeoLocations(design)
+  if (geoLocations.length > 0) {
+    cls.locations = geoLocations.map((l) => ({ latitude: l.latitude, longitude: l.longitude }))
   }
 
   // Google Wallet optional labels
