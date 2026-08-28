@@ -29,6 +29,37 @@ interface Cred {
   password: string
 }
 
+/** Kleiner Kopier-Button: legt den Wert in die Zwischenablage und zeigt kurz „Kopiert". */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [done, setDone] = React.useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      // Fallback für ältere Browser
+      const ta = document.createElement('textarea')
+      ta.value = value
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        document.execCommand('copy')
+      } catch {
+        /* ignore */
+      }
+      document.body.removeChild(ta)
+    }
+    setDone(true)
+    setTimeout(() => setDone(false), 1500)
+  }
+  return (
+    <Button variant="ghost" size="sm" aria-label={`${label} kopieren`} onClick={() => void copy()}>
+      {done ? '✓ Kopiert' : 'Kopieren'}
+    </Button>
+  )
+}
+
 /**
  * Manage the app logins of one business: list them, add another (multiple staff), or reset
  * a password. Passwords are only ever shown once, right after they are generated.
@@ -100,15 +131,34 @@ export function LoginsDialog({
             <p className="text-[12px] text-ink-2">Bitte notieren und der Firma geben:</p>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[12px] text-ink-3">Benutzername</span>
-              <code className="text-[13px] font-medium text-ink">{cred.username}</code>
+              <div className="flex items-center gap-2">
+                <code className="text-[13px] font-medium text-ink">{cred.username}</code>
+                <CopyButton value={cred.username} label="Benutzername" />
+              </div>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[12px] text-ink-3">Passwort</span>
-              <code className="text-[13px] font-medium text-ink">{cred.password}</code>
+              <div className="flex items-center gap-2">
+                <code className="text-[13px] font-medium text-ink">{cred.password}</code>
+                <CopyButton value={cred.password} label="Passwort" />
+              </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setCred(null)}>
-              Ausblenden
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void navigator.clipboard
+                    .writeText(`Benutzername: ${cred.username}\nPasswort: ${cred.password}`)
+                    .catch(() => {})
+                }
+              >
+                Beides kopieren
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCred(null)}>
+                Ausblenden
+              </Button>
+            </div>
           </div>
         ) : null}
 
@@ -127,6 +177,7 @@ export function LoginsDialog({
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <code className="truncate text-[13px] font-medium text-ink">{r.username}</code>
+                  <CopyButton value={r.username} label="Benutzername" />
                   {r.mustChangePassword ? <Badge tone="warn">PW-Änderung offen</Badge> : null}
                 </div>
                 <Button
