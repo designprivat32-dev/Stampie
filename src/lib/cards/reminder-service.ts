@@ -1,142 +1,151 @@
 import 'server-only'
+import type { CardKind } from '@/lib/cards/schema'
 import { prisma } from '@/lib/db'
-import { pushAppleWalletUpdateForCard } from '@/lib/wallet/apple-sync'
-import { sendGoogleWalletMessage } from '@/lib/wallet/google-sync'
+import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
+import { sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
 
 /**
- * Wiederkehrende Karten-Erinnerungen.
+ * Inaktivitäts-Erinnerungen — pro Kunde.
  *
- * Anders als `CardMessage` (Einmal-Versand) bleibt eine `CardReminder` stehen und feuert
- * alle `intervalMinutes` Minuten erneut an alle Kunden, die die Karte im Wallet haben. Der
- * Cron-Lauf ruft `deliverDueReminders()`.
+ * Für jede aktive `CardReminder` (Schwelle in Minuten) sucht der Lauf die Kunden dieser
+ * Karte, die seit der Schwelle nicht mehr da waren (kein Stempel) und die in diesem
+ * Fenster noch nicht erinnert wurden. Nur an die geht die Nachricht. Danach wieder erst
+ * nach der nächsten Schwelle — und ein neuer Besuch setzt den Zähler von selbst zurück,
+ * weil „zuletzt da" dann jünger ist als die Schwelle.
  *
- * Der Versand ist derselbe Weg wie bei manuellen Nachrichten: Apple bekommt die Meldung
- * über ein geändertes Feld auf der Karte, Google über eine `TEXT_AND_NOTIFY`-Nachricht an
- * die Klasse. Beides „best effort" — ein hängendes Telefon darf den Lauf nicht stoppen.
+ * „Zuletzt da" kommt aus `StampEvent` — der Stempel-Code bleibt unangetastet. Der Versand
+ * nutzt den Einzel-Pass-Weg der Gruppen-Nachrichten: Text aufs Pass-Feld schreiben, dann
+ * Apple/Google an genau diese Pässe.
  */
 
 const MINUTE_MS = 60 * 1000
 
-/**
- * Apple zeigt eine Benachrichtigung nur, wenn sich der Feldwert *ändert*. Eine Erinnerung
- * mit jede Runde identischem Text würde ab dem zweiten Mal stumm bleiben. Deshalb hängen
- * wir eine wachsende, unsichtbare Markierung (Zero-Width Space) an den Apple-Text — für
- * den Kunden unsichtbar, für iOS eine echte Änderung.
- */
+/** Unsichtbares Zeichen (Zero-Width Space): erzwingt bei Apple eine Feldänderung. */
 const ZWSP = '​'
-function appleBodyFor(body: string, sentCount: number): string {
-  return body + ZWSP.repeat((sentCount % 6) + 1)
-}
-
-export interface ReminderDeliveryResult {
-  delivered: boolean
-  appleDevices: number
-  appleFailed: number
-  googleStatus: string
-}
 
 export interface ReminderRunResult {
-  due: number
+  reminders: number
   sent: number
   errors: number
 }
 
-export async function deliverDueReminders(now: Date = new Date()): Promise<ReminderRunResult> {
-  const due = await prisma.cardReminder.findMany({
-    where: { enabled: true, nextSendAt: { lte: now } },
-    select: { id: true },
-    take: 500,
-  })
-
-  let sent = 0
-  let errors = 0
-  for (const row of due) {
-    const result = await deliverOneReminder(row.id, now)
-    if (result.delivered) sent++
-    else errors++
-  }
-  return { due: due.length, sent, errors }
+interface ReminderRow {
+  id: string
+  cardId: string
+  headline: string | null
+  body: string
+  intervalMinutes: number
+  card: { kind: CardKind }
 }
 
-/**
- * Verschickt eine einzelne Erinnerung.
- *
- * `advanceSchedule` (Standard: true) stellt `nextSendAt` um ein Intervall weiter — auch bei
- * Teil-Fehlern, sonst stünde die Erinnerung beim nächsten Lauf sofort wieder als „fällig"
- * da. Beim Test-Versand (`advanceSchedule: false`) bleibt der Zeitplan stehen, `sentCount`
- * wächst aber trotzdem (sonst würde Apple die nächste echte Runde mit gleichem Feldwert
- * verschlucken).
- */
-export async function deliverOneReminder(
-  reminderId: string,
-  now: Date = new Date(),
-  opts: { advanceSchedule?: boolean } = {},
-): Promise<ReminderDeliveryResult> {
-  const advanceSchedule = opts.advanceSchedule !== false
-
-  const reminder = await prisma.cardReminder.findFirst({
-    where: { id: reminderId },
+export async function deliverDueReminders(now: Date = new Date()): Promise<ReminderRunResult> {
+  const reminders = await prisma.cardReminder.findMany({
+    where: { enabled: true },
     select: {
       id: true,
       cardId: true,
       headline: true,
       body: true,
       intervalMinutes: true,
-      sentCount: true,
-      enabled: true,
       card: { select: { kind: true } },
     },
   })
-  if (!reminder || !reminder.enabled) {
-    return { delivered: false, appleDevices: 0, appleFailed: 0, googleStatus: 'skipped' }
+
+  let sent = 0
+  let errors = 0
+  for (const reminder of reminders) {
+    try {
+      sent += await deliverReminderToDueCustomers(reminder, now)
+    } catch {
+      errors++
+    }
+  }
+  return { reminders: reminders.length, sent, errors }
+}
+
+async function deliverReminderToDueCustomers(reminder: ReminderRow, now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - reminder.intervalMinutes * MINUTE_MS)
+
+  // Echte Kunden-Pässe dieser Karte — Testkarten bleiben außen vor.
+  const passes = await prisma.issuedPass.findMany({
+    where: { cardId: reminder.cardId, isTest: false, kind: 'STAMP' },
+    select: { id: true, serial: true, createdAt: true },
+  })
+  if (passes.length === 0) return 0
+  const passIds = passes.map((p) => p.id)
+
+  // Letzter Besuch je Pass = jüngstes STAMP-Event. Fehlt eins, gilt die Ausgabe (createdAt).
+  const lastEvents = await prisma.stampEvent.groupBy({
+    by: ['passId'],
+    where: { passId: { in: passIds }, kind: 'STAMP' },
+    _max: { createdAt: true },
+  })
+  const lastVisit = new Map<string, Date>()
+  for (const e of lastEvents) {
+    if (e._max.createdAt) lastVisit.set(e.passId, e._max.createdAt)
   }
 
-  let hadError = false
-  let appleDevices = 0
-  let appleFailed = 0
-  let googleStatus = 'skipped'
+  // Letzte Erinnerung + bisheriger Zähler je Pass, für GENAU diese Erinnerung.
+  const deliveries = await prisma.cardReminderDelivery.findMany({
+    where: { reminderId: reminder.id, passId: { in: passIds } },
+    select: { passId: true, sentAt: true, count: true },
+  })
+  const lastReminder = new Map<string, Date>()
+  const priorCount = new Map<string, number>()
+  for (const d of deliveries) {
+    lastReminder.set(d.passId, d.sentAt)
+    priorCount.set(d.passId, d.count)
+  }
 
-  // Apple: Text (mit unsichtbarer Variation) aufs Kartenfeld schreiben und pushen.
+  // Ziel: lange genug weg UND nicht erst in diesem Fenster erinnert.
+  const targets = passes.filter((p) => {
+    const visited = lastVisit.get(p.id) ?? p.createdAt
+    if (visited > cutoff) return false
+    const reminded = lastReminder.get(p.id)
+    if (reminded && reminded > cutoff) return false
+    return true
+  })
+  if (targets.length === 0) return 0
+
+  // Pro Pass: Text (mit wachsender unsichtbarer Variation) aufs Pass-Feld schreiben und den
+  // Erinnerungs-Datensatz hochzählen — alles in einer Transaktion.
+  const ops = targets.flatMap((t) => {
+    const n = ((priorCount.get(t.id) ?? 0) % 6) + 1
+    return [
+      prisma.issuedPass.update({
+        where: { id: t.id },
+        data: { activeMessage: reminder.body + ZWSP.repeat(n), activeMessageAt: now },
+      }),
+      prisma.cardReminderDelivery.upsert({
+        where: { reminderId_passId: { reminderId: reminder.id, passId: t.id } },
+        update: { sentAt: now, count: { increment: 1 } },
+        create: { reminderId: reminder.id, passId: t.id, sentAt: now, count: 1 },
+      }),
+    ]
+  })
+  await prisma.$transaction(ops)
+
+  // Nur bei genau diesen Pässen anklopfen (Apple) bzw. Nachricht senden (Google).
+  const serials = targets.map((t) => t.serial)
   try {
-    await prisma.card.update({
-      where: { id: reminder.cardId },
-      data: {
-        activeMessage: appleBodyFor(reminder.body, reminder.sentCount),
-        activeMessageAt: now,
-      },
-    })
-    const push = await pushAppleWalletUpdateForCard(reminder.cardId)
-    appleDevices = push.devices
-    appleFailed = push.failed
-    if (push.failed > 0) hadError = true
+    await pushAppleWalletUpdateForPasses(serials)
   } catch {
-    hadError = true
+    /* best effort */
   }
-
-  // Google: eine Nachricht an die Klasse erreicht alle Kartenbesitzer.
   try {
-    const google = await sendGoogleWalletMessage(
-      reminder.cardId,
+    await sendGoogleWalletMessageToPasses(
+      serials,
       { headline: reminder.headline, body: reminder.body },
       reminder.card.kind,
     )
-    googleStatus = google.status
-    if (google.status === 'error') hadError = true
   } catch {
-    hadError = true
-    googleStatus = 'error'
+    /* best effort */
   }
 
   await prisma.cardReminder.update({
     where: { id: reminder.id },
-    data: {
-      lastSentAt: now,
-      sentCount: { increment: 1 },
-      ...(advanceSchedule
-        ? { nextSendAt: new Date(now.getTime() + reminder.intervalMinutes * MINUTE_MS) }
-        : {}),
-    },
+    data: { lastSentAt: now, sentCount: { increment: targets.length } },
   })
 
-  return { delivered: !hadError, appleDevices, appleFailed, googleStatus }
+  return targets.length
 }

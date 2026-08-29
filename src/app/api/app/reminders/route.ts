@@ -45,9 +45,6 @@ interface ReminderDTO {
   body: string
   intervalMinutes: number
   enabled: boolean
-  nextSendAt: string
-  lastSentAt: string | null
-  sentCount: number
 }
 
 /** Alle Erinnerungen der Karten dieses Betriebs. */
@@ -65,9 +62,6 @@ export async function GET(request: Request): Promise<Response> {
       body: true,
       intervalMinutes: true,
       enabled: true,
-      nextSendAt: true,
-      lastSentAt: true,
-      sentCount: true,
       card: { select: { name: true } },
     },
   })
@@ -80,9 +74,6 @@ export async function GET(request: Request): Promise<Response> {
     body: r.body,
     intervalMinutes: r.intervalMinutes,
     enabled: r.enabled,
-    nextSendAt: r.nextSendAt.toISOString(),
-    lastSentAt: r.lastSentAt?.toISOString() ?? null,
-    sentCount: r.sentCount,
   }))
 
   return NextResponse.json({ reminders })

@@ -230,13 +230,18 @@ model CardMessage {
   @@index([cardId, createdAt])
 }
 
-/// Wiederkehrende Erinnerung: alle `intervalMinutes` Minuten geht dieselbe Nachricht an
-/// alle Kunden, die diese Karte im Wallet haben (z. B. „Zeit für einen neuen Haarschnitt").
+/// Wiederkehrende Inaktivitäts-Erinnerung — pro Kunde, nicht an alle.
 ///
-/// Der Betrieb legt sie in der App an. Der Cron-Lauf verschickt jede fällige Erinnerung und
-/// setzt `nextSendAt` um `intervalMinutes` weiter. Im Gegensatz zu `CardMessage`
-/// (Einmal-Versand) bleibt eine Erinnerung stehen und feuert wieder. Wie *oft* real
-/// verschickt wird, hängt daran, wie oft der Cron-Endpunkt aufgerufen wird.
+/// Steht z. B. auf 20 Tage, geht die Nachricht *nur* an Kunden dieser Karte, die seit 20
+/// Tagen nicht mehr da waren (kein Stempel), und danach alle 20 Tage erneut, solange sie
+/// wegbleiben. Kommt ein Kunde wieder (neuer Stempel), startet sein Zähler von vorn.
+///
+/// „Zuletzt da" wird aus der Stempel-Historie (`StampEvent`) gelesen — der Stempel-Code
+/// selbst bleibt unangetastet. „Zuletzt erinnert" steht pro Kunde in `CardReminderDelivery`.
+/// Der Versand nutzt denselben Einzel-Pass-Weg wie die Gruppen-Nachrichten
+/// (`IssuedPass.activeMessage` + Push/Google an einzelne Pässe).
+///
+/// Wie *oft* geprüft wird, hängt daran, wie oft der Cron-Endpunkt aufgerufen wird.
 model CardReminder {
   id     String @id @default(cuid())
   cardId String
@@ -246,26 +251,47 @@ model CardReminder {
   headline String?
   /// Apple kappt bei 150 Zeichen — dieselbe Grenze wie bei CardMessage.
   body     String
-  /// Abstand zwischen zwei Versänden, in **Minuten**. So sind sowohl reale Werte
-  /// (20 Tage = 28800) als auch Testwerte (5 Minuten, 1 Stunde = 60) möglich. Die App
-  /// zeigt Minuten/Stunden/Tage an und rechnet um.
+  /// Inaktivitäts-Schwelle in **Minuten**: „so lange nicht da". Reale Werte (20 Tage =
+  /// 28800) wie Testwerte (5 Minuten, 1 Stunde = 60). Die App rechnet Minuten/Stunden/Tage um.
   intervalMinutes Int
 
   /// Aus lässt die Erinnerung liegen, ohne sie zu löschen.
   enabled Boolean @default(true)
 
-  /// Wann der nächste Versand fällig ist. Der Lauf sucht genau danach.
+  /// Nur Buchhaltung: wann der Lauf sie zuletzt geprüft/verschickt hat und wie viele
+  /// Einzel-Sendungen insgesamt rausgingen. (`nextSendAt` bleibt aus Kompatibilität, wird
+  /// vom Pro-Kunde-Lauf aber nicht mehr als globale Fälligkeit gebraucht.)
   nextSendAt DateTime
   lastSentAt DateTime?
-  /// Wie oft schon verschickt — nebenbei der Zähler für die unsichtbare Apple-Variation,
-  /// damit iOS jede Runde als Änderung erkennt und wirklich benachrichtigt.
-  sentCount Int @default(0)
+  sentCount  Int       @default(0)
 
   createdAt DateTime @default(now())
   createdBy String
 
-  @@index([enabled, nextSendAt])
+  deliveries CardReminderDelivery[]
+
+  @@index([enabled])
   @@index([cardId])
+}
+
+/// Ein Versand einer Erinnerung an *einen* Kunden (Pass). Merkt sich, wann dieser Kunde
+/// zuletzt erinnert wurde, damit er nicht öfter als alle `intervalMinutes` angeschrieben
+/// wird — und damit ein neuer Besuch den Zähler sauber zurücksetzt.
+model CardReminderDelivery {
+  id         String       @id @default(cuid())
+  reminderId String
+  reminder   CardReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  passId     String
+  pass       IssuedPass   @relation(fields: [passId], references: [id], onDelete: Cascade)
+
+  sentAt DateTime @default(now())
+  /// Wie oft dieser Kunde von dieser Erinnerung schon angeschrieben wurde — treibt die
+  /// unsichtbare Apple-Variation, damit iOS jede Runde eine Meldung zeigt.
+  count  Int      @default(1)
+
+  @@unique([reminderId, passId])
+  @@index([reminderId, sentAt])
+  @@index([passId])
 }
 
 // ---------------------------------------------------------------- assets
@@ -495,6 +521,7 @@ model IssuedPass {
 
   events             StampEvent[]
   appleRegistrations AppleDeviceRegistration[]
+  reminderDeliveries CardReminderDelivery[]
 
   @@index([cardId, isTest])
   @@index([claimToken])
