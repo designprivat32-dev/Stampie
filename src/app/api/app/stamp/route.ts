@@ -10,6 +10,8 @@ import {
 } from '@/lib/cards/stamping'
 import { rateLimit } from '@/lib/rate-limit'
 import { pushAppleWalletUpdate } from '@/lib/wallet/apple-sync'
+import { syncGoogleStampCount } from '@/lib/wallet/google-sync'
+import { loadPublishedDesign } from '@/lib/cards/repository'
 
 export const runtime = 'nodejs'
 
@@ -153,8 +155,13 @@ export async function POST(request: Request): Promise<Response> {
   })
 
   // Best-effort: the stamp is booked and audited, so a phone that is off must not turn a
-  // successful scan into an error at the till.
-  await pushAppleWalletUpdate(serial)
+  // successful scan into an error at the till. Beide Wallets aktualisieren — sonst zählt der
+  // Google-Wallet-Pass des Kunden beim Stempeln über die App nicht hoch (Apple schon).
+  const design = await loadPublishedDesign(pass.cardId)
+  await Promise.all([
+    pushAppleWalletUpdate(serial),
+    design ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, design) : Promise.resolve(),
+  ])
 
   return NextResponse.json({
     ok: true,
