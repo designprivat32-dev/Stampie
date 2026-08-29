@@ -25,6 +25,7 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       stamps: true,
       kind: true,
       cardId: true,
+      activeMessage: true,
       card: {
         select: { name: true, activeMessage: true, org: { select: { name: true } } },
       },
@@ -48,7 +49,13 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       currentStamps: pass.stamps,
       assets,
       appleAuthToken,
-      message: pass.card.activeMessage,
+      /*
+       * Die Nachricht des Passes hat Vorrang: sie ist die an eine Gruppe, die der Karte
+       * die an alle. Wer zuletzt einzeln angeschrieben wurde, soll nicht plötzlich wieder
+       * den alten Rundruf sehen. Ein Versand an alle räumt die Pass-Nachrichten ab, damit
+       * dieser Vorrang nicht zur Sackgasse wird.
+       */
+      message: pass.activeMessage ?? pass.card.activeMessage,
     },
     pass.serial,
   )

@@ -1,7 +1,14 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { pushAppleWalletUpdateForCard } from '@/lib/wallet/apple-sync'
-import { sendGoogleWalletMessage } from '@/lib/wallet/google-sync'
+import { pushAppleWalletUpdateForCard, pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
+import { sendGoogleWalletMessage, sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
+import {
+  matchesSegment,
+  MESSAGE_SEGMENT_LABELS,
+  parseMessageSegment,
+  type MessageSegment,
+} from './message-segments'
+import type { CardKind } from './schema'
 
 /**
  * Delivering a shop's message to everyone holding one of its cards.
@@ -23,6 +30,8 @@ export const MESSAGE_MAX_LENGTH = 150
 export interface MessageDeliveryResult {
   appleDevices: number
   googleSynced: boolean
+  /** Wie viele ausgegebene Karten die Gruppe umfasste — 0 heißt: niemand passte darauf. */
+  recipients: number
   error: string | null
 }
 
@@ -34,11 +43,49 @@ export async function deliverCardMessage(messageId: string): Promise<MessageDeli
       cardId: true,
       headline: true,
       body: true,
+      segment: true,
       card: { select: { kind: true, activeMessage: true } },
     },
   })
-  if (!message) return { appleDevices: 0, googleSynced: false, error: 'Nachricht nicht gefunden.' }
+  if (!message) {
+    return { appleDevices: 0, googleSynced: false, recipients: 0, error: 'Nachricht nicht gefunden.' }
+  }
 
+  const segment = parseMessageSegment(message.segment)
+  const result =
+    segment === 'ALL'
+      ? await deliverToEveryone(message)
+      : await deliverToSegment(message, segment)
+
+  // Written even when something failed: a half-delivered message must not be sent again by
+  // the next run, or the shops that did receive it get it twice.
+  await prisma.cardMessage.update({
+    where: { id: message.id },
+    data: {
+      sentAt: new Date(),
+      appleDevices: result.appleDevices,
+      googleSynced: result.googleSynced,
+      recipients: result.recipients,
+      error: result.error,
+    },
+  })
+
+  return result
+}
+
+interface PendingMessage {
+  id: string
+  cardId: string
+  headline: string | null
+  body: string
+  card: { kind: CardKind; activeMessage: string | null }
+}
+
+/**
+ * Der Weg, den es immer schon gab: die Nachricht hängt an der Karte und erreicht damit
+ * jeden, der sie hält.
+ */
+async function deliverToEveryone(message: PendingMessage): Promise<MessageDeliveryResult> {
   const problems: string[] = []
 
   /*
@@ -56,6 +103,17 @@ export async function deliverCardMessage(messageId: string): Promise<MessageDeli
       where: { id: message.cardId },
       data: { activeMessage: message.body, activeMessageAt: new Date() },
     })
+    /*
+     * Ältere Gruppennachrichten abräumen.
+     *
+     * Der Pass hat Vorrang vor der Karte. Ohne dieses Aufräumen würde ausgerechnet die
+     * Gruppe, die zuletzt einzeln angeschrieben wurde, die Nachricht an alle nicht sehen —
+     * ihr Pass zeigt weiter den alten Text.
+     */
+    await prisma.issuedPass.updateMany({
+      where: { cardId: message.cardId, activeMessage: { not: null } },
+      data: { activeMessage: null, activeMessageAt: null },
+    })
     // Marks the passes as changed and knocks on every registered phone; each one then
     // fetches a pass whose message field carries the new text.
     const push = await pushAppleWalletUpdateForCard(message.cardId)
@@ -70,25 +128,85 @@ export async function deliverCardMessage(messageId: string): Promise<MessageDeli
   )
   if (google.status === 'error') problems.push(`Google: ${google.message}`)
 
-  const result: MessageDeliveryResult = {
-    appleDevices,
-    googleSynced: google.status === 'updated',
-    error: problems.length > 0 ? problems.join(' ') : null,
-  }
-
-  // Written even when something failed: a half-delivered message must not be sent again by
-  // the next run, or the shops that did receive it get it twice.
-  await prisma.cardMessage.update({
-    where: { id: message.id },
-    data: {
-      sentAt: new Date(),
-      appleDevices: result.appleDevices,
-      googleSynced: result.googleSynced,
-      error: result.error,
-    },
+  const recipients = await prisma.issuedPass.count({
+    where: { cardId: message.cardId, isTest: false },
   })
 
-  return result
+  return {
+    appleDevices,
+    googleSynced: google.status === 'updated',
+    recipients,
+    error: problems.length > 0 ? problems.join(' ') : null,
+  }
+}
+
+/**
+ * Der Weg für eine Gruppe: die Nachricht hängt am einzelnen Pass.
+ *
+ * Apple kennt keinen freien Push — eine Meldung entsteht, weil sich ein Feld ändert.
+ * Deshalb wird der Text auf genau die betroffenen Pässe geschrieben und auch nur dort
+ * angeklopft. Google bekommt die Meldung aufs Objekt statt auf die Klasse, aus demselben
+ * Grund.
+ */
+async function deliverToSegment(
+  message: PendingMessage,
+  segment: MessageSegment,
+): Promise<MessageDeliveryResult> {
+  const passes = await prisma.issuedPass.findMany({
+    // Testkarten bleiben außen vor, wie überall: sie sind Werkzeug, kein Kunde.
+    where: { cardId: message.cardId, isTest: false, kind: 'STAMP' },
+    select: { id: true, serial: true, stamps: true, stampGoal: true, activeMessage: true },
+  })
+  const targets = passes.filter((pass) => matchesSegment(pass, segment))
+
+  if (targets.length === 0) {
+    return {
+      appleDevices: 0,
+      googleSynced: false,
+      recipients: 0,
+      error: `Niemand in dieser Gruppe: „${MESSAGE_SEGMENT_LABELS[segment]}" trifft aktuell auf keine ausgegebene Karte zu.`,
+    }
+  }
+
+  const problems: string[] = []
+  const body = message.body.trim()
+
+  /*
+   * Wieder Apples Regel: gleicher Feldwert, keine Meldung. Was ein Pass gerade zeigt, ist
+   * seine eigene Nachricht — und wenn er keine hat, die der Karte.
+   */
+  const changed = targets.filter(
+    (pass) => (pass.activeMessage ?? message.card.activeMessage)?.trim() !== body,
+  )
+
+  let appleDevices = 0
+  if (changed.length === 0) {
+    problems.push(
+      'Apple: identischer Text wie zuletzt — iPhones zeigen dafür keine Meldung. Bitte umformulieren.',
+    )
+  } else {
+    await prisma.issuedPass.updateMany({
+      where: { id: { in: changed.map((pass) => pass.id) } },
+      data: { activeMessage: message.body, activeMessageAt: new Date() },
+    })
+    const push = await pushAppleWalletUpdateForPasses(changed.map((pass) => pass.serial))
+    appleDevices = push.devices
+    if (push.failed > 0) problems.push(`Apple: ${push.failed} Karten nicht erreicht.`)
+  }
+
+  const google = await sendGoogleWalletMessageToPasses(
+    targets.map((pass) => pass.serial),
+    { headline: message.headline, body: message.body },
+    message.card.kind,
+  )
+  if (google.failed > 0) problems.push(`Google: ${google.failed} Karten nicht erreicht.`)
+
+  return {
+    appleDevices,
+    googleSynced: google.delivered > 0,
+    recipients: targets.length,
+    error: problems.length > 0 ? problems.join(' ') : null,
+  }
 }
 
 /**
