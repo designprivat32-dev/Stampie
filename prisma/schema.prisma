@@ -230,12 +230,13 @@ model CardMessage {
   @@index([cardId, createdAt])
 }
 
-/// Wiederkehrende Erinnerung: alle `intervalDays` Tage geht dieselbe Nachricht an alle
-/// Kunden, die diese Karte im Wallet haben (z. B. „Zeit für einen neuen Haarschnitt").
+/// Wiederkehrende Erinnerung: alle `intervalMinutes` Minuten geht dieselbe Nachricht an
+/// alle Kunden, die diese Karte im Wallet haben (z. B. „Zeit für einen neuen Haarschnitt").
 ///
-/// Der Betrieb legt sie in der App an. Der tägliche Cron-Lauf verschickt jede fällige
-/// Erinnerung und setzt `nextSendAt` um `intervalDays` weiter. Im Gegensatz zu
-/// `CardMessage` (Einmal-Versand) bleibt eine Erinnerung stehen und feuert wieder.
+/// Der Betrieb legt sie in der App an. Der Cron-Lauf verschickt jede fällige Erinnerung und
+/// setzt `nextSendAt` um `intervalMinutes` weiter. Im Gegensatz zu `CardMessage`
+/// (Einmal-Versand) bleibt eine Erinnerung stehen und feuert wieder. Wie *oft* real
+/// verschickt wird, hängt daran, wie oft der Cron-Endpunkt aufgerufen wird.
 model CardReminder {
   id     String @id @default(cuid())
   cardId String
@@ -245,8 +246,10 @@ model CardReminder {
   headline String?
   /// Apple kappt bei 150 Zeichen — dieselbe Grenze wie bei CardMessage.
   body     String
-  /// Abstand zwischen zwei Versänden, in Tagen (1–365).
-  intervalDays Int
+  /// Abstand zwischen zwei Versänden, in **Minuten**. So sind sowohl reale Werte
+  /// (20 Tage = 28800) als auch Testwerte (5 Minuten, 1 Stunde = 60) möglich. Die App
+  /// zeigt Minuten/Stunden/Tage an und rechnet um.
+  intervalMinutes Int
 
   /// Aus lässt die Erinnerung liegen, ohne sie zu löschen.
   enabled Boolean @default(true)

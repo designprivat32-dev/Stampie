@@ -15,7 +15,9 @@ export const runtime = 'nodejs'
  * Absicherung wie überall im App-API: nur Karten des eingeloggten Betriebs.
  */
 
-const DAY_MS = 24 * 60 * 60 * 1000
+const MINUTE_MS = 60 * 1000
+/** 365 Tage in Minuten — Obergrenze. */
+const MAX_INTERVAL_MINUTES = 365 * 24 * 60
 
 const createSchema = z.object({
   cardId: z.string().cuid(),
@@ -28,7 +30,11 @@ const createSchema = z.object({
     .trim()
     .min(1, 'Bitte einen Text eingeben.')
     .max(MESSAGE_MAX_LENGTH, `Höchstens ${MESSAGE_MAX_LENGTH} Zeichen — mehr zeigt iOS nicht.`),
-  intervalDays: z.number().int().min(1, 'Mindestens 1 Tag.').max(365, 'Höchstens 365 Tage.'),
+  intervalMinutes: z
+    .number()
+    .int()
+    .min(1, 'Mindestens 1 Minute.')
+    .max(MAX_INTERVAL_MINUTES, 'Höchstens 365 Tage.'),
 })
 
 interface ReminderDTO {
@@ -37,7 +43,7 @@ interface ReminderDTO {
   cardName: string
   headline: string | null
   body: string
-  intervalDays: number
+  intervalMinutes: number
   enabled: boolean
   nextSendAt: string
   lastSentAt: string | null
@@ -57,7 +63,7 @@ export async function GET(request: Request): Promise<Response> {
       cardId: true,
       headline: true,
       body: true,
-      intervalDays: true,
+      intervalMinutes: true,
       enabled: true,
       nextSendAt: true,
       lastSentAt: true,
@@ -72,7 +78,7 @@ export async function GET(request: Request): Promise<Response> {
     cardName: r.card.name,
     headline: r.headline,
     body: r.body,
-    intervalDays: r.intervalDays,
+    intervalMinutes: r.intervalMinutes,
     enabled: r.enabled,
     nextSendAt: r.nextSendAt.toISOString(),
     lastSentAt: r.lastSentAt?.toISOString() ?? null,
@@ -112,14 +118,14 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: 'Karte nicht gefunden.', code: 'not_found' }, { status: 404 })
   }
 
-  const nextSendAt = new Date(Date.now() + parsed.data.intervalDays * DAY_MS)
+  const nextSendAt = new Date(Date.now() + parsed.data.intervalMinutes * MINUTE_MS)
 
   const created = await prisma.cardReminder.create({
     data: {
       cardId: parsed.data.cardId,
       headline: parsed.data.headline,
       body: parsed.data.body,
-      intervalDays: parsed.data.intervalDays,
+      intervalMinutes: parsed.data.intervalMinutes,
       nextSendAt,
       createdBy: appUser.userId,
     },

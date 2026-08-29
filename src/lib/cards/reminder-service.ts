@@ -7,7 +7,7 @@ import { sendGoogleWalletMessage } from '@/lib/wallet/google-sync'
  * Wiederkehrende Karten-Erinnerungen.
  *
  * Anders als `CardMessage` (Einmal-Versand) bleibt eine `CardReminder` stehen und feuert
- * alle `intervalDays` Tage erneut an alle Kunden, die die Karte im Wallet haben. Der
+ * alle `intervalMinutes` Minuten erneut an alle Kunden, die die Karte im Wallet haben. Der
  * tägliche Cron-Lauf ruft `deliverDueReminders()`.
  *
  * Der Versand ist derselbe Weg wie bei manuellen Nachrichten: Apple bekommt die Meldung
@@ -15,7 +15,7 @@ import { sendGoogleWalletMessage } from '@/lib/wallet/google-sync'
  * die Klasse. Beides „best effort" — ein hängendes Telefon darf den Lauf nicht stoppen.
  */
 
-const DAY_MS = 24 * 60 * 60 * 1000
+const MINUTE_MS = 60 * 1000
 
 /**
  * Apple zeigt eine Benachrichtigung nur, wenn sich der Feldwert *ändert*. Eine Erinnerung
@@ -68,7 +68,7 @@ export async function deliverOneReminder(
       cardId: true,
       headline: true,
       body: true,
-      intervalDays: true,
+      intervalMinutes: true,
       sentCount: true,
       enabled: true,
       card: { select: { kind: true } },
@@ -110,7 +110,7 @@ export async function deliverOneReminder(
     data: {
       lastSentAt: now,
       sentCount: { increment: 1 },
-      nextSendAt: new Date(now.getTime() + reminder.intervalDays * DAY_MS),
+      nextSendAt: new Date(now.getTime() + reminder.intervalMinutes * MINUTE_MS),
     },
   })
 
