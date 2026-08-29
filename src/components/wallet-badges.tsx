@@ -21,9 +21,18 @@ import { cn } from '@/lib/utils'
 /**
  * Height, not width. Both badges keep their own aspect ratio, which the guidelines also
  * require, so the shared height is what makes them sit level next to each other.
- * Google asks for at least 48dp; this clears that for both.
+ * Google asks for at least 48dp; both sizes clear that.
+ *
+ * `lg` is for the page a customer lands on after scanning the QR at the till: there the
+ * badge is the only thing to do on the page, held at arm's length, often one-handed — so
+ * it gets the thumb-sized target rather than the polite one.
  */
-const BADGE_HEIGHT = 'h-[52px]'
+const BADGE_HEIGHT = {
+  md: 'h-[52px]',
+  lg: 'h-[68px]',
+} as const
+
+export type BadgeSize = keyof typeof BADGE_HEIGHT
 
 function BadgeLink({
   href,
@@ -31,6 +40,7 @@ function BadgeLink({
   alt,
   width,
   height,
+  size = 'md',
   className,
 }: {
   href: string
@@ -38,17 +48,32 @@ function BadgeLink({
   alt: string
   width: number
   height: number
+  size?: BadgeSize
   className?: string
 }) {
   return (
     <a href={href} className={cn('inline-flex', className)} aria-label={alt}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} width={width} height={height} className={cn(BADGE_HEIGHT, 'w-auto')} />
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className={cn(BADGE_HEIGHT[size], 'w-auto')}
+      />
     </a>
   )
 }
 
-export function AppleWalletButton({ href, className }: { href: string; className?: string }) {
+export function AppleWalletButton({
+  href,
+  size,
+  className,
+}: {
+  href: string
+  size?: BadgeSize
+  className?: string
+}) {
   return (
     <BadgeLink
       href={href}
@@ -56,12 +81,21 @@ export function AppleWalletButton({ href, className }: { href: string; className
       alt="Zu Apple Wallet hinzufügen"
       width={110}
       height={35}
+      size={size}
       className={className}
     />
   )
 }
 
-export function GoogleWalletButton({ href, className }: { href: string; className?: string }) {
+export function GoogleWalletButton({
+  href,
+  size,
+  className,
+}: {
+  href: string
+  size?: BadgeSize
+  className?: string
+}) {
   return (
     <BadgeLink
       href={href}
@@ -69,6 +103,7 @@ export function GoogleWalletButton({ href, className }: { href: string; classNam
       alt="Hinzufügen zu Google Wallet"
       width={199}
       height={55}
+      size={size}
       className={className}
     />
   )

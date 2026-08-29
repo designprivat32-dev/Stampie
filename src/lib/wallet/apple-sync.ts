@@ -101,6 +101,49 @@ export async function pushAppleWalletUpdateForCard(cardId: string): Promise<Card
   return summary
 }
 
+/**
+ * Dasselbe für eine ausgewählte Handvoll Pässe statt für die ganze Karte.
+ *
+ * Gebraucht für Nachrichten an eine Gruppe: die Meldung hängt dann am einzelnen Pass, also
+ * darf auch nur bei diesen Pässen angeklopft werden. Ein Push an alle würde die Übrigen
+ * ihre Karte neu laden lassen — unsichtbar, aber Apple zählt es als grundlosen Push.
+ */
+export async function pushAppleWalletUpdateForPasses(serials: string[]): Promise<CardPushSummary> {
+  const empty: CardPushSummary = { passes: 0, devices: 0, failed: 0 }
+  if (serials.length === 0 || !readAppleWalletCredentials()) return empty
+
+  const passes = await prisma.issuedPass.findMany({
+    where: { serial: { in: serials }, appleRegistrations: { some: {} } },
+    select: { serial: true },
+  })
+  if (passes.length === 0) return empty
+
+  // Gleicher Grund wie beim Kartenlauf: das Gerät fragt "was hat sich seit <tag> geändert",
+  // und diese Frage beantwortet `updatedAt`. Ohne das kommt die Liste leer zurück.
+  await prisma.issuedPass.updateMany({
+    where: { serial: { in: passes.map((p) => p.serial) } },
+    data: { updatedAt: new Date() },
+  })
+
+  const summary = { ...empty }
+
+  for (let i = 0; i < passes.length; i += PUSH_BATCH_SIZE) {
+    const batch = passes.slice(i, i + PUSH_BATCH_SIZE)
+    const results = await Promise.all(batch.map((p) => pushAppleWalletUpdate(p.serial)))
+
+    for (const result of results) {
+      if (result.status === 'updated') {
+        summary.passes++
+        summary.devices += result.devices
+      } else if (result.status === 'error') {
+        summary.failed++
+      }
+    }
+  }
+
+  return summary
+}
+
 export async function pushAppleWalletUpdate(serial: string): Promise<AppleSyncResult> {
   const credentials = readAppleWalletCredentials()
   if (!credentials) return { status: 'not_configured' }

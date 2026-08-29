@@ -6,6 +6,12 @@ import { assertCardAccess } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { deliverCardMessage, MESSAGE_MAX_LENGTH } from '@/lib/cards/message-service'
+import {
+  matchesSegment,
+  MESSAGE_SEGMENTS,
+  parseMessageSegment,
+  type MessageSegment,
+} from '@/lib/cards/message-segments'
 
 /**
  * Messages a shop sends to everyone holding one of its cards.
@@ -20,6 +26,9 @@ export interface CardMessageSummary {
   id: string
   headline: string | null
   body: string
+  segment: MessageSegment
+  /** Wie viele Karten die Gruppe beim Versand umfasste. Vor dem Versand 0. */
+  recipients: number
   scheduledFor: string
   sentAt: string | null
   appleDevices: number
@@ -40,12 +49,16 @@ const createInputSchema = z.object({
     .max(MESSAGE_MAX_LENGTH, `Höchstens ${MESSAGE_MAX_LENGTH} Zeichen — mehr zeigt iOS nicht.`),
   /** ISO string, or null for "right now". */
   scheduledFor: z.string().datetime().nullable().default(null),
+  /** An wen. Fehlt sie, geht die Nachricht an alle — das Verhalten von vorher. */
+  segment: z.enum(MESSAGE_SEGMENTS).default('ALL'),
 })
 
 function toSummary(row: {
   id: string
   headline: string | null
   body: string
+  segment: string
+  recipients: number
   scheduledFor: Date
   sentAt: Date | null
   appleDevices: number
@@ -56,6 +69,8 @@ function toSummary(row: {
     id: row.id,
     headline: row.headline,
     body: row.body,
+    segment: parseMessageSegment(row.segment),
+    recipients: row.recipients,
     scheduledFor: row.scheduledFor.toISOString(),
     sentAt: row.sentAt?.toISOString() ?? null,
     appleDevices: row.appleDevices,
@@ -98,6 +113,7 @@ export async function createCardMessageAction(
         cardId: parsed.data.cardId,
         headline: parsed.data.headline,
         body: parsed.data.body,
+        segment: parsed.data.segment,
         scheduledFor,
         createdBy: session.userId,
       },
@@ -113,6 +129,44 @@ export async function createCardMessageAction(
 
     const fresh = await prisma.cardMessage.findFirst({ where: { id: created.id } })
     return ok(toSummary(fresh ?? created))
+  })
+}
+
+/**
+ * Wie viele ausgegebene Karten aktuell in welcher Gruppe stehen.
+ *
+ * Der Dialog zeigt die Zahl neben jeder Gruppe an. Ohne sie wäre "noch 2 Stempel" eine
+ * Wette: niemand weiß, ob dahinter drei Kunden stehen oder dreihundert.
+ *
+ * Gefiltert wird in der Anwendung und nicht in SQL, weil der Vergleich zwei Spalten
+ * gegeneinander stellt (`stamps` gegen `stampGoal` des Passes) — das kann Prisma nicht,
+ * und für die Kartenmenge eines Betriebs ist die Schleife billiger als roher SQL.
+ */
+export async function messageSegmentCountsAction(
+  cardId: string,
+): Promise<ActionResult<Record<MessageSegment, number>>> {
+  return guarded(async () => {
+    const parsed = z.string().cuid().safeParse(cardId)
+    if (!parsed.success) return fail('Ungültige Karten-ID.', 'validation')
+
+    await assertCardAccess(parsed.data)
+
+    const passes = await prisma.issuedPass.findMany({
+      where: { cardId: parsed.data, isTest: false },
+      select: { stamps: true, stampGoal: true, kind: true },
+    })
+
+    const counts = Object.fromEntries(
+      MESSAGE_SEGMENTS.map((segment) => [
+        segment,
+        passes.filter(
+          (pass) =>
+            (segment === 'ALL' || pass.kind === 'STAMP') && matchesSegment(pass, segment),
+        ).length,
+      ]),
+    ) as Record<MessageSegment, number>
+
+    return ok(counts)
   })
 }
 

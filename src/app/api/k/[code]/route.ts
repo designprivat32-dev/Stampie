@@ -2,9 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getPassBuilder } from '@/lib/pass/mock-pass-builder'
 import { rateLimit } from '@/lib/rate-limit'
 import {
-  DEVICE_COOKIE,
-  DEVICE_COOKIE_MAX_AGE,
-  findPassForDevice,
   issuePassForDevice,
   newDeviceKey,
   resolveHandoutCode,
@@ -20,8 +17,9 @@ export const runtime = 'nodejs'
  * stranger's phone at the counter is exactly the caller this is for.
  *
  * The pass row is created here rather than on the landing page, so a tap that the customer
- * dismisses leaves nothing behind. A tap they follow through gets one row, and every later
- * tap from the same phone gets that same row back.
+ * dismisses leaves nothing behind. Nothing is stored on the phone: every scan hands out a
+ * fresh, empty card instead of the previous one, which is what the shop asks for when the
+ * QR is scanned again.
  */
 export async function GET(
   request: NextRequest,
@@ -38,30 +36,23 @@ export async function GET(
     )
   }
 
-  // A phone without the cookie is a first-time visitor; it gets a key for this response so
-  // the very next tap already recognises it.
-  const existingKey = request.cookies.get(DEVICE_COOKIE)?.value
-  const deviceKey = existingKey ?? newDeviceKey()
+  // Every tap mints its own card, so the key is per-pass rather than per-phone: it still
+  // distinguishes real handouts from test passes, it just never identifies a returning
+  // visitor.
+  const deviceKey = newDeviceKey()
 
-  // Handing back a card this phone already holds creates nothing, so it is never rate
-  // limited — otherwise a customer re-tapping their own card (which they will, because
-  // tapping *looks* like how you collect a stamp) eats the shop's allowance.
-  const existing = existingKey ? await findPassForDevice(resolved, deviceKey) : null
-
-  if (!existing) {
-    // Only minting a new pass is capped, and generously: every customer in a café sits
-    // behind the same WiFi address, so a tight per-IP ceiling locks out real people on a
-    // busy afternoon. This is a backstop against a script, not a queue.
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!rateLimit(`handout:${resolved.cardId}:${ip}`, 120, 60 * 60 * 1000).allowed) {
-      return NextResponse.json(
-        { error: 'Zu viele neue Karten von diesem Anschluss. Bitte später erneut versuchen.' },
-        { status: 429 },
-      )
-    }
+  // Minting is capped, and generously: every customer in a café sits behind the same WiFi
+  // address, so a tight per-IP ceiling locks out real people on a busy afternoon. This is a
+  // backstop against a script, not a queue.
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  if (!rateLimit(`handout:${resolved.cardId}:${ip}`, 120, 60 * 60 * 1000).allowed) {
+    return NextResponse.json(
+      { error: 'Zu viele neue Karten von diesem Anschluss. Bitte später erneut versuchen.' },
+      { status: 429 },
+    )
   }
 
-  const { serial, currentStamps } = existing ?? (await issuePassForDevice(resolved, deviceKey))
+  const { serial, currentStamps } = await issuePassForDevice(resolved, deviceKey)
   const design = await toHandoutDesign(resolved, currentStamps, serial)
   const builder = getPassBuilder()
 
@@ -69,16 +60,6 @@ export async function GET(
     platform === 'google'
       ? NextResponse.redirect(await builder.buildGoogleSaveUrl(design, serial), 302)
       : await applePassResponse(await builder.buildApplePass(design, serial), resolved.design.programName)
-
-  if (!existingKey) {
-    response.cookies.set(DEVICE_COOKIE, deviceKey, {
-      maxAge: DEVICE_COOKIE_MAX_AGE,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    })
-  }
 
   return response
 }
