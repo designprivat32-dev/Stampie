@@ -177,7 +177,8 @@ model Card {
   tokens   TestCardToken[]
   assets   Asset[]
 
-  messages CardMessage[]
+  messages  CardMessage[]
+  reminders CardReminder[]
 
   @@index([orgId])
   @@index([nfcCode])
@@ -214,6 +215,41 @@ model CardMessage {
   /// Der Lauf sucht genau danach: fällig und noch nicht raus.
   @@index([sentAt, scheduledFor])
   @@index([cardId, createdAt])
+}
+
+/// Wiederkehrende Erinnerung: alle `intervalDays` Tage geht dieselbe Nachricht an alle
+/// Kunden, die diese Karte im Wallet haben (z. B. „Zeit für einen neuen Haarschnitt").
+///
+/// Der Betrieb legt sie in der App an. Der tägliche Cron-Lauf verschickt jede fällige
+/// Erinnerung und setzt `nextSendAt` um `intervalDays` weiter. Im Gegensatz zu
+/// `CardMessage` (Einmal-Versand) bleibt eine Erinnerung stehen und feuert wieder.
+model CardReminder {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  /// Nur Google zeigt eine Überschrift; bei Apple ist der Text alles.
+  headline String?
+  /// Apple kappt bei 150 Zeichen — dieselbe Grenze wie bei CardMessage.
+  body     String
+  /// Abstand zwischen zwei Versänden, in Tagen (1–365).
+  intervalDays Int
+
+  /// Aus lässt die Erinnerung liegen, ohne sie zu löschen.
+  enabled Boolean @default(true)
+
+  /// Wann der nächste Versand fällig ist. Der Lauf sucht genau danach.
+  nextSendAt DateTime
+  lastSentAt DateTime?
+  /// Wie oft schon verschickt — nebenbei der Zähler für die unsichtbare Apple-Variation,
+  /// damit iOS jede Runde als Änderung erkennt und wirklich benachrichtigt.
+  sentCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  createdBy String
+
+  @@index([enabled, nextSendAt])
+  @@index([cardId])
 }
 
 // ---------------------------------------------------------------- assets
