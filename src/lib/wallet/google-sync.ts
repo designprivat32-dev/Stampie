@@ -218,6 +218,81 @@ export async function syncGoogleStampCount(
 }
 
 /**
+ * Dieselbe Nachricht, aber nur an ausgewählte Pässe.
+ *
+ * Google hängt die Meldung sonst an die Klasse, und die gilt für alle. Für eine Gruppe
+ * muss sie ans einzelne Objekt — dieselbe Route, nur eine Ebene tiefer.
+ *
+ * Ein 404 ist hier der Normalfall und kein Fehler: die meisten Kunden haben die Karte im
+ * Apple Wallet, ein Google-Objekt existiert für sie nie. Gezählt wird deshalb, wen es
+ * wirklich erreicht hat.
+ */
+export async function sendGoogleWalletMessageToPasses(
+  serials: string[],
+  message: { headline: string | null; body: string },
+  kind: CardKind = 'STAMP',
+): Promise<{ delivered: number; failed: number; configured: boolean }> {
+  const credentials = readGoogleWalletCredentials()
+  if (!credentials) return { delivered: 0, failed: 0, configured: false }
+  if (serials.length === 0) return { delivered: 0, failed: 0, configured: true }
+
+  const resource = kind === 'COUPON' ? 'offerObject' : 'loyaltyObject'
+  let accessToken: string
+  try {
+    accessToken = await getAccessToken(credentials.clientEmail, credentials.privateKey)
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(`[google-wallet] token for group message failed: ${messageOf(e)}`)
+    return { delivered: 0, failed: serials.length, configured: true }
+  }
+
+  let delivered = 0
+  let failed = 0
+
+  for (const serial of serials) {
+    const objectId = `${credentials.issuerId}.sn_${serial}`
+    try {
+      const response = await fetch(
+        `${WALLET_API}/${resource}/${encodeURIComponent(objectId)}/addMessage`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: {
+              header: message.headline ?? undefined,
+              body: message.body,
+              messageType: 'TEXT_AND_NOTIFY',
+            },
+          }),
+        },
+      )
+
+      // Kein Google-Objekt zu diesem Pass — der Kunde hat die Karte woanders.
+      if (response.status === 404) continue
+      if (!response.ok) {
+        failed++
+        // eslint-disable-next-line no-console
+        console.error(
+          `[google-wallet] message for ${objectId} failed: ${response.status} ${await response.text()}`,
+        )
+        continue
+      }
+      delivered++
+    } catch (e) {
+      failed++
+      // eslint-disable-next-line no-console
+      console.error(`[google-wallet] message for ${objectId} threw: ${messageOf(e)}`)
+    }
+  }
+
+  return { delivered, failed, configured: true }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown'
+}
+
+/**
  * Sends a message to everyone holding a card of this programme.
  *
  * Google's counterpart to Apple's changed-field trick, and much the better one: the message

@@ -14,12 +14,19 @@ import {
 import { Input, Textarea } from '@/components/ui/input'
 import { Field } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/misc'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   cancelCardMessageAction,
   createCardMessageAction,
   listCardMessagesAction,
+  messageSegmentCountsAction,
   type CardMessageSummary,
 } from '@/actions/messages'
+import {
+  MESSAGE_SEGMENTS,
+  MESSAGE_SEGMENT_LABELS,
+  type MessageSegment,
+} from '@/lib/cards/message-segments'
 
 const MAX = 150
 
@@ -46,6 +53,8 @@ export function MessageDialog({
 }) {
 
   const [messages, setMessages] = React.useState<CardMessageSummary[] | null>(null)
+  const [segment, setSegment] = React.useState<MessageSegment>('ALL')
+  const [counts, setCounts] = React.useState<Record<MessageSegment, number> | null>(null)
   const [headline, setHeadline] = React.useState('')
   const [body, setBody] = React.useState('')
   const [scheduled, setScheduled] = React.useState('')
@@ -53,9 +62,13 @@ export function MessageDialog({
   const [error, setError] = React.useState<string | null>(null)
 
   const load = React.useCallback(async () => {
-    const result = await listCardMessagesAction(cardId)
+    const [result, segmentCounts] = await Promise.all([
+      listCardMessagesAction(cardId),
+      messageSegmentCountsAction(cardId),
+    ])
     if (result.success) setMessages(result.data)
     else setError(result.error.message)
+    if (segmentCounts.success) setCounts(segmentCounts.data)
   }, [cardId])
 
   React.useEffect(() => {
@@ -69,6 +82,7 @@ export function MessageDialog({
     setError(null)
     const result = await createCardMessageAction({
       cardId,
+      segment,
       headline: headline.trim() || null,
       body: body.trim(),
       // A local datetime-local value carries no zone; the browser's own offset is the one
@@ -100,12 +114,36 @@ export function MessageDialog({
         <DialogHeader>
           <DialogTitle>Nachricht an Karteninhaber</DialogTitle>
           <DialogDescription>
-            Erreicht jeden, der diese Karte im Wallet hat. Leer lassen und später planen ist
-            möglich.
+            Geht an alle oder an eine Gruppe nach Stempelstand. Leer lassen und später planen
+            ist möglich.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          {/*
+            Die Gruppe steht oben, nicht unten: sie ändert, an wen der Text geht, und das
+            gehört vor das Schreiben, nicht dahinter.
+          */}
+          <Field
+            label="Empfänger"
+            htmlFor="msg-segment"
+            hint="Gruppen richten sich nach dem Stempelstand. Namen kennt das System nicht."
+          >
+            <Select value={segment} onValueChange={(value) => setSegment(value as MessageSegment)}>
+              <SelectTrigger id="msg-segment">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MESSAGE_SEGMENTS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {MESSAGE_SEGMENT_LABELS[option]}
+                    {counts ? ` (${counts[option]})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
           <Field label="Überschrift" htmlFor="msg-headline" hint="Nur Google Wallet zeigt sie an.">
             <Input
               id="msg-headline"
@@ -166,11 +204,15 @@ export function MessageDialog({
                   <p className="text-ink-3">
                     {m.sentAt ? (
                       <>
-                        Gesendet · {m.appleDevices} iPhones
+                        {MESSAGE_SEGMENT_LABELS[m.segment]} · {m.recipients} Karten ·{' '}
+                        {m.appleDevices} iPhones
                         {m.googleSynced ? ' · Google erreicht' : ' · Google nicht erreicht'}
                       </>
                     ) : (
-                      <>Geplant für {new Date(m.scheduledFor).toLocaleString('de-DE')}</>
+                      <>
+                        {MESSAGE_SEGMENT_LABELS[m.segment]} · geplant für{' '}
+                        {new Date(m.scheduledFor).toLocaleString('de-DE')}
+                      </>
                     )}
                   </p>
                   {m.error ? <p className="text-warn-ink">{m.error}</p> : null}
@@ -197,9 +239,15 @@ export function MessageDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
             Schließen
           </Button>
-          <Button variant="primary" disabled={busy || body.trim().length === 0} onClick={send}>
+          <Button
+            variant="primary"
+            disabled={busy || body.trim().length === 0 || counts?.[segment] === 0}
+            title={counts?.[segment] === 0 ? 'In dieser Gruppe steht gerade niemand.' : undefined}
+            onClick={send}
+          >
             {busy ? <Spinner /> : <Send />}
             {scheduled ? 'Einplanen' : 'Jetzt senden'}
+            {counts ? ` (${counts[segment]})` : ''}
           </Button>
         </DialogFooter>
       </DialogContent>

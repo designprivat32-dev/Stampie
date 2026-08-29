@@ -198,6 +198,19 @@ model CardMessage {
   /// Apple kappt die Meldung bei 150 Zeichen, deshalb ist das auch hier die Grenze.
   body     String
 
+  /// An wen sie geht — `MessageSegment`, siehe src/lib/cards/message-segments.ts.
+  ///
+  /// Als String und nicht als Enum: die Gruppen sind eine Produktentscheidung ("noch zwei
+  /// Stempel"), keine Datenbankwahrheit. Eine neue Gruppe soll eine Zeile Anwendungscode
+  /// sein und keine Migration, und eine Zeile, deren Gruppe es nicht mehr gibt, muss
+  /// lesbar bleiben statt beim Laden zu scheitern.
+  segment String @default("ALL")
+
+  /// Wie viele Karten die Gruppe beim Versand umfasste. Ohne diese Zahl ist im Nachhinein
+  /// nicht mehr feststellbar, wen eine Nachricht erreicht hat — die Stempelstände von
+  /// damals sind längst weitergezählt.
+  recipients Int @default(0)
+
   /// Wann sie raus soll. Vergangenheit heißt "beim nächsten Lauf".
   scheduledFor DateTime
   sentAt       DateTime?
@@ -406,6 +419,17 @@ model IssuedPass {
   stampGoal    Int       @default(10)
   /// Set when a full card was cashed in; the counter restarts from zero.
   lastRewardAt DateTime?
+
+  /// Nachricht nur für diesen Pass, gesetzt beim Versand an eine Gruppe.
+  ///
+  /// Apple kennt keinen freien Push: eine Meldung entsteht, weil sich ein Feld ändert.
+  /// Solange die Nachricht an der Karte hing, konnte sie deshalb nur alle erreichen. Steht
+  /// sie hier, bekommt sie genau der, dessen Stempelstand gemeint war.
+  ///
+  /// Vorrang vor `Card.activeMessage`; ein Versand an alle räumt diese Felder wieder ab,
+  /// damit nicht eine alte Gruppennachricht die neue an alle überdeckt.
+  activeMessage   String?
+  activeMessageAt DateTime?
   rewardCount  Int       @default(0)
 
   /// COUPON only: a coupon is single-use, so this is the hard latch against a second
