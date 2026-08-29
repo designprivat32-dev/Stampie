@@ -19,9 +19,9 @@ export const dynamic = 'force-dynamic'
  * a rendered page behaves differently — the sheet opens *over this page*, and closing it
  * comes back here.
  *
- * The device is still detected, but only to decide which button leads. Detection is a
- * guess — an iPad reports as a Mac, in-app browsers lie — so the other wallet stays one
- * tap away rather than being hidden behind a wrong assumption.
+ * The device decides which wallet button is shown: an iPhone gets Apple, an Android phone
+ * gets Google. Only when the user agent says neither (a desktop, an in-app browser that
+ * lies) do both appear, because guessing wrong there would look like an unsupported phone.
  */
 export default async function HandoutLandingPage({
   params,
@@ -51,9 +51,8 @@ export default async function HandoutLandingPage({
   const apple = <AppleWalletButton key="apple" href={`/api/k/${code}?p=apple`} className="justify-center" />
   const google = <GoogleWalletButton key="google" href={`/api/k/${code}?p=google`} className="justify-center" />
 
-  // The detected wallet leads; the other one keeps its full-size button rather than being
-  // demoted to fine print, because a wrong guess otherwise looks like an unsupported phone.
-  const buttons = platform === 'google' ? [google, apple] : [apple, google]
+  const buttons =
+    platform === 'apple' ? [apple] : platform === 'google' ? [google] : [apple, google]
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10">
@@ -76,11 +75,6 @@ export default async function HandoutLandingPage({
         ) : null}
 
         <div className="flex flex-col items-center gap-3">{buttons}</div>
-
-        <p className="text-center text-[12px] leading-snug text-ink-3">
-          Beim nächsten Antippen bekommst du wieder dieselbe Karte — mit den Stempeln, die
-          bis dahin darauf sind.
-        </p>
 
         <ShopDetails customer={resolved.customer} />
       </div>

@@ -14,7 +14,8 @@ import type { CardDesign } from '@/lib/pass/pass-builder'
  * The NFC chip holds nothing but a URL — `/k/<nfcCode>` — so tapping it is the same event
  * as scanning the printed QR next to the till. Both land here, and both get the customer
  * their *own* pass: one `IssuedPass` row with its own serial, which is what the barcode
- * carries and what the till scans to book a stamp.
+ * carries and what the till scans to book a stamp. Every scan hands out a new, empty card;
+ * the phone is not recognised across visits.
  *
  * Deliberately unauthenticated. The point is that a stranger's phone, with no app and no
  * account, is one tap away from a card in their wallet.
@@ -22,9 +23,6 @@ import type { CardDesign } from '@/lib/pass/pass-builder'
  * Only *published* designs are handed out. A draft is work in progress; the customer's
  * wallet would keep whatever it was mid-edit.
  */
-
-export const DEVICE_COOKIE = 'stampie_device'
-export const DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 export interface ResolvedHandout {
   cardId: string
@@ -116,12 +114,12 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
 }
 
 /**
- * The pass for this phone: the one it already holds, or a new one.
+ * The pass belonging to a `deviceKey`, if there is one.
  *
- * Reusing on `deviceKey` is what keeps a second tap from handing out a second card with
- * zero stamps — the customer would end up collecting on two cards without noticing which.
- * Test passes are excluded from the lookup so a card tried out from the dashboard is never
- * mistaken for the customer's real one.
+ * Nothing is stored on the phone any more — each handout mints its own key — so in the
+ * handout flow this only guards against creating two rows for the same key. Test passes
+ * are excluded from the lookup so a card tried out from the dashboard is never mistaken
+ * for a customer's real one.
  */
 export async function findPassForDevice(
   resolved: ResolvedHandout,
