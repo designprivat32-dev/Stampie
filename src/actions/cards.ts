@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { assertCardAccess, isAdminSession, requireSession } from '@/lib/auth/session'
+import { assertPassword } from '@/lib/auth/reauth'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { accessibleOrgIds, listCards, listCustomers, type CardSummary } from '@/lib/cards/card-service'
@@ -159,14 +160,23 @@ export async function renameCardAction(cardId: string, name: string): Promise<Ac
  * Versionen, Bilder, Nachrichten, Testkarten-Token, alle ausgegebenen Pässe samt
  * Wallet-Registrierungen und die gesamte Stempel-Historie. Pässe, die Kunden im Wallet
  * haben, aktualisieren sich danach nicht mehr — sie frieren auf ihrem letzten Stand ein.
- * Deshalb fragt die Oberfläche vorher nach und nennt die Zahl der Karten im Umlauf.
+ * Deshalb fragt die Oberfläche vorher nach und nennt die Zahl der Karten im Umlauf, und
+ * deshalb verlangt die Aktion zusätzlich das Passwort des Betreibers (`lib/auth/reauth`):
+ * eine offene Sitzung allein darf nicht reichen, um fremde Kundenhistorie zu vernichten.
  */
-export async function deleteCardAction(cardId: string): Promise<ActionResult<null>> {
+export async function deleteCardAction(
+  cardId: string,
+  password: string,
+): Promise<ActionResult<null>> {
   return guarded(async () => {
     const parsed = z.object({ cardId: z.string().cuid() }).safeParse({ cardId })
     if (!parsed.success) return fromZodError(parsed.error)
 
     await assertCardAccess(parsed.data.cardId)
+    // After the tenancy check, so a wrong password never doubles as a way to probe which
+    // card ids exist.
+    await assertPassword(password, 'card-delete')
+
     await prisma.card.delete({ where: { id: parsed.data.cardId } })
 
     revalidatePath('/dashboard/karten')

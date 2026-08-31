@@ -8,6 +8,7 @@ import { fail, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { appUrl } from '@/lib/app-url'
 import { newNfcCode } from '@/lib/cards/handout-service'
+import { assertPassword } from '@/lib/auth/reauth'
 import { loadPublishedDesign } from '@/lib/cards/repository'
 import type { CardKind } from '@/lib/cards/schema'
 
@@ -163,12 +164,24 @@ export async function updateHandoutGreetingAction(
   })
 }
 
-export async function disableHandoutAction(cardId: string): Promise<ActionResult<null>> {
+/**
+ * Switching the hand-out off.
+ *
+ * Clears the code, and turning it back on mints a different one — every chip and every
+ * printed QR already out there dies at that moment, permanently. That is why this asks for
+ * the password on top of the warning: it is one click, and it cannot be undone.
+ */
+export async function disableHandoutAction(
+  cardId: string,
+  password: string,
+): Promise<ActionResult<null>> {
   return guarded(async () => {
     const parsed = z.string().cuid().safeParse(cardId)
     if (!parsed.success) return fail('Ungültige Karten-ID.', 'validation')
 
     await assertCardAccess(parsed.data)
+    await assertPassword(password, 'handout-disable')
+
     await prisma.card.update({ where: { id: parsed.data }, data: { nfcCode: null } })
 
     revalidatePath('/dashboard/karten')

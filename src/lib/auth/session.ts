@@ -22,6 +22,17 @@ export interface Session {
   mustChangePassword: boolean
 }
 
+/**
+ * The password was not re-entered, or not correctly, in front of an irreversible action.
+ * See `lib/auth/reauth.ts` for which actions ask and why.
+ */
+export class PasswordConfirmationError extends Error {
+  constructor(message = 'Passwort falsch.') {
+    super(message)
+    this.name = 'PasswordConfirmationError'
+  }
+}
+
 export class UnauthorizedError extends Error {
   constructor(message = 'Nicht angemeldet.') {
     super(message)

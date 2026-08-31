@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { Building2, MapPin, Plus, QrCode, Send, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Spinner } from '@/components/ui/misc'
+import { Input } from '@/components/ui/input'
+import { Label, FieldError } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
@@ -52,13 +54,16 @@ export function CardGrid({
   const [busyId, setBusyId] = React.useState<string | null>(null)
 
   // Löschen ist endgültig und nimmt die Pässe der Kunden mit — deshalb erst die Rückfrage,
-  // die beziffert, was daran hängt, und dann erst der Griff zur Aktion.
-  const handleDelete = async (card: CardSummary) => {
+  // die beziffert, was daran hängt, dann das Passwort, und dann erst der Griff zur Aktion.
+  // Gibt die Fehlermeldung zurück, damit der Dialog sie am Passwortfeld zeigen kann.
+  const handleDelete = async (card: CardSummary, password: string): Promise<string | null> => {
     setBusyId(card.id)
     try {
-      await deleteCardAction(card.id)
+      const result = await deleteCardAction(card.id, password)
+      if (!result.success) return result.error.message
       setDeleting(null)
       router.refresh()
+      return null
     } finally {
       setBusyId(null)
     }
@@ -142,7 +147,9 @@ export function CardGrid({
         card={deleting}
         busy={deleting !== null && busyId === deleting.id}
         onOpenChange={(open) => !open && setDeleting(null)}
-        onConfirm={() => deleting && void handleDelete(deleting)}
+        onConfirm={(password) =>
+          deleting ? handleDelete(deleting, password) : Promise.resolve(null)
+        }
       />
     </div>
   )
@@ -154,6 +161,9 @@ export function CardGrid({
  * Sie nennt beim Namen, was verschwindet — vor allem die Karten im Umlauf, denn die liegen
  * bei Kunden im Wallet und lassen sich durch nichts wiederherstellen. Ohne diese Zahl wäre
  * „Löschen?" eine Frage, die niemand beantworten kann.
+ *
+ * Danach noch das Passwort: eine offene Sitzung reicht für diesen Klick nicht. Geprüft wird
+ * es auf dem Server (`lib/auth/reauth`) — das Feld hier ist nur die Eingabe dafür.
  */
 function DeleteCardDialog({
   card,
@@ -164,8 +174,29 @@ function DeleteCardDialog({
   card: CardSummary | null
   busy: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: () => void
+  onConfirm: (password: string) => Promise<string | null>
 }) {
+  const [password, setPassword] = React.useState('')
+  const [error, setError] = React.useState<string | null>(null)
+
+  // Jede neue Rückfrage startet leer — ein stehengebliebenes Passwort im Feld wäre genau
+  // die Bequemlichkeit, die diese Abfrage verhindern soll.
+  React.useEffect(() => {
+    if (card === null) {
+      setPassword('')
+      setError(null)
+    }
+  }, [card])
+
+  const submit = async () => {
+    setError(null)
+    const message = await onConfirm(password)
+    if (message) {
+      setError(message)
+      setPassword('')
+    }
+  }
+
   return (
     <Dialog open={card !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -185,11 +216,36 @@ function DeleteCardDialog({
             gelöscht. Das lässt sich nicht rückgängig machen.
           </DialogDescription>
         </DialogHeader>
+
+        <form
+          className="space-y-1.5"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void submit()
+          }}
+        >
+          <Label htmlFor="delete-password">Zum Bestätigen dein Passwort</Label>
+          <Input
+            id="delete-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={error !== null}
+            disabled={busy}
+          />
+          <FieldError>{error}</FieldError>
+        </form>
+
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
             Abbrechen
           </Button>
-          <Button variant="danger" onClick={onConfirm} disabled={busy}>
+          <Button
+            variant="danger"
+            onClick={() => void submit()}
+            disabled={busy || password.length === 0}
+          >
             {busy ? <Spinner /> : <Trash2 />}
             Endgültig löschen
           </Button>

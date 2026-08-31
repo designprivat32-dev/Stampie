@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input, Textarea } from '@/components/ui/input'
+import { Label, FieldError } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/misc'
 import {
   disableHandoutAction,
@@ -44,6 +45,8 @@ export function HandoutDialog({
   const [error, setError] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
   const [confirmingOff, setConfirmingOff] = React.useState(false)
+  const [offPassword, setOffPassword] = React.useState('')
+  const [offError, setOffError] = React.useState<string | null>(null)
 
   const [startStamps, setStartStamps] = React.useState(0)
   const [startStampsBusy, setStartStampsBusy] = React.useState(false)
@@ -58,6 +61,8 @@ export function HandoutDialog({
     setError(null)
     setCopied(false)
     setConfirmingOff(false)
+    setOffPassword('')
+    setOffError(null)
     void (async () => {
       const result = await getHandoutStateAction(cardId)
       if (result.success) {
@@ -98,11 +103,18 @@ export function HandoutDialog({
 
   const disable = async () => {
     setBusy(true)
-    setError(null)
-    const result = await disableHandoutAction(cardId)
-    if (result.success) setState((prev) => (prev ? { ...prev, link: null } : prev))
-    else setError(result.error.message)
-    setConfirmingOff(false)
+    setOffError(null)
+    const result = await disableHandoutAction(cardId, offPassword)
+    if (result.success) {
+      setState((prev) => (prev ? { ...prev, link: null } : prev))
+      setConfirmingOff(false)
+      setOffPassword('')
+    } else {
+      // Bleibt in der Rückfrage stehen: ein falsch getipptes Passwort soll den Dialog nicht
+      // schließen und die Warnung nicht wegnehmen.
+      setOffError(result.error.message)
+      setOffPassword('')
+    }
     setBusy(false)
   }
 
@@ -241,8 +253,34 @@ export function HandoutDialog({
                   <strong>neue</strong> Adresse — die alten Aufkleber bleiben tot.
                   Ausgegebene Karten behalten ihre Stempel.
                 </p>
+
+                <form
+                  className="space-y-1.5"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void disable()
+                  }}
+                >
+                  <Label htmlFor="handout-off-password">Zum Bestätigen dein Passwort</Label>
+                  <Input
+                    id="handout-off-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={offPassword}
+                    onChange={(e) => setOffPassword(e.target.value)}
+                    aria-invalid={offError !== null}
+                    disabled={busy}
+                  />
+                  <FieldError>{offError}</FieldError>
+                </form>
+
                 <div className="flex gap-2">
-                  <Button variant="danger" size="sm" disabled={busy} onClick={disable}>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={busy || offPassword.length === 0}
+                    onClick={disable}
+                  >
                     {busy ? <Spinner /> : null}
                     Trotzdem abschalten
                   </Button>
