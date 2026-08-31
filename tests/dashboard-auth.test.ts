@@ -8,14 +8,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  */
 
 const findUnique = vi.fn()
-vi.mock('@/lib/db', () => ({ prisma: { appSession: { findUnique: (...a: unknown[]) => findUnique(...a) } } }))
+const deleteMany = vi.fn()
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    appSession: {
+      findUnique: (...a: unknown[]) => findUnique(...a),
+      deleteMany: (...a: unknown[]) => deleteMany(...a),
+    },
+  },
+}))
 
 const cookieGet = vi.fn()
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: cookieGet }) }))
 
 import { isOperatorEmail, parseOperatorEmails } from '@/lib/auth/operators'
 import { DASHBOARD_TOKEN_PREFIX, isDashboardToken } from '@/lib/auth/dashboard-cookie'
-import { resolveDashboardSession } from '@/lib/auth/dashboard-session'
+import { dropDashboardSessions, resolveDashboardSession } from '@/lib/auth/dashboard-session'
 import { resolveAppUser } from '@/lib/auth/app-session'
 
 describe('parseOperatorEmails', () => {
@@ -77,7 +85,7 @@ describe('token namespaces', () => {
 
 describe('resolveDashboardSession', () => {
   const future = () => new Date(Date.now() + 60_000)
-  const operator = { id: 'u1', email: 'demo@stampie.de', name: 'Demo' }
+  const operator = { id: 'u1', email: 'demo@stampie.de', name: 'Demo', mustChangePassword: false }
 
   beforeEach(() => {
     vi.stubEnv('DASHBOARD_ADMIN_EMAILS', 'demo@stampie.de')
@@ -96,7 +104,17 @@ describe('resolveDashboardSession', () => {
       userId: 'u1',
       email: 'demo@stampie.de',
       name: 'Demo',
+      mustChangePassword: false,
     })
+  })
+
+  it('carries the forced-change flag through', async () => {
+    withCookie(`${DASHBOARD_TOKEN_PREFIX}good`)
+    findUnique.mockResolvedValue({
+      expiresAt: future(),
+      user: { ...operator, mustChangePassword: true },
+    })
+    await expect(resolveDashboardSession()).resolves.toMatchObject({ mustChangePassword: true })
   })
 
   it('returns null without a cookie', async () => {
@@ -121,7 +139,12 @@ describe('resolveDashboardSession', () => {
     withCookie(`${DASHBOARD_TOKEN_PREFIX}good`)
     findUnique.mockResolvedValue({
       expiresAt: future(),
-      user: { id: 'u2', email: 'hairlight-by-rejin@login.stampie.local', name: 'Rejin' },
+      user: {
+        id: 'u2',
+        email: 'hairlight-by-rejin@login.stampie.local',
+        name: 'Rejin',
+        mustChangePassword: false,
+      },
     })
     await expect(resolveDashboardSession()).resolves.toBeNull()
   })
@@ -131,5 +154,15 @@ describe('resolveDashboardSession', () => {
     withCookie(`${DASHBOARD_TOKEN_PREFIX}good`)
     findUnique.mockResolvedValue({ expiresAt: future(), user: operator })
     await expect(resolveDashboardSession()).resolves.toBeNull()
+  })
+})
+
+describe('dropDashboardSessions', () => {
+  it('ends only the dashboard sessions, never the app tokens', async () => {
+    deleteMany.mockReset().mockResolvedValue({ count: 2 })
+    await dropDashboardSessions('u1')
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', token: { startsWith: DASHBOARD_TOKEN_PREFIX } },
+    })
   })
 })

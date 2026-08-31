@@ -5,8 +5,9 @@
  * login — they have no password at all. This is how one gets set. It is also how you add
  * a new operator: pass an address that does not exist yet and the account is created.
  *
- *   npm run dashboard:user -- demo@stampie.de              set a generated password
- *   npm run dashboard:user -- demo@stampie.de --show       …and print the existing state first
+ *   npm run dashboard:user -- demo@stampie.de                 set a generated password
+ *   npm run dashboard:user -- demo@stampie.de --show          …print the existing state first
+ *   npm run dashboard:user -- demo@stampie.de --must-change   force a change on first sign-in
  *
  * To choose the password yourself, put it in STAMPIE_DASHBOARD_PASSWORD rather than on the
  * command line, so it does not end up in the shell history.
@@ -24,6 +25,7 @@ import { parseOperatorEmails } from '../src/lib/auth/operators'
 const args = process.argv.slice(2)
 const email = args.find((a) => !a.startsWith('--'))?.trim().toLowerCase()
 const show = args.includes('--show')
+const mustChange = args.includes('--must-change')
 
 if (!email) {
   console.error('Aufruf: npm run dashboard:user -- <e-mail> [--show]')
@@ -61,19 +63,21 @@ try {
   }
 
   const password = process.env.STAMPIE_DASHBOARD_PASSWORD?.trim() || randomPassword()
-  if (password.length < 12) {
-    console.error('Das Passwort muss mindestens 12 Zeichen haben.')
+  // Same floor as /api/app/change-password, so the two logins agree on what is acceptable.
+  if (password.length < 8) {
+    console.error('Das Passwort muss mindestens 8 Zeichen haben.')
     process.exit(1)
   }
   const passwordHash = await hashPassword(password)
 
   await prisma.user.upsert({
     where: { email },
-    update: { passwordHash, mustChangePassword: false },
-    create: { email, name: 'Betreiber', passwordHash, mustChangePassword: false },
+    update: { passwordHash, mustChangePassword: mustChange },
+    create: { email, name: 'Betreiber', passwordHash, mustChangePassword: mustChange },
   })
 
   console.log(`${existing ? 'Passwort gesetzt' : 'Konto angelegt'} für ${email}`)
+  if (mustChange) console.log('Muss beim ersten Anmelden geändert werden.')
   if (!process.env.STAMPIE_DASHBOARD_PASSWORD) {
     console.log(`Passwort:  ${password}`)
     console.log('(wird nur einmal angezeigt — jetzt in den Passwortmanager)')

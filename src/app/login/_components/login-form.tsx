@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,12 +9,13 @@ import { dashboardLoginAction } from '@/actions/dashboard-auth'
 /**
  * The sign-in form.
  *
- * Navigates on success rather than letting the action redirect — see the action for why.
- * `router.refresh()` first, so the dashboard's server components re-render with the new
- * cookie instead of a cached signed-out tree.
+ * Navigates on success rather than letting the action redirect — see the action for why,
+ * and with a full document load rather than `router.replace`. The client router keeps RSC
+ * payloads that were rendered for the signed-out visitor, and a soft navigation across a
+ * sign-in stalls: the destination renders server-side but never commits. A real navigation
+ * starts from a clean cache with the cookie attached.
  */
 export function LoginForm({ target }: { target: string }) {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -31,8 +31,8 @@ export function LoginForm({ target }: { target: string }) {
         setPassword('')
         return
       }
-      router.refresh()
-      router.replace(target)
+      // Deliberately not router.replace — see the comment above.
+      window.location.assign(target)
     })
   }
 

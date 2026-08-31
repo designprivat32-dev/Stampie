@@ -18,6 +18,8 @@ export interface Session {
   userId: string
   email: string
   name: string | null
+  /** Set by `scripts/dashboard-user.mts`; the dashboard sends these sessions to /dashboard/konto. */
+  mustChangePassword: boolean
 }
 
 export class UnauthorizedError extends Error {
@@ -57,7 +59,8 @@ async function devSession(): Promise<Session | null> {
   if (!email) return null
   const user = await prisma.user.findUnique({ where: { email } })
   if (!user) return null
-  return { userId: user.id, email: user.email, name: user.name }
+  // Never forces a change locally — the dev shortcut has no password to begin with.
+  return { userId: user.id, email: user.email, name: user.name, mustChangePassword: false }
 }
 
 export async function requireSession(): Promise<Session> {

@@ -1,12 +1,10 @@
 'use client'
 
 import { useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { dashboardLogoutAction } from '@/actions/dashboard-auth'
 
 /** Ends the operator session and returns to the sign-in page. */
 export function LogoutButton() {
-  const router = useRouter()
   const [pending, startTransition] = useTransition()
 
   return (
@@ -16,8 +14,9 @@ export function LogoutButton() {
       onClick={() =>
         startTransition(async () => {
           await dashboardLogoutAction()
-          router.refresh()
-          router.replace('/login')
+          // Full load, so nothing rendered for the signed-in operator survives in the
+          // client router's cache.
+          window.location.assign('/login')
         })
       }
       className="text-[12px] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"

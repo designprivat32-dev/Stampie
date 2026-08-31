@@ -74,16 +74,33 @@ export async function resolveDashboardSession(): Promise<Session | null> {
     where: { token: token as string },
     select: {
       expiresAt: true,
-      user: { select: { id: true, email: true, name: true } },
+      user: { select: { id: true, email: true, name: true, mustChangePassword: true } },
     },
   })
   if (!session || session.expiresAt.getTime() < Date.now()) return null
   if (!isOperatorEmail(session.user.email)) return null
 
-  return { userId: session.user.id, email: session.user.email, name: session.user.name }
+  return {
+    userId: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+    mustChangePassword: session.user.mustChangePassword,
+  }
 }
 
 /** Removes expired rows for this user; called on login so the table does not grow forever. */
 export async function pruneExpiredSessions(userId: string): Promise<void> {
   await prisma.appSession.deleteMany({ where: { userId, expiresAt: { lt: new Date() } } })
+}
+
+/**
+ * Ends every dashboard session of this user, on every device.
+ *
+ * Scoped to the `dash_` prefix so it leaves the native app's bearer tokens alone — those
+ * are a separate credential behind a separate password.
+ */
+export async function dropDashboardSessions(userId: string): Promise<void> {
+  await prisma.appSession.deleteMany({
+    where: { userId, token: { startsWith: DASHBOARD_TOKEN_PREFIX } },
+  })
 }

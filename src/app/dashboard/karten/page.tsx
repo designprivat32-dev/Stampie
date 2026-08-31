@@ -18,6 +18,8 @@ export const dynamic = 'force-dynamic'
 export default async function KartenPage() {
   const session = await getSession()
   if (!session) redirect('/login')
+  // A temporary password has to be replaced before anything else is reachable.
+  if (session.mustChangePassword) redirect('/dashboard/konto')
 
   const admin = await isAdminSession(session.userId)
   const orgIds = await accessibleOrgIds(session.userId)
@@ -40,9 +42,12 @@ export default async function KartenPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-[12px] text-ink-3">
+            <Link
+              href="/dashboard/konto"
+              className="text-[12px] text-ink-3 transition-colors hover:text-ink"
+            >
               {admin ? 'Agentur-Zugang' : (customers[0]?.name ?? session.email)}
-            </span>
+            </Link>
             <LogoutButton />
           </div>
         </div>

@@ -16,6 +16,8 @@ export const dynamic = 'force-dynamic'
 export default async function KundenPage() {
   const session = await getSession()
   if (!session) redirect('/login')
+  // A temporary password has to be replaced before anything else is reachable.
+  if (session.mustChangePassword) redirect('/dashboard/konto')
 
   const customers = await listCustomerRecords(null)
 
@@ -35,7 +37,12 @@ export default async function KundenPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-[12px] text-ink-3">{session.email}</span>
+            <Link
+              href="/dashboard/konto"
+              className="text-[12px] text-ink-3 transition-colors hover:text-ink"
+            >
+              {session.email}
+            </Link>
             <LogoutButton />
           </div>
         </div>
