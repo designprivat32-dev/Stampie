@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth/session'
+import { LogoutButton } from '@/components/logout-button'
 import { listCustomerRecords } from '@/lib/customers/customer-service'
 import { CustomersView } from './_components/customers-view'
 
@@ -9,12 +10,12 @@ export const dynamic = 'force-dynamic'
 /**
  * Customer overview.
  *
- * Single-operator setup: whoever is logged in may manage every customer — there is no
- * agency/owner split here. (Auth is a stub, and this dashboard is only used by us.)
+ * Every signed-in operator may manage every customer — there is no agency/owner split
+ * here. Access is the `DASHBOARD_ADMIN_EMAILS` allowlist, which no business login is on.
  */
 export default async function KundenPage() {
   const session = await getSession()
-  if (!session) redirect('/')
+  if (!session) redirect('/login')
 
   const customers = await listCustomerRecords(null)
 
@@ -33,7 +34,10 @@ export default async function KundenPage() {
               </Link>
             </nav>
           </div>
-          <span className="text-[12px] text-ink-3">{session.email}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-[12px] text-ink-3">{session.email}</span>
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

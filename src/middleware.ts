@@ -1,15 +1,37 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { DASHBOARD_COOKIE, DASHBOARD_TOKEN_PREFIX } from '@/lib/auth/dashboard-cookie'
 
 /**
- * CORS for the business-app API (`/api/app/*`).
+ * Two unrelated concerns, one file, because Next allows exactly one middleware:
  *
- * The native app is not subject to CORS, but the browser web-preview (Expo web on
- * localhost:8081) calls the backend cross-origin (localhost:3000). Without these headers
- * the browser blocks the request. Tokens travel in the Authorization header (no cookies),
- * so reflecting the origin is safe.
+ *  1. CORS for the business-app API (`/api/app/*`). The native app is not subject to CORS,
+ *     but the browser web-preview (Expo web on localhost:8081) calls the backend
+ *     cross-origin (localhost:3000). Without these headers the browser blocks the request.
+ *     Tokens travel in the Authorization header (no cookies), so reflecting the origin is
+ *     safe.
+ *
+ *  2. The dashboard gate (`/dashboard/*`). This is a *cheap* check — is a dashboard-shaped
+ *     cookie present at all — because middleware runs on the edge and Prisma does not. The
+ *     real check is `getSession()` in each page, which validates the session against the
+ *     database and re-checks the operator allowlist. This only saves an unauthenticated
+ *     visitor from rendering a page that would redirect anyway.
  */
 export function middleware(req: NextRequest): NextResponse {
+  if (req.nextUrl.pathname.startsWith('/dashboard')) return dashboardGate(req)
+  return appApiCors(req)
+}
+
+function dashboardGate(req: NextRequest): NextResponse {
+  const token = req.cookies.get(DASHBOARD_COOKIE)?.value
+  if (token?.startsWith(DASHBOARD_TOKEN_PREFIX)) return NextResponse.next()
+
+  const login = new URL('/login', req.url)
+  login.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search)
+  return NextResponse.redirect(login)
+}
+
+function appApiCors(req: NextRequest): NextResponse {
   const origin = req.headers.get('origin') ?? '*'
   const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': origin,
@@ -28,4 +50,4 @@ export function middleware(req: NextRequest): NextResponse {
   return res
 }
 
-export const config = { matcher: '/api/app/:path*' }
+export const config = { matcher: ['/api/app/:path*', '/dashboard/:path*'] }

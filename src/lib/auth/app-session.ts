@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/db'
+import { isDashboardToken } from '@/lib/auth/dashboard-cookie'
 import type { MemberRole } from '@/lib/auth/session'
 
 /**
@@ -8,6 +9,11 @@ import type { MemberRole } from '@/lib/auth/session'
  *
  * The web app uses cookie/server-component auth; the native app cannot, so it authenticates
  * with a bearer token it receives on login and sends in the `Authorization` header.
+ *
+ * The dashboard's cookie sessions live in the same table and are told apart by the
+ * `dash_` prefix on their token. Both resolvers refuse the other's tokens: an app token
+ * pasted into the dashboard cookie must not open the dashboard, and a stolen dashboard
+ * cookie must not work as an app bearer token.
  */
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30 // 30 days
@@ -46,6 +52,8 @@ export function bearerToken(request: Request): string | null {
 /** Resolves a token to the business user + their organisation, or null. */
 export async function resolveAppUser(token: string | null): Promise<AppUser | null> {
   if (!token) return null
+  // A dashboard cookie is not an app credential — see the module comment.
+  if (isDashboardToken(token)) return null
 
   const session = await prisma.appSession.findUnique({
     where: { token },

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CardGrid } from './_components/card-grid'
 import { getSession, isAdminSession } from '@/lib/auth/session'
+import { LogoutButton } from '@/components/logout-button'
 import { accessibleOrgIds, listCards, listCustomers } from '@/lib/cards/card-service'
 
 export const dynamic = 'force-dynamic'
@@ -9,13 +10,14 @@ export const dynamic = 'force-dynamic'
 /**
  * Card overview — the dashboard entry point.
  *
- * Single-operator setup, same as `/dashboard/kunden`: whoever is logged in sees every
- * card and may hand any of them to any customer. Customer logins do not reach this page —
- * they use the app API, which scopes itself to their own organisation.
+ * Every signed-in operator sees every card and may hand any of them to any customer;
+ * signing in at all requires the `DASHBOARD_ADMIN_EMAILS` allowlist. Customer logins are
+ * never on it and do not reach this page — they use the app API, which scopes itself to
+ * their own organisation.
  */
 export default async function KartenPage() {
   const session = await getSession()
-  if (!session) redirect('/')
+  if (!session) redirect('/login')
 
   const admin = await isAdminSession(session.userId)
   const orgIds = await accessibleOrgIds(session.userId)
@@ -37,9 +39,12 @@ export default async function KartenPage() {
               </Link>
             </nav>
           </div>
-          <span className="text-[12px] text-ink-3">
-            {admin ? 'Agentur-Zugang' : (customers[0]?.name ?? session.email)}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-[12px] text-ink-3">
+              {admin ? 'Agentur-Zugang' : (customers[0]?.name ?? session.email)}
+            </span>
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

@@ -1,13 +1,17 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
+import { isOperatorEmail } from '@/lib/auth/operators'
 
 /**
- * STUB. The real auth layer lands separately; everything downstream only ever talks to
- * this module, so swapping the implementation is a one-file change.
+ * The dashboard's session gate.
  *
- * The important part is not the stub — it is `assertCardAccess`. Every server action and
- * every page load goes through it, and every Prisma query additionally filters by
- * `cardId`, so no design is reachable through a guessed id.
+ * A session is a signed-in operator, resolved from an httpOnly cookie — see
+ * `lib/auth/dashboard-session.ts` for the cookie and `lib/auth/operators.ts` for who
+ * counts as one. Everything downstream only ever talks to this module.
+ *
+ * The session only answers *who* is calling. What they may reach is `assertCardAccess`:
+ * every server action and every page load goes through it, and every Prisma query
+ * additionally filters by `cardId`, so no design is reachable through a guessed id.
  */
 
 export interface Session {
@@ -35,6 +39,20 @@ export class CardAccessError extends Error {
 }
 
 export async function getSession(): Promise<Session | null> {
+  // Imported lazily: this module is pulled in for its error classes all over the codebase,
+  // unit tests included, and the cookie store must not be touched at import time.
+  const { resolveDashboardSession } = await import('@/lib/auth/dashboard-session')
+  return (await resolveDashboardSession()) ?? devSession()
+}
+
+/**
+ * Local-development convenience: be `DEV_SESSION_USER_EMAIL` without signing in.
+ *
+ * Hard-gated on a non-production build. This used to be the *only* auth the dashboard
+ * had, so leaving it reachable in production would defeat the login entirely.
+ */
+async function devSession(): Promise<Session | null> {
+  if (process.env.NODE_ENV === 'production') return null
   const email = process.env.DEV_SESSION_USER_EMAIL
   if (!email) return null
   const user = await prisma.user.findUnique({ where: { email } })
@@ -76,9 +94,10 @@ export class StampPermissionError extends Error {
 /**
  * Whether this session administers every customer.
  *
- * Single-operator setup, same premise as `/dashboard/kunden`: the web dashboard has no
- * real login — `getSession()` resolves the one operator from `DEV_SESSION_USER_EMAIL` —
- * so whoever reaches it *is* the operator, whatever the membership rows happen to say.
+ * Every operator administers every customer. That is not a loosening: holding a session
+ * at all now requires being on the `DASHBOARD_ADMIN_EMAILS` allowlist, and that list
+ * exists precisely to name the few people who run all the customers' cards. A business
+ * login is never on it — see `lib/auth/operators.ts`.
  * Tying card assignment to an AGENCY row meant a freshly created login could add customers
  * but not hand a card to one, which is not a rule anyone chose.
  *
@@ -89,8 +108,9 @@ export class StampPermissionError extends Error {
  * Deliberately a function rather than an inlined `true`: when real dashboard auth lands,
  * this is the single place that decides who administers all customers.
  */
-export async function isAdminSession(_userId: string): Promise<boolean> {
-  return true
+export async function isAdminSession(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
+  return isOperatorEmail(user?.email)
 }
 
 /**
