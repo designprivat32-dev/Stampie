@@ -32,11 +32,8 @@ export async function GET(request: Request): Promise<Response> {
   const appUser = await requireAppUser(request)
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
-  const org = await prisma.organization.findUnique({
-    where: { id: appUser.orgId },
-    select: { inaktivNachMonaten: true },
-  })
-  const inactiveAfterMonths = org?.inaktivNachMonaten ?? 2
+  // Schwelle „eingeschlafen" vorerst fest auf 2 Monate (editierbar folgt separat).
+  const inactiveAfterMonths = 2
 
   // Karten des Betriebs + aktuelles Stempel-Ziel (veröffentlicht, sonst Entwurf, sonst 10).
   const cards = await prisma.card.findMany({
