@@ -252,8 +252,8 @@ async function redeemFullCard(
    * Übertrag und Neustempel addieren sich: wer mit 12 bei einem Ziel von 10 kommt, hat
    * danach 2 aus dem Übertrag plus den heutigen.
    */
-  const booked = Math.max(0, Math.min(count, goal - decision.nextBalance))
-  const finalBalance = decision.nextBalance + booked
+  const booked = 0
+  const finalBalance = decision.nextBalance
 
   const updated = await prisma.$transaction(async (tx) => {
     const next = await tx.issuedPass.update({
