@@ -69,7 +69,14 @@ export interface LoyaltyObject {
   accountName?: string
   loyaltyPoints: {
     label: string
-    balance: { int: number }
+    /*
+     * Als Text, nicht als Zahl.
+     *
+     * Google zeigt bei `int` nur den Stand: "Schnitte 1". Wie viele der Kunde braucht,
+     * stand damit nirgends auf der Karte — Apple hat das Ziel in der Kopfzeile, Google
+     * hatte es gar nicht. Mit "1/7" lesen beide Wallets dasselbe.
+     */
+    balance: { string: string }
   }
   barcode: {
     type: 'QR_CODE' | 'CODE_128' | 'PDF_417' | 'AZTEC'
@@ -178,7 +185,7 @@ export function buildLoyaltyObject(design: CardDesignInput, ctx: BuildGoogleCont
     accountId: ctx.serial,
     loyaltyPoints: {
       label: design.stampLabel,
-      balance: { int: stamps },
+      balance: { string: stamps + '/' + design.stampGoal },
     },
     barcode: {
       type: BARCODE_MAP[design.barcodeFormat],

@@ -178,12 +178,14 @@ describe('google loyalty mapping', () => {
   it('maps the stamp counter to loyaltyPoints', () => {
     const obj = buildLoyaltyObject(design({ stampLabel: 'Kaffee' }), gctx)
     expect(obj.loyaltyPoints.label).toBe('Kaffee')
-    expect(obj.loyaltyPoints.balance.int).toBe(6)
+    // Stand *und* Ziel: Google zeigt sonst nur die Zahl, und der Kunde weiss nicht,
+    // wie viele er noch braucht. Apple hat das Ziel in der Kopfzeile.
+    expect(obj.loyaltyPoints.balance.string).toBe('6/10')
   })
 
   it('clamps loyaltyPoints to the goal', () => {
     const obj = buildLoyaltyObject(design({ stampGoal: 5 }), { ...gctx, currentStamps: 42 })
-    expect(obj.loyaltyPoints.balance.int).toBe(5)
+    expect(obj.loyaltyPoints.balance.string).toBe('5/5')
   })
 
   it('maps barcode formats to Google names', () => {
