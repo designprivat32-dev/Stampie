@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireAppUser } from '@/lib/auth/app-session'
-import { inactivityCutoff, inactivityThreshold } from '@/lib/cards/inactivity'
 
 export const runtime = 'nodejs'
 
@@ -33,16 +32,11 @@ export async function GET(request: Request): Promise<Response> {
   const appUser = await requireAppUser(request)
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
-  /*
-   * Die Schwelle für „inaktiv" ist keine eigene Einstellung, sondern die, die der Betrieb
-   * mit seiner Erinnerung ohnehin gesetzt hat — dieselbe Frage, dieselbe Zahl. Ohne
-   * Erinnerung greift die Vorgabe. Siehe `lib/cards/inactivity`.
-   */
-  const reminders = await prisma.cardReminder.findMany({
-    where: { enabled: true, card: { orgId: appUser.orgId } },
-    select: { intervalMinutes: true },
+  const org = await prisma.organization.findUnique({
+    where: { id: appUser.orgId },
+    select: { inaktivNachMonaten: true },
   })
-  const threshold = inactivityThreshold(reminders.map((r) => r.intervalMinutes))
+  const inactiveAfterMonths = org?.inaktivNachMonaten ?? 2
 
   // Karten des Betriebs + aktuelles Stempel-Ziel (veröffentlicht, sonst Entwurf, sonst 10).
   const cards = await prisma.card.findMany({
@@ -65,8 +59,7 @@ export async function GET(request: Request): Promise<Response> {
       newThisMonth: 0,
       active: 0,
       inactive: 0,
-      inactiveAfterDays: threshold.days,
-      inactiveThresholdSource: threshold.source,
+      inactiveAfterMonths,
       cards: [],
     })
   }
@@ -90,7 +83,8 @@ export async function GET(request: Request): Promise<Response> {
 
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const cutoff = inactivityCutoff(threshold, now)
+  const cutoff = new Date(now)
+  cutoff.setMonth(cutoff.getMonth() - inactiveAfterMonths)
 
   // Pro Gerät (= Person): erster Kontakt + letzter Besuch über alle seine Pässe.
   interface Dev {
@@ -119,6 +113,27 @@ export async function GET(request: Request): Promise<Response> {
     if (d.first >= startOfMonth) newThisMonth++
   }
 
+  // Wochen-Zeitreihe (letzte 12 Wochen): kumulierte Kunden (grün) + neue je Woche (blau).
+  const WEEKS = 12
+  const weekStart = new Date(now)
+  weekStart.setHours(0, 0, 0, 0)
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)) // Montag dieser Woche
+  const weekly: { label: string; customers: number; new: number }[] = []
+  for (let i = WEEKS - 1; i >= 0; i--) {
+    const ws = new Date(weekStart)
+    ws.setDate(ws.getDate() - i * 7)
+    const we = new Date(ws)
+    we.setDate(we.getDate() + 7)
+    let nw = 0
+    let cum = 0
+    for (const dev of devices.values()) {
+      if (dev.first < we) cum++
+      if (dev.first >= ws && dev.first < we) nw++
+    }
+    const label = `${String(ws.getDate()).padStart(2, '0')}.${String(ws.getMonth() + 1).padStart(2, '0')}.`
+    weekly.push({ label, customers: cum, new: nw })
+  }
+
   // Pro Karte: Kunden, „voll", eingelöst, Stempel-Verteilung (nach Gerät entdoppelt).
   const cardStats: CardStat[] = []
   for (const cid of cardIds) {
@@ -136,14 +151,14 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     let full = 0
-    const counts = new Array<number>(goal + 1).fill(0) // Index = Stempelzahl 0..goal
+    const counts = new Map<number, number>() // Stempelzahl -> Anzahl Kunden
     for (const cur of currentByDevice.values()) {
       if (cur.stamps >= goal) full++
       const s = Math.min(cur.stamps, goal)
-      if (s >= 1 && s <= goal) counts[s] = (counts[s] ?? 0) + 1
+      if (s >= 1) counts.set(s, (counts.get(s) ?? 0) + 1)
     }
     const distribution: DistBucket[] = []
-    for (let s = 1; s <= goal; s++) distribution.push({ stamps: s, count: counts[s] ?? 0 })
+    for (let s = 1; s <= goal; s++) distribution.push({ stamps: s, count: counts.get(s) ?? 0 })
 
     cardStats.push({
       name: cardName.get(cid) ?? 'Karte',
@@ -160,8 +175,8 @@ export async function GET(request: Request): Promise<Response> {
     newThisMonth,
     active,
     inactive,
-    inactiveAfterDays: threshold.days,
-    inactiveThresholdSource: threshold.source,
+    inactiveAfterMonths,
+    weekly,
     cards: cardStats,
   })
 }
