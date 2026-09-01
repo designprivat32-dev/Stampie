@@ -23,6 +23,7 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
     select: {
       serial: true,
       stamps: true,
+      stampGoal: true,
       kind: true,
       cardId: true,
       activeMessage: true,
@@ -47,6 +48,19 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       cardId: pass.cardId,
       kind: pass.kind,
       organizationName: pass.card.org?.name ?? pass.card.name,
+      /*
+       * Das Ziel des Passes, nicht das des Designs.
+       *
+       * Beides lief auseinander, sobald jemand die Stempelzahl im Designer aenderte: die
+       * Karte im Wallet zeigte danach das neue Ziel, die Kasse rechnete weiter gegen das
+       * eingefrorene. Ein Kunde sah "7/7 — voll" und wurde an der Kasse trotzdem weiter
+       * gestempelt, weil sein Pass auf 10 stand.
+       *
+       * Der Pass gewinnt. Eine Treuekarte ist ein Versprechen, und das aendert man nicht
+       * nachtraeglich zulasten dessen, der schon sammelt. Neue Karten bekommen das neue
+       * Ziel ohnehin, weil es beim Ausgeben eingefroren wird.
+       */
+      stampGoal: pass.stampGoal,
       currentStamps: pass.stamps,
       assets,
       appleAuthToken,

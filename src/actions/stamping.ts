@@ -191,7 +191,11 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
     // Both wallets in parallel: neither may hold up the till, and Apple's push involves a
     // TLS handshake per device.
     const [sync] = await Promise.all([
-      syncGoogleStampCount(cardId, serial, updated.stamps, design),
+      syncGoogleStampCount(cardId, serial, updated.stamps, {
+        ...design,
+        // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
+        stampGoal: updated.stampGoal,
+      }),
       pushAppleWalletUpdate(serial),
     ])
 
@@ -251,7 +255,11 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
     // Both wallets in parallel: neither may hold up the till, and Apple's push involves a
     // TLS handshake per device.
     const [sync] = await Promise.all([
-      syncGoogleStampCount(cardId, serial, updated.stamps, design),
+      syncGoogleStampCount(cardId, serial, updated.stamps, {
+        ...design,
+        // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
+        stampGoal: updated.stampGoal,
+      }),
       pushAppleWalletUpdate(serial),
     ])
 

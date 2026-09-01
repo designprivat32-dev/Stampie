@@ -67,7 +67,17 @@ export async function GET(request: Request): Promise<Response> {
   // Echte Kunden-Pässe: STAMP, keine Testkarte, mit Gerät (echtes Handy hat die Karte).
   const passes = await prisma.issuedPass.findMany({
     where: { cardId: { in: cardIds }, isTest: false, kind: 'STAMP', deviceKey: { not: null } },
-    select: { id: true, cardId: true, deviceKey: true, stamps: true, rewardCount: true, createdAt: true },
+    select: {
+      id: true,
+      cardId: true,
+      deviceKey: true,
+      stamps: true,
+      // Das beim Ausgeben eingefrorene Ziel dieses Passes. Es kann vom aktuellen Design
+      // abweichen, und dann gilt es — siehe pass-rebuild.
+      stampGoal: true,
+      rewardCount: true,
+      createdAt: true,
+    },
   })
 
   // Letzter echter Besuch je Pass = jüngstes STAMP-Event; fehlt eins, gilt die Ausgabe.
@@ -137,32 +147,47 @@ export async function GET(request: Request): Promise<Response> {
   // Pro Karte: Kunden, „voll", eingelöst, Stempel-Verteilung (nach Gerät entdoppelt).
   const cardStats: CardStat[] = []
   for (const cid of cardIds) {
-    const goal = cardGoal.get(cid) ?? 10
     const cardPasses = passes.filter((p) => p.cardId === cid)
 
-    // Aktueller Pass je Gerät auf dieser Karte = der neueste.
-    const currentByDevice = new Map<string, { stamps: number; createdAt: Date }>()
+    // Aktueller Pass je Gerät auf dieser Karte = der neueste. Sein eigenes Ziel wandert
+    // mit: wer eine 10er-Karte hält, ist bei 8 nicht voll, auch wenn im Designer 7 steht.
+    const currentByDevice = new Map<string, { stamps: number; goal: number; createdAt: Date }>()
     let redeemed = 0
     for (const p of cardPasses) {
       redeemed += p.rewardCount
       const dk = p.deviceKey as string
       const cur = currentByDevice.get(dk)
-      if (!cur || p.createdAt > cur.createdAt) currentByDevice.set(dk, { stamps: p.stamps, createdAt: p.createdAt })
+      if (!cur || p.createdAt > cur.createdAt) {
+        currentByDevice.set(dk, { stamps: p.stamps, goal: p.stampGoal, createdAt: p.createdAt })
+      }
     }
+
+    /*
+     * Die Achse des Diagramms.
+     *
+     * Wird das Ziel im Designer gesenkt, laufen ältere Karten mit höherem Ziel weiter.
+     * Die Achse muss die größte im Umlauf befindliche Zahl fassen, sonst fielen genau die
+     * Kunden aus der Grafik, die am längsten sammeln.
+     */
+    const chartGoal = Math.max(
+      cardGoal.get(cid) ?? 10,
+      ...cardPasses.map((p) => p.stampGoal),
+      1,
+    )
 
     let full = 0
     const counts = new Map<number, number>() // Stempelzahl -> Anzahl Kunden
     for (const cur of currentByDevice.values()) {
-      if (cur.stamps >= goal) full++
-      const s = Math.min(cur.stamps, goal)
+      if (cur.stamps >= cur.goal) full++
+      const s = Math.min(cur.stamps, chartGoal)
       if (s >= 1) counts.set(s, (counts.get(s) ?? 0) + 1)
     }
     const distribution: DistBucket[] = []
-    for (let s = 1; s <= goal; s++) distribution.push({ stamps: s, count: counts.get(s) ?? 0 })
+    for (let s = 1; s <= chartGoal; s++) distribution.push({ stamps: s, count: counts.get(s) ?? 0 })
 
     cardStats.push({
       name: cardName.get(cid) ?? 'Karte',
-      stampGoal: goal,
+      stampGoal: chartGoal,
       customers: currentByDevice.size,
       full,
       redeemed,

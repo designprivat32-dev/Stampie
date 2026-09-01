@@ -164,7 +164,13 @@ export async function POST(request: Request): Promise<Response> {
   const design = await loadPublishedDesign(pass.cardId)
   await Promise.all([
     pushAppleWalletUpdate(serial),
-    design ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, design) : Promise.resolve(),
+    design
+      ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, {
+          ...design,
+          // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
+          stampGoal: updated.stampGoal,
+        })
+      : Promise.resolve(),
   ])
 
   return NextResponse.json({
@@ -249,7 +255,13 @@ async function redeemFullCard(pass: FullPass, serial: string, userId: string): P
   const design = await loadPublishedDesign(pass.cardId)
   await Promise.all([
     pushAppleWalletUpdate(serial),
-    design ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, design) : Promise.resolve(),
+    design
+      ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, {
+          ...design,
+          // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
+          stampGoal: updated.stampGoal,
+        })
+      : Promise.resolve(),
   ])
 
   return NextResponse.json({
