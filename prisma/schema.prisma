@@ -26,6 +26,8 @@ datasource db {
 /// so every self-created customer offered an empty "Filiale" dropdown and no way to fill
 /// it. The master data it held moved here.
 model Organization {
+  /// Ab wie vielen Monaten ohne Besuch ein Kunde in der Statistik als „eingeschlafen“ gilt.
+  inaktivNachMonaten Int @default(2)
   id   String @id @default(cuid())
   name String
 
