@@ -26,6 +26,7 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       kind: true,
       cardId: true,
       activeMessage: true,
+      marketingConsentAt: true,
       card: {
         select: { name: true, activeMessage: true, org: { select: { name: true } } },
       },
@@ -56,6 +57,8 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
        * dieser Vorrang nicht zur Sackgasse wird.
        */
       message: pass.activeMessage ?? pass.card.activeMessage,
+      // Traegt den Widerruf-Link auf die Rueckseite — automatisch, ohne Zutun im Designer.
+      marketingConsent: pass.marketingConsentAt !== null,
     },
     pass.serial,
   )

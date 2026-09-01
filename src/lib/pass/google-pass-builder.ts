@@ -83,6 +83,7 @@ export function buildGoogleContext(
     serial,
     currentStamps: design.currentStamps,
     barcodeMessage: `${config.appUrl}/s/${serial}`,
+    marketingConsent: design.marketingConsent ?? false,
     // Never the raw asset: it is 160x50 for Apple, which Google would crop to a sliver.
     logoUrl: null,
     heroUrl: walletHeroUrl(config.appUrl, design.cardId, design, design.currentStamps),

@@ -61,7 +61,7 @@ export async function GET(
     deviceKey,
     marketingConsent,
   )
-  const design = await toHandoutDesign(resolved, currentStamps, serial)
+  const design = await toHandoutDesign(resolved, currentStamps, serial, marketingConsent)
   const builder = getPassBuilder()
 
   const response =

@@ -110,6 +110,15 @@ export interface BuildPassJsonContext {
   teamIdentifier: string
   /** Payload behind the barcode — the stamping URL. */
   barcodeMessage: string
+  /**
+   * Hat der Kunde in Werbenachrichten eingewilligt?
+   *
+   * Steuert nur ein Feld auf der Rückseite: den Widerruf. Der Widerruf muss so einfach
+   * sein wie die Zustimmung, und die war ein Fingertipp — eine Kartennummer abtippen ist
+   * das nicht. Wer nie zugestimmt hat, sieht das Feld nicht; sonst böte man an, etwas
+   * abzubestellen, das gar nicht läuft.
+   */
+  marketingConsent?: boolean
   customerName?: string | null
   memberSince?: Date | null
   /** Defaults to the stamp card so existing callers keep their behaviour. */
@@ -195,6 +204,17 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
     label: f.label,
     value: f.value,
   }))
+
+  // Ganz unten, wo auch Impressum und Datenschutz stehen. `attributedValue` macht daraus
+  // in Wallet einen Link; `value` bleibt als Klartext für alles, was das nicht darstellt.
+  if (ctx.marketingConsent) {
+    backFields.push({
+      key: 'marketing-opt-out',
+      label: 'Nachrichten',
+      value: ctx.barcodeMessage,
+      attributedValue: `<a href="${ctx.barcodeMessage}">Keine Nachrichten mehr erhalten</a>`,
+    })
+  }
 
   // Fine print is a legal term of the offer — it goes on the back, above the shop's own
   // fields, because that is where a customer looks for the conditions.

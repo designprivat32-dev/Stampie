@@ -55,6 +55,7 @@ export class MockPassBuilder implements PassBuilder {
       barcodeMessage: this.barcodeMessage(serial),
       kind: design.kind,
       message: design.message ?? null,
+      marketingConsent: design.marketingConsent ?? false,
       webService: authenticationToken
         ? { url: applePassKitBaseUrl(), authenticationToken }
         : null,

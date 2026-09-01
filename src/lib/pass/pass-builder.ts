@@ -49,6 +49,14 @@ export interface CardDesign extends CardDesignInput {
    * separately, because Apple has no separate channel — see `buildPassJson`.
    */
   message?: string | null
+  /**
+   * Hat der Kunde in Werbenachrichten eingewilligt?
+   *
+   * Steuert allein den Widerruf-Link auf der Rückseite. Er wird automatisch gesetzt und
+   * ist nichts, was im Designer eingerichtet werden müsste — ein Widerruf, den erst
+   * jemand einbauen muss, fehlt genau dort, wo er gebraucht wird.
+   */
+  marketingConsent?: boolean
 }
 
 export interface PassAssets {

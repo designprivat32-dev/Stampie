@@ -98,6 +98,8 @@ export interface BuildGoogleContext {
   serial: string
   currentStamps: number
   barcodeMessage: string
+  /** Siehe `marketingConsent` im Apple-Pass: derselbe Link, dieselbe Bedingung. */
+  marketingConsent?: boolean
   logoUrl?: string | null
   /**
    * The rendered stamp row at 3:1 — NOT the uploaded background image. An uploaded
@@ -183,6 +185,14 @@ export function buildLoyaltyObject(design: CardDesignInput, ctx: BuildGoogleCont
       value: ctx.barcodeMessage,
       alternateText: ctx.serial,
     },
+  }
+
+  // Am Objekt statt an der Klasse: die Klasse gilt für alle Karten dieses Betriebs, der
+  // Widerruf aber nur für die, die eingewilligt haben. Google verlinkt URLs im Text selbst.
+  if (ctx.marketingConsent) {
+    obj.textModulesData = [
+      { id: 'marketing-opt-out', header: 'Nachrichten', body: `Keine Nachrichten mehr erhalten: ${ctx.barcodeMessage}` },
+    ]
   }
 
   if (ctx.customerName && design.googleAccountNameEnabled) obj.accountName = ctx.customerName

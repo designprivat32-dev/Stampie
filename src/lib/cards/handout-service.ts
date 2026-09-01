@@ -170,6 +170,7 @@ export async function toHandoutDesign(
   resolved: ResolvedHandout,
   currentStamps: number,
   serial: string,
+  marketingConsent = false,
 ): Promise<CardDesign> {
   const [assets, appleAuthToken] = await Promise.all([
     loadPassAssets(resolved.design, resolved.cardId),
@@ -183,5 +184,6 @@ export async function toHandoutDesign(
     currentStamps,
     assets,
     appleAuthToken,
+    marketingConsent,
   }
 }

@@ -365,3 +365,43 @@ describe('the message field', () => {
     }
   })
 })
+
+/**
+ * Der Widerruf auf der Rückseite.
+ *
+ * Er wird automatisch gesetzt, nicht im Designer eingerichtet — ein Widerruf, den erst
+ * jemand einbauen muss, fehlt genau dort, wo er gebraucht wird. Und er erscheint nur auf
+ * Karten mit Einwilligung: sonst böte man an, etwas abzubestellen, das gar nicht läuft.
+ */
+describe('Widerruf auf der Kartenrückseite', () => {
+  const backOf = (p: PassJson) => storeCardOf(p).backFields
+  const optOut = (p: PassJson) => backOf(p).find((f) => f.key === 'marketing-opt-out')
+
+  it('fehlt ohne Einwilligung', () => {
+    expect(optOut(buildPassJson(design(), ctx))).toBeUndefined()
+    expect(optOut(buildPassJson(design(), { ...ctx, marketingConsent: false }))).toBeUndefined()
+  })
+
+  it('steht mit Einwilligung auf der Rückseite, als anklickbarer Link', () => {
+    const field = optOut(buildPassJson(design(), { ...ctx, marketingConsent: true }))
+
+    expect(field).toBeDefined()
+    expect(field!.attributedValue).toBe(
+      '<a href="https://stampie.de/s/SN-123">Keine Nachrichten mehr erhalten</a>',
+    )
+    // Klartext daneben, für alles was `attributedValue` nicht darstellt.
+    expect(field!.value).toBe('https://stampie.de/s/SN-123')
+  })
+
+  it('zeigt auf dieselbe Adresse wie der Strichcode', () => {
+    const p = buildPassJson(design(), { ...ctx, marketingConsent: true })
+    expect(optOut(p)!.value).toBe(p.barcode.message)
+  })
+
+  it('verdrängt die eigenen Felder des Betriebs nicht, sondern hängt sich an', () => {
+    const eigene: BackField[] = [{ id: 'impressum', label: 'Impressum', value: 'https://x.de/i' }]
+    const p = buildPassJson(design({ backFields: eigene }), { ...ctx, marketingConsent: true })
+
+    expect(backOf(p).map((f) => f.key)).toEqual(['impressum', 'marketing-opt-out'])
+  })
+})
