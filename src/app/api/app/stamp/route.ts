@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { requireAppUser } from '@/lib/auth/app-session'
 import {
   MAX_STAMPS_PER_BOOKING,
+  STAMP_COOLDOWN_MS,
+  decideRedeem,
   decideStamp,
   extractSerial,
   formatCooldown,
@@ -113,17 +115,19 @@ export async function POST(request: Request): Promise<Response> {
   })
 
   if (!decision.ok) {
-    if (decision.reason === 'already_full') {
-      return NextResponse.json(
-        {
-          error: 'Karte ist voll — bitte zuerst die Belohnung einlösen.',
-          code: 'full',
-          stamps: pass.stamps,
-          stampGoal: pass.stampGoal,
-        },
-        { status: 409 },
-      )
-    }
+    /*
+     * Volle Karte: einlösen statt abweisen.
+     *
+     * Vorher antwortete diese Stelle „bitte zuerst die Belohnung einlösen" — nur gab es in
+     * der App keinen Weg dorthin. Der Kassierer stand damit vor einer Karte, die sich weder
+     * stempeln noch einlösen ließ. Ein zweiter Scan auf der vollen Karte ist genau die
+     * Geste, die im Laden passiert: Kunde legt die volle Karte hin, bekommt seine
+     * Belohnung, die Karte fängt von vorn an.
+     *
+     * Übrige Stempel bleiben erhalten (siehe `decideRedeem`) — wer bei einem Ziel von 10
+     * mit 12 kommt, startet danach mit 2 und verliert nichts.
+     */
+    if (decision.reason === 'already_full') return redeemFullCard(pass, serial, appUser.userId)
     return NextResponse.json(
       {
         error: `Gerade eben schon gestempelt. In ${formatCooldown(decision.retryInMs)} erneut versuchen.`,
@@ -171,5 +175,92 @@ export async function POST(request: Request): Promise<Response> {
     /** Was wirklich gebucht wurde — am Ziel gedeckelt, kann also unter `count` liegen. */
     booked: decision.booked,
     completesCard: decision.completesCard,
+    redeemed: false,
+  })
+}
+
+interface FullPass {
+  id: string
+  stamps: number
+  stampGoal: number
+  cardId: string
+}
+
+/**
+ * Löst eine volle Karte ein und setzt sie zurück.
+ *
+ * Eigene Sperrfrist gegen den Doppelscan: bei Übertrag kann eine Karte nach dem Einlösen
+ * sofort wieder voll sein — 20 Stempel bei einem Ziel von 10. Ohne diese Prüfung machte
+ * ein zweimal ausgelöster Scanner aus einer Belohnung zwei, und eine Belohnung ist Geld.
+ */
+async function redeemFullCard(pass: FullPass, serial: string, userId: string): Promise<Response> {
+  const lastRedeem = await prisma.stampEvent.findFirst({
+    where: { passId: pass.id, kind: 'REDEEM' },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true },
+  })
+  if (lastRedeem) {
+    const elapsed = Date.now() - lastRedeem.createdAt.getTime()
+    if (elapsed < STAMP_COOLDOWN_MS) {
+      return NextResponse.json(
+        {
+          error: `Gerade eben schon eingelöst. In ${formatCooldown(STAMP_COOLDOWN_MS - elapsed)} erneut versuchen.`,
+          code: 'cooldown',
+          stamps: pass.stamps,
+          stampGoal: pass.stampGoal,
+        },
+        { status: 409 },
+      )
+    }
+  }
+
+  const decision = decideRedeem({ stamps: pass.stamps, stampGoal: pass.stampGoal })
+  // Kann hier nicht eintreten — die Karte ist voll, sonst wären wir nicht hier. Der Zweig
+  // steht, damit ein späterer Umbau der Regel nicht still eine Belohnung verschenkt.
+  if (!decision.ok) {
+    return NextResponse.json(
+      { error: 'Die Karte ist noch nicht voll.', code: 'not_full' },
+      { status: 409 },
+    )
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.issuedPass.update({
+      where: { id: pass.id },
+      data: {
+        stamps: decision.nextBalance,
+        rewardCount: { increment: 1 },
+        lastRewardAt: new Date(),
+      },
+    })
+    await tx.stampEvent.create({
+      data: {
+        passId: pass.id,
+        cardId: pass.cardId,
+        kind: 'REDEEM',
+        delta: -pass.stampGoal,
+        balance: decision.nextBalance,
+        stampedBy: userId,
+      },
+    })
+    return next
+  })
+
+  const design = await loadPublishedDesign(pass.cardId)
+  await Promise.all([
+    pushAppleWalletUpdate(serial),
+    design ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, design) : Promise.resolve(),
+  ])
+
+  return NextResponse.json({
+    ok: true,
+    serial,
+    stamps: updated.stamps,
+    stampGoal: updated.stampGoal,
+    booked: -pass.stampGoal,
+    completesCard: false,
+    /** Die App zeigt daraufhin „Belohnung eingelöst" statt „gestempelt". */
+    redeemed: true,
+    rewardCount: updated.rewardCount,
   })
 }
