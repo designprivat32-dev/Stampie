@@ -23,6 +23,15 @@ export function middleware(req: NextRequest): NextResponse {
 }
 
 function dashboardGate(req: NextRequest): NextResponse {
+  // Die lokale Entwickler-Sitzung kommt ohne Cookie aus (siehe `devSession` in
+  // `lib/auth/session`). Ohne diese Ausnahme schickt das Gate sie auf /login, /login
+  // findet eine gültige Sitzung und schickt zurück — eine Schleife, die das Dashboard
+  // lokal unerreichbar macht. Die Bedingung ist dieselbe wie dort, damit die beiden
+  // nicht auseinanderlaufen können.
+  if (process.env.NODE_ENV !== 'production' && process.env.DEV_SESSION_USER_EMAIL) {
+    return NextResponse.next()
+  }
+
   const token = req.cookies.get(DASHBOARD_COOKIE)?.value
   if (token?.startsWith(DASHBOARD_TOKEN_PREFIX)) return NextResponse.next()
 
