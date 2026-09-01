@@ -42,6 +42,9 @@ export default async function HandoutPrivacyPage({
     .filter((part) => part && part.trim().length > 0)
     .join(', ')
   const { processor, missing } = readProcessor()
+  // Ohne hinterlegte Stammdaten hat der Betrieb hier keine Anlaufstelle. Dann darf der
+  // Text nicht auf eine Adresse verweisen, die gar nicht dasteht.
+  const hasContact = Boolean(address || customer.phone || customer.email)
 
   return (
     <Shell title="Datenschutz">
@@ -57,7 +60,9 @@ export default async function HandoutPrivacyPage({
         {customer.phone ? <p>Telefon: {customer.phone}</p> : null}
         {customer.email ? <p>E-Mail: {customer.email}</p> : null}
         <p>
-          An diese Adresse richten Sie Auskunfts- und Löschanfragen zu Ihrer Stempelkarte.
+          {hasContact
+            ? 'An diese Adresse richten Sie Auskunfts- und Löschanfragen zu Ihrer Stempelkarte.'
+            : 'Für Auskunft oder Löschung wenden Sie sich bitte direkt an den Betrieb.'}
         </p>
       </Section>
 
