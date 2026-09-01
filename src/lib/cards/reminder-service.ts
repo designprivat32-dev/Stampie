@@ -68,7 +68,14 @@ async function deliverReminderToDueCustomers(reminder: ReminderRow, now: Date): 
 
   // Echte Kunden-Pässe dieser Karte — Testkarten bleiben außen vor.
   const passes = await prisma.issuedPass.findMany({
-    where: { cardId: reminder.cardId, isTest: false, kind: 'STAMP' },
+    // Eine Erinnerung ist Werbung, kein Dienst am Pass: ohne Einwilligung geht sie nicht
+    // raus. Fehlt sie, ist `marketingConsentAt` null.
+    where: {
+      cardId: reminder.cardId,
+      isTest: false,
+      kind: 'STAMP',
+      marketingConsentAt: { not: null },
+    },
     select: { id: true, serial: true, createdAt: true },
   })
   if (passes.length === 0) return 0

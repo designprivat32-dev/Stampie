@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getPassBuilder } from '@/lib/pass/mock-pass-builder'
 import { rateLimit } from '@/lib/rate-limit'
+import { hasConsentParam, CONSENT_PARAM } from '@/lib/privacy/consent'
 import {
   issuePassForDevice,
   newDeviceKey,
@@ -27,6 +28,9 @@ export async function GET(
 ): Promise<Response> {
   const { code } = await params
   const platform = request.nextUrl.searchParams.get('p')
+  // Die Einwilligung reist als Parameter mit, weil der Pass erst hier entsteht: vorher
+  // wird nichts gespeichert, auch kein angekreuztes Kästchen.
+  const marketingConsent = hasConsentParam(request.nextUrl.searchParams.get(CONSENT_PARAM))
 
   const resolved = await resolveHandoutCode(code)
   if (!resolved) {
@@ -52,7 +56,11 @@ export async function GET(
     )
   }
 
-  const { serial, currentStamps } = await issuePassForDevice(resolved, deviceKey)
+  const { serial, currentStamps } = await issuePassForDevice(
+    resolved,
+    deviceKey,
+    marketingConsent,
+  )
   const design = await toHandoutDesign(resolved, currentStamps, serial)
   const builder = getPassBuilder()
 

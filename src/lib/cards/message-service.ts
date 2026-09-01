@@ -1,7 +1,7 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { pushAppleWalletUpdateForCard, pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
-import { sendGoogleWalletMessage, sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
+import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
+import { sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
 import {
   matchesSegment,
   MESSAGE_SEGMENT_LABELS,
@@ -52,10 +52,10 @@ export async function deliverCardMessage(messageId: string): Promise<MessageDeli
   }
 
   const segment = parseMessageSegment(message.segment)
-  const result =
-    segment === 'ALL'
-      ? await deliverToEveryone(message)
-      : await deliverToSegment(message, segment)
+  // Auch "an alle" läuft über den Einzel-Pass-Weg. Der frühere Weg schrieb den Text auf
+  // die *Karte*, und den erbt jeder Pass — eine Einwilligung, die sich so umgehen lässt,
+  // wäre keine.
+  const result = await deliverToSegment(message, segment)
 
   // Written even when something failed: a half-delivered message must not be sent again by
   // the next run, or the shops that did receive it get it twice.
@@ -82,65 +82,6 @@ interface PendingMessage {
 }
 
 /**
- * Der Weg, den es immer schon gab: die Nachricht hängt an der Karte und erreicht damit
- * jeden, der sie hält.
- */
-async function deliverToEveryone(message: PendingMessage): Promise<MessageDeliveryResult> {
-  const problems: string[] = []
-
-  /*
-   * Apple notifies only when the field's value actually differs. Sending the same text
-   * twice would update nothing and notify nobody — so say that plainly instead of
-   * reporting a delivery that never happened.
-   */
-  let appleDevices = 0
-  if (message.card.activeMessage?.trim() === message.body.trim()) {
-    problems.push(
-      'Apple: identischer Text wie zuletzt — iPhones zeigen dafür keine Meldung. Bitte umformulieren.',
-    )
-  } else {
-    await prisma.card.update({
-      where: { id: message.cardId },
-      data: { activeMessage: message.body, activeMessageAt: new Date() },
-    })
-    /*
-     * Ältere Gruppennachrichten abräumen.
-     *
-     * Der Pass hat Vorrang vor der Karte. Ohne dieses Aufräumen würde ausgerechnet die
-     * Gruppe, die zuletzt einzeln angeschrieben wurde, die Nachricht an alle nicht sehen —
-     * ihr Pass zeigt weiter den alten Text.
-     */
-    await prisma.issuedPass.updateMany({
-      where: { cardId: message.cardId, activeMessage: { not: null } },
-      data: { activeMessage: null, activeMessageAt: null },
-    })
-    // Marks the passes as changed and knocks on every registered phone; each one then
-    // fetches a pass whose message field carries the new text.
-    const push = await pushAppleWalletUpdateForCard(message.cardId)
-    appleDevices = push.devices
-    if (push.failed > 0) problems.push(`Apple: ${push.failed} Karten nicht erreicht.`)
-  }
-
-  const google = await sendGoogleWalletMessage(
-    message.cardId,
-    { headline: message.headline, body: message.body },
-    message.card.kind,
-  )
-  if (google.status === 'error') problems.push(`Google: ${google.message}`)
-
-  const recipients = await prisma.issuedPass.count({
-    where: { cardId: message.cardId, isTest: false },
-  })
-
-  return {
-    appleDevices,
-    googleSynced: google.status === 'updated',
-    recipients,
-    error: problems.length > 0 ? problems.join(' ') : null,
-  }
-}
-
-/**
  * Der Weg für eine Gruppe: die Nachricht hängt am einzelnen Pass.
  *
  * Apple kennt keinen freien Push — eine Meldung entsteht, weil sich ein Feld ändert.
@@ -153,8 +94,15 @@ async function deliverToSegment(
   segment: MessageSegment,
 ): Promise<MessageDeliveryResult> {
   const passes = await prisma.issuedPass.findMany({
-    // Testkarten bleiben außen vor, wie überall: sie sind Werkzeug, kein Kunde.
-    where: { cardId: message.cardId, isTest: false, kind: 'STAMP' },
+    where: {
+      cardId: message.cardId,
+      // Testkarten bleiben außen vor, wie überall: sie sind Werkzeug, kein Kunde.
+      isTest: false,
+      // Stempelgruppen zählen Stempel; "alle" schließt Gutscheine mit ein.
+      ...(segment === 'ALL' ? {} : { kind: 'STAMP' as const }),
+      // Ohne Einwilligung keine Werbenachricht.
+      marketingConsentAt: { not: null },
+    },
     select: { id: true, serial: true, stamps: true, stampGoal: true, activeMessage: true },
   })
   const targets = passes.filter((pass) => matchesSegment(pass, segment))
@@ -164,7 +112,10 @@ async function deliverToSegment(
       appleDevices: 0,
       googleSynced: false,
       recipients: 0,
-      error: `Niemand in dieser Gruppe: „${MESSAGE_SEGMENT_LABELS[segment]}" trifft aktuell auf keine ausgegebene Karte zu.`,
+      error:
+        segment === 'ALL'
+          ? 'Niemand hat in Nachrichten eingewilligt. Das Häkchen setzen Kunden beim Hinzufügen der Karte.'
+          : `Niemand in dieser Gruppe: „${MESSAGE_SEGMENT_LABELS[segment]}" trifft aktuell auf keine ausgegebene Karte mit Einwilligung zu.`,
     }
   }
 

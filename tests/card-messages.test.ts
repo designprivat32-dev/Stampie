@@ -60,7 +60,7 @@ beforeEach(() => {
   messageFindMany.mockReset()
   messageUpdate.mockReset().mockResolvedValue({})
   cardUpdate.mockReset().mockResolvedValue({})
-  passFindMany.mockReset().mockResolvedValue([])
+  passFindMany.mockReset().mockResolvedValue([pass('p1', 3)])
   passUpdateMany.mockReset().mockResolvedValue({ count: 0 })
   passCount.mockReset().mockResolvedValue(12)
   pushForCard.mockReset().mockResolvedValue({ passes: 3, devices: 4, failed: 0 })
@@ -76,43 +76,72 @@ beforeEach(() => {
  * of a pass field changing. Every rule below follows from that, and getting one wrong is
  * silent — the shop sees "gesendet" and no phone ever lights up.
  */
-describe('deliverCardMessage', () => {
-  it('writes the text onto the card, then knocks on the phones', async () => {
+describe('deliverCardMessage — an alle', () => {
+  it('schreibt den Text auf die Pässe, nicht auf die Karte', async () => {
     messageFindFirst.mockResolvedValue(message())
 
     const result = await deliverCardMessage('m1')
 
-    expect(cardUpdate.mock.calls[0]?.[0].data.activeMessage).toBe('Heute doppelte Stempel.')
-    expect(pushForCard).toHaveBeenCalledWith('card-1')
-    expect(result.appleDevices).toBe(4)
+    // Frueher lag der Text auf der Karte und wurde von jedem Pass geerbt. Genau das ist
+    // der Weg, auf dem eine fehlende Einwilligung uebergangen wuerde.
+    expect(cardUpdate).not.toHaveBeenCalled()
+    expect(passUpdateMany.mock.calls[0]?.[0].data.activeMessage).toBe('Heute doppelte Stempel.')
+    expect(pushForPasses).toHaveBeenCalledWith(['sn_p1'])
     expect(result.googleSynced).toBe(true)
     expect(result.error).toBeNull()
   })
 
-  it('refuses to claim delivery when the text is unchanged', async () => {
-    messageFindFirst.mockResolvedValue(
-      message({ card: { kind: 'STAMP', activeMessage: 'Heute doppelte Stempel.' } }),
-    )
+  it('fragt nur Pässe mit Einwilligung ab', async () => {
+    messageFindFirst.mockResolvedValue(message())
+
+    await deliverCardMessage('m1')
+
+    expect(passFindMany.mock.calls[0]?.[0].where).toMatchObject({
+      cardId: 'card-1',
+      isTest: false,
+      marketingConsentAt: { not: null },
+    })
+  })
+
+  it('nimmt bei "an alle" auch Gutscheine mit, nicht nur Stempelkarten', async () => {
+    messageFindFirst.mockResolvedValue(message())
+
+    await deliverCardMessage('m1')
+
+    // Nur die Stempelgruppen zaehlen Stempel; "alle" darf sich nicht auf STAMP verengen.
+    expect(passFindMany.mock.calls[0]?.[0].where.kind).toBeUndefined()
+  })
+
+  it('sagt es, wenn niemand eingewilligt hat, statt Versand zu melden', async () => {
+    messageFindFirst.mockResolvedValue(message())
+    passFindMany.mockResolvedValue([])
 
     const result = await deliverCardMessage('m1')
 
-    // iOS notifies on a *changed* field. Same text, no change, no notification — so no
-    // push is even attempted and the shop is told why.
-    expect(pushForCard).not.toHaveBeenCalled()
-    expect(cardUpdate).not.toHaveBeenCalled()
+    expect(result.recipients).toBe(0)
+    expect(pushForPasses).not.toHaveBeenCalled()
+    expect(result.error).toContain('eingewilligt')
+  })
+
+  it('refuses to claim delivery when the text is unchanged', async () => {
+    messageFindFirst.mockResolvedValue(message())
+    passFindMany.mockResolvedValue([pass('p1', 3, { activeMessage: 'Heute doppelte Stempel.' })])
+
+    const result = await deliverCardMessage('m1')
+
+    // iOS meldet nur bei geaendertem Feld. Gleicher Text, keine Aenderung, keine Meldung.
+    expect(pushForPasses).not.toHaveBeenCalled()
     expect(result.appleDevices).toBe(0)
     expect(result.error).toContain('identischer Text')
   })
 
   it('still reaches Google when Apple has nothing to change', async () => {
-    messageFindFirst.mockResolvedValue(
-      message({ card: { kind: 'STAMP', activeMessage: 'Heute doppelte Stempel.' } }),
-    )
+    messageFindFirst.mockResolvedValue(message())
+    passFindMany.mockResolvedValue([pass('p1', 3, { activeMessage: 'Heute doppelte Stempel.' })])
 
     const result = await deliverCardMessage('m1')
 
-    // Google files the message itself and does not care whether the text repeats.
-    expect(sendGoogleMessage).toHaveBeenCalled()
+    expect(sendGoogleMessageToPasses).toHaveBeenCalled()
     expect(result.googleSynced).toBe(true)
   })
 
@@ -121,23 +150,23 @@ describe('deliverCardMessage', () => {
 
     await deliverCardMessage('m1')
 
-    expect(sendGoogleMessage.mock.calls[0]?.[2]).toBe('COUPON')
+    expect(sendGoogleMessageToPasses.mock.calls[0]?.[2]).toBe('COUPON')
   })
 
   it('marks a half-failed message as sent rather than retrying it forever', async () => {
     messageFindFirst.mockResolvedValue(message())
-    sendGoogleMessage.mockResolvedValue({ status: 'error', message: 'kaputt' })
+    sendGoogleMessageToPasses.mockResolvedValue({ delivered: 0, failed: 1, configured: true })
 
     const result = await deliverCardMessage('m1')
 
-    // The Apple half already went out. A retry would deliver it twice to those phones.
+    // Die Apple-Haelfte ist raus. Ein zweiter Versuch erreichte diese Handys doppelt.
     expect(messageUpdate.mock.calls[0]?.[0].data.sentAt).toBeInstanceOf(Date)
     expect(result.error).toContain('Google')
   })
 
   it('reports failed Apple pushes instead of swallowing them', async () => {
     messageFindFirst.mockResolvedValue(message())
-    pushForCard.mockResolvedValue({ passes: 1, devices: 1, failed: 2 })
+    pushForPasses.mockResolvedValue({ passes: 1, devices: 1, failed: 2 })
 
     const result = await deliverCardMessage('m1')
 
@@ -149,8 +178,8 @@ describe('deliverCardMessage', () => {
 
     const result = await deliverCardMessage('m1')
 
-    expect(pushForCard).not.toHaveBeenCalled()
-    expect(sendGoogleMessage).not.toHaveBeenCalled()
+    expect(pushForPasses).not.toHaveBeenCalled()
+    expect(sendGoogleMessageToPasses).not.toHaveBeenCalled()
     expect(result.error).toBeTruthy()
   })
 })
@@ -250,15 +279,17 @@ describe('deliverCardMessage an eine Gruppe', () => {
     expect(sendGoogleMessageToPasses).toHaveBeenCalled()
   })
 
-  it('raeumt beim Versand an alle die alten Gruppennachrichten ab', async () => {
+  it('ueberschreibt eine aeltere Gruppennachricht auf dem Pass', async () => {
     messageFindFirst.mockResolvedValue(message())
+    passFindMany.mockResolvedValue([pass('p1', 3, { activeMessage: 'Alte Gruppennachricht.' })])
 
     await deliverCardMessage('m1')
 
-    // Sonst ueberdeckt die letzte Gruppennachricht auf dem Pass den Rundruf der Karte.
-    const cleanup = passUpdateMany.mock.calls[0]?.[0]
-    expect(cleanup.where.cardId).toBe('card-1')
-    expect(cleanup.data.activeMessage).toBeNull()
+    // Frueher brauchte es dafuer einen Aufraeum-Schritt, weil der Rundruf auf der Karte
+    // lag und vom Pass ueberdeckt wurde. Jetzt wird der Pass direkt beschrieben.
+    const write = passUpdateMany.mock.calls[0]?.[0]
+    expect(write.where.id.in).toEqual(['p1'])
+    expect(write.data.activeMessage).toBe('Heute doppelte Stempel.')
   })
 
   it('haelt eine unbekannte Gruppe fuer "alle", statt den Lauf zu sprengen', async () => {
@@ -266,7 +297,7 @@ describe('deliverCardMessage an eine Gruppe', () => {
 
     await deliverCardMessage('m1')
 
-    expect(pushForCard).toHaveBeenCalledWith('card-1')
+    expect(pushForPasses).toHaveBeenCalledWith(['sn_p1'])
   })
 })
 
@@ -294,9 +325,9 @@ describe('deliverDueMessages', () => {
     messageFindFirst
       .mockResolvedValueOnce(message({ id: 'm1' }))
       .mockResolvedValueOnce(message({ id: 'm2', card: { kind: 'STAMP', activeMessage: null } }))
-    sendGoogleMessage
-      .mockResolvedValueOnce({ status: 'updated' })
-      .mockResolvedValueOnce({ status: 'error', message: 'kaputt' })
+    sendGoogleMessageToPasses
+      .mockResolvedValueOnce({ delivered: 1, failed: 0, configured: true })
+      .mockResolvedValueOnce({ delivered: 0, failed: 1, configured: true })
 
     expect(await deliverDueMessages()).toEqual({ delivered: 1, failed: 1 })
   })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { ConsentWithdraw } from './_components/consent-withdraw'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,7 @@ export default async function ScanLandingPage({
       stamps: true,
       stampGoal: true,
       cardId: true,
+      marketingConsentAt: true,
       card: { select: { name: true, orgId: true, org: { select: { name: true } } } },
     },
   })
@@ -69,6 +71,10 @@ export default async function ScanLandingPage({
       <p className="mt-5 text-[13px] leading-snug text-ink-3">
         Zum Sammeln zeig diese Karte beim Bezahlen vor — das Personal scannt sie.
       </p>
+
+      {/* Nur wer eingewilligt hat, sieht den Widerruf: für alle anderen wäre er ein
+          Angebot, etwas abzubestellen, das sie nie bestellt haben. */}
+      {pass.marketingConsentAt ? <ConsentWithdraw serial={pass.serial} /> : null}
     </Shell>
   )
 }

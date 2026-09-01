@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { loadPassAssets } from './asset-service'
 import { loadPublishedDesign } from './repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
+import { consentRecord } from '@/lib/privacy/consent'
 import type { CardDesignInput, CardKind } from './schema'
 import type { OpeningHours } from '@/types/customer'
 import type { CardDesign } from '@/lib/pass/pass-builder'
@@ -140,6 +141,8 @@ export async function findPassForDevice(
 export async function issuePassForDevice(
   resolved: ResolvedHandout,
   deviceKey: string,
+  /** Hat der Kunde auf der Ausgabeseite in Werbenachrichten eingewilligt? */
+  marketingConsent = false,
 ): Promise<{ serial: string; currentStamps: number; created: boolean }> {
   const existing = await findPassForDevice(resolved, deviceKey)
   if (existing) return { ...existing, created: false }
@@ -153,6 +156,8 @@ export async function issuePassForDevice(
       stamps: resolved.startStamps,
       stampGoal: resolved.design.stampGoal,
       designVersion: 1,
+      // Ohne Häkchen bleiben beide Felder null — und null heißt überall "keine Werbung".
+      ...(marketingConsent ? consentRecord() : {}),
     },
     select: { serial: true },
   })

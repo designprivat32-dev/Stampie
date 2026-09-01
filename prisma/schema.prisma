@@ -495,6 +495,14 @@ model IssuedPass {
   /// damit nicht eine alte Gruppennachricht die neue an alle überdeckt.
   activeMessage   String?
   activeMessageAt DateTime?
+
+  /// Einwilligung in Werbenachrichten, gesetzt beim Ausgeben der Karte.
+  /// Null heißt: keine. Nachrichten und Erinnerungen filtern darauf.
+  marketingConsentAt DateTime?
+  /// Wortlaut, dem zugestimmt wurde — Art. 7 Abs. 1 verlangt den Nachweis,
+  /// und der ist ohne die Fassung des Textes keiner.
+  marketingConsentText String?
+
   rewardCount  Int       @default(0)
 
   /// COUPON only: a coupon is single-use, so this is the hard latch against a second
