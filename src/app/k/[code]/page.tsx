@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { detectPlatform } from '@/lib/cards/test-card-service'
 import { resolveHandoutCode, type ResolvedHandout } from '@/lib/cards/handout-service'
+import Link from 'next/link'
 import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
 import { formatAddress, formatOpeningHours } from '@/types/customer'
 
@@ -92,6 +93,18 @@ export default async function HandoutLandingPage({
 
         <ShopDetails customer={resolved.customer} />
       </div>
+
+      {/* Die Erhebung beginnt mit dem Tippen auf einen der Wallet-Knöpfe. Der Hinweis
+          gehört deshalb auf diese Seite und nicht auf eine Website, die der Kunde im Laden
+          nie aufruft. */}
+      <p className="pt-8 text-center text-[12px] text-ink-3">
+        <Link
+          href={`/k/${code}/datenschutz`}
+          className="underline underline-offset-2 hover:text-ink"
+        >
+          Datenschutzhinweise
+        </Link>
+      </p>
     </main>
   )
 }

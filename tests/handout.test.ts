@@ -38,6 +38,7 @@ const resolved = {
     postalCode: null,
     city: null,
     phone: null,
+    email: null,
     website: null,
     openingHours: [],
   },
