@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireAppUser } from '@/lib/auth/app-session'
+import { inactivityCutoff, inactivityThreshold } from '@/lib/cards/inactivity'
 
 export const runtime = 'nodejs'
 
@@ -32,8 +33,16 @@ export async function GET(request: Request): Promise<Response> {
   const appUser = await requireAppUser(request)
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
-  // Schwelle „eingeschlafen" vorerst fest auf 2 Monate (editierbar folgt separat).
-  const inactiveAfterMonths = 2
+  /*
+   * Die Schwelle für „inaktiv" ist keine eigene Einstellung, sondern die, die der Betrieb
+   * mit seiner Erinnerung ohnehin gesetzt hat — dieselbe Frage, dieselbe Zahl. Ohne
+   * Erinnerung greift die Vorgabe. Siehe `lib/cards/inactivity`.
+   */
+  const reminders = await prisma.cardReminder.findMany({
+    where: { enabled: true, card: { orgId: appUser.orgId } },
+    select: { intervalMinutes: true },
+  })
+  const threshold = inactivityThreshold(reminders.map((r) => r.intervalMinutes))
 
   // Karten des Betriebs + aktuelles Stempel-Ziel (veröffentlicht, sonst Entwurf, sonst 10).
   const cards = await prisma.card.findMany({
@@ -56,7 +65,8 @@ export async function GET(request: Request): Promise<Response> {
       newThisMonth: 0,
       active: 0,
       inactive: 0,
-      inactiveAfterMonths,
+      inactiveAfterDays: threshold.days,
+      inactiveThresholdSource: threshold.source,
       cards: [],
     })
   }
@@ -80,8 +90,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const cutoff = new Date(now)
-  cutoff.setMonth(cutoff.getMonth() - inactiveAfterMonths)
+  const cutoff = inactivityCutoff(threshold, now)
 
   // Pro Gerät (= Person): erster Kontakt + letzter Besuch über alle seine Pässe.
   interface Dev {
@@ -131,10 +140,10 @@ export async function GET(request: Request): Promise<Response> {
     for (const cur of currentByDevice.values()) {
       if (cur.stamps >= goal) full++
       const s = Math.min(cur.stamps, goal)
-      if (s >= 1 && s <= goal) counts[s]++
+      if (s >= 1 && s <= goal) counts[s] = (counts[s] ?? 0) + 1
     }
     const distribution: DistBucket[] = []
-    for (let s = 1; s <= goal; s++) distribution.push({ stamps: s, count: counts[s] })
+    for (let s = 1; s <= goal; s++) distribution.push({ stamps: s, count: counts[s] ?? 0 })
 
     cardStats.push({
       name: cardName.get(cid) ?? 'Karte',
@@ -151,7 +160,8 @@ export async function GET(request: Request): Promise<Response> {
     newThisMonth,
     active,
     inactive,
-    inactiveAfterMonths,
+    inactiveAfterDays: threshold.days,
+    inactiveThresholdSource: threshold.source,
     cards: cardStats,
   })
 }
