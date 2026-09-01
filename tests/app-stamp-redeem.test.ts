@@ -86,26 +86,34 @@ beforeEach(() => {
 })
 
 describe('Scan auf einer vollen Karte', () => {
-  it('löst ein und setzt auf null zurück', async () => {
+  it('löst ein und stempelt den heutigen Besuch gleich mit', async () => {
     const res = await POST(scan())
     const body = await res.json()
 
     expect(res.status).toBe(200)
     expect(body.redeemed).toBe(true)
-    expect(body.stamps).toBe(0)
-    expect(body.booked).toBe(-10)
+    // Nicht 0: der Kunde stand gerade im Laden und hat bezahlt. Ginge er mit einer leeren
+    // Karte, müsste er beim nächsten Mal für denselben Besuch noch einmal anstehen.
+    expect(body.stamps).toBe(1)
+    expect(body.booked).toBe(1)
   })
 
-  it('schreibt eine REDEEM-Buchung in die Prüfspur', async () => {
+  it('trennt Einlösen und Stempeln in der Prüfspur', async () => {
     await POST(scan())
 
-    expect(eventCreate).toHaveBeenCalledOnce()
+    // Zwei Einträge, nicht ein verrechneter: sonst liesse sich später nicht mehr sagen,
+    // ob eine Belohnung herausgegeben wurde.
+    expect(eventCreate).toHaveBeenCalledTimes(2)
     expect(eventCreate.mock.calls[0]![0].data).toMatchObject({
-      passId: 'p1',
       kind: 'REDEEM',
       delta: -10,
       balance: 0,
       stampedBy: 'u1',
+    })
+    expect(eventCreate.mock.calls[1]![0].data).toMatchObject({
+      kind: 'STAMP',
+      delta: 1,
+      balance: 1,
     })
   })
 
@@ -117,13 +125,13 @@ describe('Scan auf einer vollen Karte', () => {
     expect(data.lastRewardAt).toBeInstanceOf(Date)
   })
 
-  it('behält übrige Stempel statt sie zu verschlucken', async () => {
-    // Ziel 10, aber 12 gesammelt: nach dem Einlösen bleiben 2 stehen.
+  it('behält übrige Stempel und zählt den Besuch obendrauf', async () => {
+    // Ziel 10, aber 12 gesammelt: 2 aus dem Übertrag plus der heutige Besuch.
     passFindFirst.mockResolvedValue({ ...vollerPass, stamps: 12 })
 
     const body = await (await POST(scan())).json()
 
-    expect(body.stamps).toBe(2)
+    expect(body.stamps).toBe(3)
   })
 
   it('gibt nicht zweimal hintereinander eine Belohnung heraus', async () => {

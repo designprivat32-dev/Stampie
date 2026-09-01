@@ -139,7 +139,7 @@ export async function POST(request: Request): Promise<Response> {
      * mit 12 kommt, startet danach mit 2 und verliert nichts.
      */
     if (decision.reason === 'already_full') {
-      return redeemFullCard(pass, goal, serial, appUser.userId)
+      return redeemFullCard(pass, goal, parsed.data.count, serial, appUser.userId)
     }
     return NextResponse.json(
       {
@@ -209,6 +209,8 @@ async function redeemFullCard(
   pass: FullPass,
   /** Das aktuelle Ziel aus dem Design — dieselbe Zahl, gegen die gestempelt wird. */
   goal: number,
+  /** Der Besuch, bei dem eingelöst wird, zählt für die neue Karte mit. */
+  count: number,
   serial: string,
   userId: string,
 ): Promise<Response> {
@@ -242,16 +244,29 @@ async function redeemFullCard(
     )
   }
 
+  /*
+   * Der Besuch, bei dem eingelöst wird, zählt schon für die neue Karte.
+   *
+   * Sonst geht der Kunde mit einer leeren Karte aus dem Laden, obwohl er gerade da war und
+   * bezahlt hat — er müsste beim nächsten Mal noch einmal für denselben Besuch anstehen.
+   * Übertrag und Neustempel addieren sich: wer mit 12 bei einem Ziel von 10 kommt, hat
+   * danach 2 aus dem Übertrag plus den heutigen.
+   */
+  const booked = Math.max(0, Math.min(count, goal - decision.nextBalance))
+  const finalBalance = decision.nextBalance + booked
+
   const updated = await prisma.$transaction(async (tx) => {
     const next = await tx.issuedPass.update({
       where: { id: pass.id },
       data: {
-        stamps: decision.nextBalance,
+        stamps: finalBalance,
         stampGoal: goal,
         rewardCount: { increment: 1 },
         lastRewardAt: new Date(),
       },
     })
+    // Zwei Einträge, nicht einer: die Prüfspur soll zeigen, dass eingelöst *und* gestempelt
+    // wurde. Eine verrechnete Zahl liesse sich später nicht mehr auseinandernehmen.
     await tx.stampEvent.create({
       data: {
         passId: pass.id,
@@ -262,6 +277,18 @@ async function redeemFullCard(
         stampedBy: userId,
       },
     })
+    if (booked > 0) {
+      await tx.stampEvent.create({
+        data: {
+          passId: pass.id,
+          cardId: pass.cardId,
+          kind: 'STAMP',
+          delta: booked,
+          balance: finalBalance,
+          stampedBy: userId,
+        },
+      })
+    }
     return next
   })
 
@@ -276,8 +303,8 @@ async function redeemFullCard(
     serial,
     stamps: updated.stamps,
     stampGoal: updated.stampGoal,
-    booked: -goal,
-    completesCard: false,
+    booked: booked,
+    completesCard: finalBalance >= goal,
     /** Die App zeigt daraufhin „Belohnung eingelöst" statt „gestempelt". */
     redeemed: true,
     rewardCount: updated.rewardCount,

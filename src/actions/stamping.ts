@@ -231,16 +231,26 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
       return fail(`Die Karte ist noch nicht voll (${pass.stamps} von ${goal}).`, 'validation')
     }
 
+    /*
+     * Der Besuch, bei dem eingelöst wird, zählt schon für die neue Karte — dieselbe Regel
+     * wie in der App-Kasse. Sonst ginge der Kunde mit einer leeren Karte, obwohl er gerade
+     * da war und bezahlt hat.
+     */
+    const booked = Math.min(1, goal - decision.nextBalance)
+    const finalBalance = decision.nextBalance + Math.max(0, booked)
+
     const updated = await prisma.$transaction(async (tx) => {
       const next = await tx.issuedPass.update({
         where: { id: pass.id },
         data: {
-          stamps: decision.nextBalance,
+          stamps: finalBalance,
           stampGoal: goal,
           rewardCount: { increment: 1 },
           lastRewardAt: new Date(),
         },
       })
+      // Zwei Einträge, nicht einer: die Prüfspur soll Einlösen und Stempeln getrennt
+      // zeigen, sonst liesse sich später nicht mehr auseinandernehmen, was passiert ist.
       await tx.stampEvent.create({
         data: {
           passId: pass.id,
@@ -251,6 +261,18 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
           stampedBy: session.userId,
         },
       })
+      if (booked > 0) {
+        await tx.stampEvent.create({
+          data: {
+            passId: pass.id,
+            cardId,
+            kind: 'STAMP',
+            delta: booked,
+            balance: finalBalance,
+            stampedBy: session.userId,
+          },
+        })
+      }
       return next
     })
 
