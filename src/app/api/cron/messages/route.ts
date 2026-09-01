@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { deliverDueMessages } from '@/lib/cards/message-service'
 import { deliverDueReminders } from '@/lib/cards/reminder-service'
+import { runRetention } from '@/lib/privacy/retention'
 
 export const runtime = 'nodejs'
 /** Sending must never be served from a cache. */
@@ -36,5 +37,8 @@ export async function GET(request: NextRequest): Promise<Response> {
   const result = await deliverDueMessages()
   // Im selben Lauf: wiederkehrende Karten-Erinnerungen, die heute fällig sind.
   const reminders = await deliverDueReminders()
-  return NextResponse.json({ ok: true, ...result, reminders })
+  // Und zuletzt das Aufräumen — nach dem Versand, damit ein Fehler beim Löschen niemals
+  // eine fällige Nachricht verschluckt.
+  const retention = await runRetention()
+  return NextResponse.json({ ok: true, ...result, reminders, retention })
 }

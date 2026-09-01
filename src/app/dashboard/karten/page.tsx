@@ -39,6 +39,9 @@ export default async function KartenPage() {
               <Link href="/dashboard/kunden" className="text-ink-3 transition-colors hover:text-ink">
                 Kunden
               </Link>
+              <Link href="/dashboard/auskunft" className="text-ink-3 transition-colors hover:text-ink">
+                Auskunft
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">

@@ -2,24 +2,20 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth/session'
 import { LogoutButton } from '@/components/logout-button'
-import { listCustomerRecords } from '@/lib/customers/customer-service'
-import { CustomersView } from './_components/customers-view'
+import { PassLookup } from './_components/pass-lookup'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Customer overview.
+ * Auskunft und Löschung zu einer einzelnen Karte.
  *
- * Every signed-in operator may manage every customer — there is no agency/owner split
- * here. Access is the `DASHBOARD_ADMIN_EMAILS` allowlist, which no business login is on.
+ * Damit ein Betrieb auf eine Anfrage nach Art. 15 oder Art. 17 antworten kann, ohne dass
+ * jemand mit einem Datenbank-Zugang in der Produktion suchen muss.
  */
-export default async function KundenPage() {
+export default async function AuskunftPage() {
   const session = await getSession()
   if (!session) redirect('/login')
-  // A temporary password has to be replaced before anything else is reachable.
   if (session.mustChangePassword) redirect('/dashboard/konto')
-
-  const customers = await listCustomerRecords(null)
 
   return (
     <div className="min-h-dvh bg-canvas">
@@ -31,10 +27,10 @@ export default async function KundenPage() {
               <Link href="/dashboard/karten" className="text-ink-3 transition-colors hover:text-ink">
                 Karten
               </Link>
-              <Link href="/dashboard/kunden" className="font-medium text-ink">
+              <Link href="/dashboard/kunden" className="text-ink-3 transition-colors hover:text-ink">
                 Kunden
               </Link>
-              <Link href="/dashboard/auskunft" className="text-ink-3 transition-colors hover:text-ink">
+              <Link href="/dashboard/auskunft" className="font-medium text-ink">
                 Auskunft
               </Link>
             </nav>
@@ -51,8 +47,16 @@ export default async function KundenPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-6">
-        <CustomersView customers={customers} canManage />
+      <main className="mx-auto max-w-2xl px-6 py-8">
+        <h1 className="text-[17px] font-semibold text-ink">Auskunft und Löschung</h1>
+        <p className="mt-1 max-w-prose text-[13px] leading-snug text-ink-3">
+          Fragt ein Kunde, welche Daten zu seiner Karte gespeichert sind, oder verlangt er
+          deren Löschung: Kartennummer eingeben. Sie steht auf der Karte im Wallet, unter
+          dem Strichcode.
+        </p>
+        <div className="mt-6">
+          <PassLookup />
+        </div>
       </main>
     </div>
   )

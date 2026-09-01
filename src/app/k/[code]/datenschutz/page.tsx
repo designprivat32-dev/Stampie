@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { resolveHandoutCode } from '@/lib/cards/handout-service'
 import { readProcessor } from '@/lib/legal/processor'
+import { readRetentionPolicy } from '@/lib/privacy/retention'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +46,9 @@ export default async function HandoutPrivacyPage({
   // Ohne hinterlegte Stammdaten hat der Betrieb hier keine Anlaufstelle. Dann darf der
   // Text nicht auf eine Adresse verweisen, die gar nicht dasteht.
   const hasContact = Boolean(address || customer.phone || customer.email)
+  // Die genannte Frist ist die, die der Aufräum-Lauf tatsächlich anwendet — keine Zahl,
+  // die hier steht und sonst nirgends gilt.
+  const { stampEventDays } = readRetentionPolicy()
 
   return (
     <Shell title="Datenschutz">
@@ -126,8 +130,14 @@ export default async function HandoutPrivacyPage({
 
       <Section title="Wie lange">
         <p>
-          Solange Sie die Karte nutzen. Löschen Sie die Karte aus Ihrem Wallet oder bitten
-          Sie den Betrieb um Löschung, werden die Daten zu Ihrer Karte entfernt.
+          Ihre Karte und ihr Stempelstand bleiben, solange Sie die Karte nutzen. Die
+          Angaben dazu, <em>wann</em> einzelne Stempel gebucht wurden, werden nach{' '}
+          {stampEventDays} Tagen automatisch gelöscht — der Stempelstand bleibt dabei
+          erhalten.
+        </p>
+        <p>
+          Löschen Sie die Karte aus Ihrem Wallet oder bitten Sie den Betrieb um Löschung,
+          werden alle Daten zu Ihrer Karte entfernt.
         </p>
       </Section>
 
