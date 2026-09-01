@@ -151,9 +151,17 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
       select: { createdAt: true },
     })
 
+    /*
+     * Massgeblich ist das aktuelle Design, nicht das beim Ausgeben eingefrorene Ziel.
+     * Aendert der Betrieb die Stempelzahl, gilt sie fuer alle Karten — sonst laufen
+     * mehrere Ziele nebeneinander und niemand weiss mehr, welche Karte wann voll ist.
+     */
+    const design = await currentDesign(cardId)
+    const goal = design.stampGoal
+
     const decision = decideStamp({
       stamps: pass.stamps,
-      stampGoal: pass.stampGoal,
+      stampGoal: goal,
       lastStampAt: last?.createdAt ?? null,
     })
 
@@ -171,7 +179,7 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
     const updated = await prisma.$transaction(async (tx) => {
       const next = await tx.issuedPass.update({
         where: { id: pass.id },
-        data: { stamps: decision.nextBalance },
+        data: { stamps: decision.nextBalance, stampGoal: goal },
       })
       await tx.stampEvent.create({
         data: {
@@ -186,16 +194,11 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
       return next
     })
 
-    const design = await currentDesign(cardId)
     const labels = toLabels(design)
     // Both wallets in parallel: neither may hold up the till, and Apple's push involves a
     // TLS handshake per device.
     const [sync] = await Promise.all([
-      syncGoogleStampCount(cardId, serial, updated.stamps, {
-        ...design,
-        // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
-        stampGoal: updated.stampGoal,
-      }),
+      syncGoogleStampCount(cardId, serial, updated.stamps, design),
       pushAppleWalletUpdate(serial),
     ])
 
@@ -220,12 +223,12 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
     const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId } })
     if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Stempelkarte.`, 'not_found')
 
-    const decision = decideRedeem({ stamps: pass.stamps, stampGoal: pass.stampGoal })
+    const design = await currentDesign(cardId)
+    const goal = design.stampGoal
+
+    const decision = decideRedeem({ stamps: pass.stamps, stampGoal: goal })
     if (!decision.ok) {
-      return fail(
-        `Die Karte ist noch nicht voll (${pass.stamps} von ${pass.stampGoal}).`,
-        'validation',
-      )
+      return fail(`Die Karte ist noch nicht voll (${pass.stamps} von ${goal}).`, 'validation')
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -233,6 +236,7 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
         where: { id: pass.id },
         data: {
           stamps: decision.nextBalance,
+          stampGoal: goal,
           rewardCount: { increment: 1 },
           lastRewardAt: new Date(),
         },
@@ -242,7 +246,7 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
           passId: pass.id,
           cardId,
           kind: 'REDEEM',
-          delta: -pass.stampGoal,
+          delta: -goal,
           balance: decision.nextBalance,
           stampedBy: session.userId,
         },
@@ -250,16 +254,11 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
       return next
     })
 
-    const design = await currentDesign(cardId)
     const labels = toLabels(design)
     // Both wallets in parallel: neither may hold up the till, and Apple's push involves a
     // TLS handshake per device.
     const [sync] = await Promise.all([
-      syncGoogleStampCount(cardId, serial, updated.stamps, {
-        ...design,
-        // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
-        stampGoal: updated.stampGoal,
-      }),
+      syncGoogleStampCount(cardId, serial, updated.stamps, design),
       pushAppleWalletUpdate(serial),
     ])
 

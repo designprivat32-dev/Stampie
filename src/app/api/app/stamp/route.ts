@@ -107,9 +107,20 @@ export async function POST(request: Request): Promise<Response> {
     select: { createdAt: true },
   })
 
+  /*
+   * Massgeblich ist das aktuelle Design, nicht das beim Ausgeben eingefrorene Ziel.
+   *
+   * Aendert ein Betrieb die Stempelzahl, soll sie fuer alle Karten gelten -- sonst laufen
+   * mehrere Ziele nebeneinander und niemand weiss mehr, welche Karte wann voll ist.
+   * `IssuedPass.stampGoal` wird bei jeder Buchung nachgezogen und bleibt damit ehrlich,
+   * statt einen Stand zu behaupten, gegen den niemand rechnet.
+   */
+  const design = await loadPublishedDesign(pass.cardId)
+  const goal = design?.stampGoal ?? pass.stampGoal
+
   const decision = decideStamp({
     stamps: pass.stamps,
-    stampGoal: pass.stampGoal,
+    stampGoal: goal,
     lastStampAt: last?.createdAt ?? null,
     requested: parsed.data.count,
   })
@@ -127,7 +138,9 @@ export async function POST(request: Request): Promise<Response> {
      * Übrige Stempel bleiben erhalten (siehe `decideRedeem`) — wer bei einem Ziel von 10
      * mit 12 kommt, startet danach mit 2 und verliert nichts.
      */
-    if (decision.reason === 'already_full') return redeemFullCard(pass, serial, appUser.userId)
+    if (decision.reason === 'already_full') {
+      return redeemFullCard(pass, goal, serial, appUser.userId)
+    }
     return NextResponse.json(
       {
         error: `Gerade eben schon gestempelt. In ${formatCooldown(decision.retryInMs)} erneut versuchen.`,
@@ -141,7 +154,7 @@ export async function POST(request: Request): Promise<Response> {
   const updated = await prisma.$transaction(async (tx) => {
     const next = await tx.issuedPass.update({
       where: { id: pass.id },
-      data: { stamps: decision.nextBalance },
+      data: { stamps: decision.nextBalance, stampGoal: goal },
     })
     await tx.stampEvent.create({
       data: {
@@ -161,16 +174,9 @@ export async function POST(request: Request): Promise<Response> {
   // Best-effort: the stamp is booked and audited, so a phone that is off must not turn a
   // successful scan into an error at the till. Beide Wallets aktualisieren — sonst zählt der
   // Google-Wallet-Pass des Kunden beim Stempeln über die App nicht hoch (Apple schon).
-  const design = await loadPublishedDesign(pass.cardId)
   await Promise.all([
     pushAppleWalletUpdate(serial),
-    design
-      ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, {
-          ...design,
-          // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
-          stampGoal: updated.stampGoal,
-        })
-      : Promise.resolve(),
+    design ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, design) : Promise.resolve(),
   ])
 
   return NextResponse.json({
@@ -199,7 +205,13 @@ interface FullPass {
  * sofort wieder voll sein — 20 Stempel bei einem Ziel von 10. Ohne diese Prüfung machte
  * ein zweimal ausgelöster Scanner aus einer Belohnung zwei, und eine Belohnung ist Geld.
  */
-async function redeemFullCard(pass: FullPass, serial: string, userId: string): Promise<Response> {
+async function redeemFullCard(
+  pass: FullPass,
+  /** Das aktuelle Ziel aus dem Design — dieselbe Zahl, gegen die gestempelt wird. */
+  goal: number,
+  serial: string,
+  userId: string,
+): Promise<Response> {
   const lastRedeem = await prisma.stampEvent.findFirst({
     where: { passId: pass.id, kind: 'REDEEM' },
     orderBy: { createdAt: 'desc' },
@@ -213,14 +225,14 @@ async function redeemFullCard(pass: FullPass, serial: string, userId: string): P
           error: `Gerade eben schon eingelöst. In ${formatCooldown(STAMP_COOLDOWN_MS - elapsed)} erneut versuchen.`,
           code: 'cooldown',
           stamps: pass.stamps,
-          stampGoal: pass.stampGoal,
+          stampGoal: goal,
         },
         { status: 409 },
       )
     }
   }
 
-  const decision = decideRedeem({ stamps: pass.stamps, stampGoal: pass.stampGoal })
+  const decision = decideRedeem({ stamps: pass.stamps, stampGoal: goal })
   // Kann hier nicht eintreten — die Karte ist voll, sonst wären wir nicht hier. Der Zweig
   // steht, damit ein späterer Umbau der Regel nicht still eine Belohnung verschenkt.
   if (!decision.ok) {
@@ -235,6 +247,7 @@ async function redeemFullCard(pass: FullPass, serial: string, userId: string): P
       where: { id: pass.id },
       data: {
         stamps: decision.nextBalance,
+        stampGoal: goal,
         rewardCount: { increment: 1 },
         lastRewardAt: new Date(),
       },
@@ -244,7 +257,7 @@ async function redeemFullCard(pass: FullPass, serial: string, userId: string): P
         passId: pass.id,
         cardId: pass.cardId,
         kind: 'REDEEM',
-        delta: -pass.stampGoal,
+        delta: -goal,
         balance: decision.nextBalance,
         stampedBy: userId,
       },
@@ -255,13 +268,7 @@ async function redeemFullCard(pass: FullPass, serial: string, userId: string): P
   const design = await loadPublishedDesign(pass.cardId)
   await Promise.all([
     pushAppleWalletUpdate(serial),
-    design
-      ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, {
-          ...design,
-          // Siehe pass-rebuild: das eingefrorene Ziel des Passes ist massgeblich.
-          stampGoal: updated.stampGoal,
-        })
-      : Promise.resolve(),
+    design ? syncGoogleStampCount(pass.cardId, serial, updated.stamps, design) : Promise.resolve(),
   ])
 
   return NextResponse.json({
@@ -269,7 +276,7 @@ async function redeemFullCard(pass: FullPass, serial: string, userId: string): P
     serial,
     stamps: updated.stamps,
     stampGoal: updated.stampGoal,
-    booked: -pass.stampGoal,
+    booked: -goal,
     completesCard: false,
     /** Die App zeigt daraufhin „Belohnung eingelöst" statt „gestempelt". */
     redeemed: true,

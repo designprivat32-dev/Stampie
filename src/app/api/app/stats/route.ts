@@ -147,47 +147,36 @@ export async function GET(request: Request): Promise<Response> {
   // Pro Karte: Kunden, „voll", eingelöst, Stempel-Verteilung (nach Gerät entdoppelt).
   const cardStats: CardStat[] = []
   for (const cid of cardIds) {
+    // Eine Zahl für alle Karten dieses Programms — dieselbe, gegen die beide Kassen
+    // rechnen und die im Wallet steht.
+    const goal = cardGoal.get(cid) ?? 10
     const cardPasses = passes.filter((p) => p.cardId === cid)
 
-    // Aktueller Pass je Gerät auf dieser Karte = der neueste. Sein eigenes Ziel wandert
-    // mit: wer eine 10er-Karte hält, ist bei 8 nicht voll, auch wenn im Designer 7 steht.
-    const currentByDevice = new Map<string, { stamps: number; goal: number; createdAt: Date }>()
+    // Aktueller Pass je Gerät auf dieser Karte = der neueste.
+    const currentByDevice = new Map<string, { stamps: number; createdAt: Date }>()
     let redeemed = 0
     for (const p of cardPasses) {
       redeemed += p.rewardCount
       const dk = p.deviceKey as string
       const cur = currentByDevice.get(dk)
       if (!cur || p.createdAt > cur.createdAt) {
-        currentByDevice.set(dk, { stamps: p.stamps, goal: p.stampGoal, createdAt: p.createdAt })
+        currentByDevice.set(dk, { stamps: p.stamps, createdAt: p.createdAt })
       }
     }
-
-    /*
-     * Die Achse des Diagramms.
-     *
-     * Wird das Ziel im Designer gesenkt, laufen ältere Karten mit höherem Ziel weiter.
-     * Die Achse muss die größte im Umlauf befindliche Zahl fassen, sonst fielen genau die
-     * Kunden aus der Grafik, die am längsten sammeln.
-     */
-    const chartGoal = Math.max(
-      cardGoal.get(cid) ?? 10,
-      ...cardPasses.map((p) => p.stampGoal),
-      1,
-    )
 
     let full = 0
     const counts = new Map<number, number>() // Stempelzahl -> Anzahl Kunden
     for (const cur of currentByDevice.values()) {
-      if (cur.stamps >= cur.goal) full++
-      const s = Math.min(cur.stamps, chartGoal)
+      if (cur.stamps >= goal) full++
+      const s = Math.min(cur.stamps, goal)
       if (s >= 1) counts.set(s, (counts.get(s) ?? 0) + 1)
     }
     const distribution: DistBucket[] = []
-    for (let s = 1; s <= chartGoal; s++) distribution.push({ stamps: s, count: counts.get(s) ?? 0 })
+    for (let s = 1; s <= goal; s++) distribution.push({ stamps: s, count: counts.get(s) ?? 0 })
 
     cardStats.push({
       name: cardName.get(cid) ?? 'Karte',
-      stampGoal: chartGoal,
+      stampGoal: goal,
       customers: currentByDevice.size,
       full,
       redeemed,

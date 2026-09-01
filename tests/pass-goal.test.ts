@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * Welches Stempel-Ziel eine ausgegebene Karte zeigt.
+ * Welches Stempel-Ziel gilt.
  *
- * Das Ziel wird beim Ausgeben in `IssuedPass.stampGoal` eingefroren, das Design im
- * Designer kann sich danach ändern. Lange lief beides auseinander: die Karte im Wallet
- * wurde aus dem *Design* gebaut, die Kasse rechnete gegen den *Pass*. Bei Hairlight
- * standen dadurch 63 Karten mit Zielen von 5, 9 und 10 im Umlauf, während der Designer 7
- * zeigte — ein Kunde sah „7/7 — voll" und wurde an der Kasse weiter gestempelt.
+ * Es gibt zwei Kandidaten: das beim Ausgeben in `IssuedPass.stampGoal` eingefrorene und
+ * das aktuelle im Design. Lange las jede Seite ein anderes — die Karte im Wallet wurde aus
+ * dem Design gebaut, die Kasse rechnete gegen den Pass. Bei Hairlight standen dadurch
+ * Karten mit Zielen von 5, 9 und 10 im Umlauf, während der Designer 7 zeigte.
  *
- * Der Pass gewinnt. Eine Treuekarte ist ein Versprechen, und das ändert man nicht
- * nachträglich zulasten dessen, der schon sammelt.
+ * Entschieden ist: **das Design gilt, für alle Karten.** Ändert ein Betrieb die
+ * Stempelzahl, zieht sie überall mit — sonst laufen mehrere Ziele nebeneinander und
+ * niemand weiß mehr, welche Karte wann voll ist. `IssuedPass.stampGoal` wird bei jeder
+ * Buchung nachgezogen und bleibt dadurch ehrlich, statt einen Stand zu behaupten, gegen
+ * den niemand rechnet.
  */
 
 const passFindFirst = vi.fn()
@@ -29,7 +31,7 @@ vi.mock('@/lib/pass/apple-passkit-auth', () => ({ ensureAppleAuthToken: async ()
 const loadPublishedDesign = vi.fn()
 vi.mock('@/lib/cards/repository', () => ({
   loadPublishedDesign: (...a: unknown[]) => loadPublishedDesign(...a),
-  loadOrCreateDraft: async () => ({ design: { stampGoal: 99, stampLabel: 'Stempel' } }),
+  loadOrCreateDraft: async () => ({ design: { stampGoal: 99, stampLabel: 'Entwurf' } }),
 }))
 
 const { rebuildIssuedPass } = await import('@/lib/cards/pass-rebuild')
@@ -37,7 +39,7 @@ const { rebuildIssuedPass } = await import('@/lib/cards/pass-rebuild')
 const pass = {
   serial: 'K-1',
   stamps: 8,
-  // Diese Karte wurde mit Ziel 10 ausgegeben …
+  // Ausgegeben mit Ziel 10 …
   stampGoal: 10,
   kind: 'STAMP',
   cardId: 'c1',
@@ -49,23 +51,25 @@ const pass = {
 beforeEach(() => {
   vi.clearAllMocks()
   passFindFirst.mockResolvedValue(pass)
-  // … während im Designer inzwischen 7 steht.
+  // … im Designer steht inzwischen 7.
   loadPublishedDesign.mockResolvedValue({ stampGoal: 7, stampLabel: 'Schnitte' })
   buildApplePass.mockResolvedValue(Buffer.from('pkpass'))
 })
 
 describe('rebuildIssuedPass', () => {
-  it('baut die Karte mit dem Ziel des Passes, nicht dem des Designs', async () => {
+  it('baut die Karte mit dem Ziel des Designs', async () => {
     await rebuildIssuedPass('K-1')
 
-    expect(buildApplePass.mock.calls[0]![0].stampGoal).toBe(10)
+    // Die Kasse rechnet gegen dieselbe Zahl — deshalb darf hier keine andere stehen.
+    expect(buildApplePass.mock.calls[0]![0].stampGoal).toBe(7)
   })
 
-  it('übernimmt alles Übrige weiterhin aus dem Design', async () => {
+  it('gilt auch, wenn das Ziel erhöht wurde', async () => {
+    loadPublishedDesign.mockResolvedValue({ stampGoal: 12, stampLabel: 'Schnitte' })
+
     await rebuildIssuedPass('K-1')
 
-    // Farben, Beschriftungen, Bilder folgen dem Designer — nur das Ziel nicht.
-    expect(buildApplePass.mock.calls[0]![0].stampLabel).toBe('Schnitte')
+    expect(buildApplePass.mock.calls[0]![0].stampGoal).toBe(12)
   })
 
   it('zeigt den Stand des Passes', async () => {
@@ -74,14 +78,12 @@ describe('rebuildIssuedPass', () => {
     expect(buildApplePass.mock.calls[0]![0].currentStamps).toBe(8)
   })
 
-  it('gilt auch, wenn das Design ein höheres Ziel hat als der Pass', async () => {
-    passFindFirst.mockResolvedValue({ ...pass, stampGoal: 5, stamps: 5 })
-    loadPublishedDesign.mockResolvedValue({ stampGoal: 12, stampLabel: 'Schnitte' })
+  it('nimmt den Entwurf, solange nichts veröffentlicht ist', async () => {
+    loadPublishedDesign.mockResolvedValue(null)
 
     await rebuildIssuedPass('K-1')
 
-    // Wer mit 5 angefangen hat, ist bei 5 fertig — die Kasse sieht das genauso.
-    expect(buildApplePass.mock.calls[0]![0].stampGoal).toBe(5)
+    expect(buildApplePass.mock.calls[0]![0].stampGoal).toBe(99)
   })
 
   it('gibt null zurück, wenn es die Karte nicht mehr gibt', async () => {
