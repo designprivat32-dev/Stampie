@@ -189,10 +189,19 @@ export function buildLoyaltyObject(design: CardDesignInput, ctx: BuildGoogleCont
 
   // Am Objekt statt an der Klasse: die Klasse gilt für alle Karten dieses Betriebs, der
   // Widerruf aber nur für die, die eingewilligt haben. Google verlinkt URLs im Text selbst.
+  obj.textModulesData = [
+    {
+      id: 'card-privacy',
+      header: 'Datenschutz zur Karte',
+      body: `Was diese Karte speichert: ${ctx.barcodeMessage}/datenschutz`,
+    },
+  ]
   if (ctx.marketingConsent) {
-    obj.textModulesData = [
-      { id: 'marketing-opt-out', header: 'Nachrichten', body: `Keine Nachrichten mehr erhalten: ${ctx.barcodeMessage}` },
-    ]
+    obj.textModulesData.push({
+      id: 'marketing-opt-out',
+      header: 'Nachrichten',
+      body: `Keine Nachrichten mehr erhalten: ${ctx.barcodeMessage}`,
+    })
   }
 
   if (ctx.customerName && design.googleAccountNameEnabled) obj.accountName = ctx.customerName

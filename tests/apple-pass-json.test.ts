@@ -129,7 +129,10 @@ describe('buildPassJson', () => {
       label: `L${i}`,
       value: `V${i}`,
     }))
-    expect(storeCardOf(buildPassJson(design({ backFields }), ctx)).backFields).toHaveLength(20)
+    const emitted = storeCardOf(buildPassJson(design({ backFields }), ctx)).backFields
+    // 20 eigene plus die Datenschutzinformation zur Karte, die jeder Pass traegt.
+    expect(emitted.filter((f) => f.key.startsWith('f'))).toHaveLength(20)
+    expect(emitted.map((f) => f.key).at(-1)).toBe('card-privacy')
   })
 
   it('sets sharingProhibited only when sharing is off', () => {
@@ -373,6 +376,32 @@ describe('the message field', () => {
  * jemand einbauen muss, fehlt genau dort, wo er gebraucht wird. Und er erscheint nur auf
  * Karten mit Einwilligung: sonst böte man an, etwas abzubestellen, das gar nicht läuft.
  */
+describe('Datenschutzinformation auf der Kartenrückseite', () => {
+  const findField = (p: PassJson, key: string) =>
+    storeCardOf(p).backFields.find((f) => f.key === key)
+
+  it('steht auf jedem Pass, auch ohne Einwilligung', () => {
+    const field = findField(buildPassJson(design(), ctx), 'card-privacy')
+
+    expect(field).toBeDefined()
+    // Haengt an der Seriennummer, nicht am Ausgabe-Code: den hat der Kunde nie gesehen.
+    expect(field!.value).toBe('https://stampie.de/s/SN-123/datenschutz')
+    expect(field!.attributedValue).toContain('Was diese Karte speichert')
+  })
+
+  it('ist etwas anderes als der Datenschutz-Link des Betriebs', () => {
+    const eigene: BackField[] = [
+      { id: 'datenschutz', type: 'url', label: 'Datenschutz', value: 'https://salon.de/ds' },
+    ]
+    const p = buildPassJson(design({ backFields: eigene }), ctx)
+
+    // Beide stehen da: die Erklaerung des Betriebs deckt sein Geschaeft ab, diese Seite
+    // deckt ab, was die Karte speichert.
+    expect(findField(p, 'datenschutz')!.value).toBe('https://salon.de/ds')
+    expect(findField(p, 'card-privacy')!.value).toBe('https://stampie.de/s/SN-123/datenschutz')
+  })
+})
+
 describe('Widerruf auf der Kartenrückseite', () => {
   const backOf = (p: PassJson) => storeCardOf(p).backFields
   const optOut = (p: PassJson) => backOf(p).find((f) => f.key === 'marketing-opt-out')
@@ -404,6 +433,10 @@ describe('Widerruf auf der Kartenrückseite', () => {
     ]
     const p = buildPassJson(design({ backFields: eigene }), { ...ctx, marketingConsent: true })
 
-    expect(backOf(p).map((f) => f.key)).toEqual(['impressum', 'marketing-opt-out'])
+    expect(backOf(p).map((f) => f.key)).toEqual([
+      'impressum',
+      'card-privacy',
+      'marketing-opt-out',
+    ])
   })
 })

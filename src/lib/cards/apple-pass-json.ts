@@ -205,6 +205,23 @@ export function buildPassJson(design: CardDesignInput, ctx: BuildPassJsonContext
     value: f.value,
   }))
 
+  /*
+   * Die Datenschutzinformation zur Karte — auf jedem Pass, nicht nur bei Einwilligung.
+   *
+   * Nicht zu verwechseln mit dem Datenschutz-Feld des Betriebs darüber: dessen Erklärung
+   * deckt sein Geschäft ab und weiß von der Stempelkarte nichts. Was die Karte speichert,
+   * steht nur hier.
+   *
+   * Die Adresse hängt an der Seriennummer statt am Ausgabe-Code: den Code hat der Kunde
+   * nie gesehen, der steht auf dem Aufsteller im Laden.
+   */
+  backFields.push({
+    key: 'card-privacy',
+    label: 'Datenschutz zur Karte',
+    value: `${ctx.barcodeMessage}/datenschutz`,
+    attributedValue: `<a href="${ctx.barcodeMessage}/datenschutz">Was diese Karte speichert</a>`,
+  })
+
   // Ganz unten, wo auch Impressum und Datenschutz stehen. `attributedValue` macht daraus
   // in Wallet einen Link; `value` bleibt als Klartext für alles, was das nicht darstellt.
   if (ctx.marketingConsent) {
