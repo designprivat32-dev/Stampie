@@ -46,6 +46,8 @@ export interface ResolvedHandout {
     phone: string | null
     /** Nur für die Datenschutzinformation: an wen sich der Endkunde wenden kann. */
     email: string | null
+    /** Impressum des Betriebs — die Ausgabeseite ist ein geschäftliches Angebot. */
+    imprintUrl: string | null
     website: string | null
     openingHours: OpeningHours[]
   }
@@ -83,6 +85,7 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
           city: true,
           phone: true,
           email: true,
+          imprintUrl: true,
           website: true,
           openingHours: true,
         },
@@ -110,6 +113,7 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
       city: card.org?.city ?? null,
       phone: card.org?.phone ?? null,
       email: card.org?.email ?? null,
+      imprintUrl: card.org?.imprintUrl ?? null,
       website: card.org?.website ?? null,
       openingHours: Array.isArray(card.org?.openingHours)
         ? (card.org.openingHours as unknown as OpeningHours[])

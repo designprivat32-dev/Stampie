@@ -78,7 +78,11 @@ export default async function HandoutLandingPage({
           <p className="text-center text-[15px] leading-snug text-ink-2">{resolved.greeting}</p>
         ) : null}
 
-        <WalletChoice code={code} platform={platform} />
+        <WalletChoice
+          code={code}
+          platform={platform}
+          imprintUrl={resolved.customer.imprintUrl}
+        />
 
         <ShopDetails customer={resolved.customer} />
       </div>

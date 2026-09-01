@@ -39,6 +39,7 @@ const resolved = {
     city: null,
     phone: null,
     email: null,
+    imprintUrl: null,
     website: null,
     openingHours: [],
   },

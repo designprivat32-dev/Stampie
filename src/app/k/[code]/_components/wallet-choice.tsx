@@ -16,7 +16,16 @@ import { CONSENT_PARAM, CONSENT_TEXT } from '@/lib/privacy/consent'
  * Übergeben wird sie als Parameter am Ausgabe-Link, weil der Pass ohnehin erst dort
  * entsteht. Vorher wird nichts gespeichert, auch nicht das Häkchen.
  */
-export function WalletChoice({ code, platform }: { code: string; platform: string | null }) {
+export function WalletChoice({
+  code,
+  platform,
+  imprintUrl,
+}: {
+  code: string
+  platform: string | null
+  /** Impressum des Betriebs, falls hinterlegt. */
+  imprintUrl: string | null
+}) {
   const [consent, setConsent] = React.useState(false)
 
   const href = (p: 'apple' | 'google') =>
@@ -45,7 +54,23 @@ export function WalletChoice({ code, platform }: { code: string; platform: strin
 
       <div className="flex w-full flex-col items-center gap-3">{buttons}</div>
 
-      <p className="text-center text-[12px] text-ink-3">
+      {/* Pflichtangaben unter den Knöpfen: die Seite ist ein geschäftliches Angebot, und
+          der Kunde soll beides finden, bevor er die Karte nimmt. Das Impressum ist das des
+          Betriebs — er betreibt das Kartenprogramm, nicht die Plattform. */}
+      <p className="flex items-center justify-center gap-3 text-center text-[12px] text-ink-3">
+        {imprintUrl ? (
+          <>
+            <a
+              href={imprintUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-ink"
+            >
+              Impressum
+            </a>
+            <span aria-hidden>·</span>
+          </>
+        ) : null}
         <Link
           href={`/k/${code}/datenschutz`}
           className="underline underline-offset-2 hover:text-ink"

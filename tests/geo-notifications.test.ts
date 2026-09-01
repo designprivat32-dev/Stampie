@@ -16,7 +16,7 @@ const LEERER_KUNDE = {
   imprintUrl: null, privacyUrl: null,
   latitude: null, longitude: null,
   openingHours: [],
-} as never
+} as unknown as import("@/types/customer").CustomerSummary
 
 /**
  * Der Standort-Schalter aus der Kartenübersicht.
