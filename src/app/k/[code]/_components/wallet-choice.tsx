@@ -3,19 +3,35 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
-import { CONSENT_PARAM, CONSENT_TEXT } from '@/lib/privacy/consent'
+import {
+  CONSENT_PARAM,
+  CONSENT_TEXT,
+  DEVICE_PARAM,
+  RECOGNITION_TEXT,
+} from '@/lib/privacy/consent'
 
 /**
- * Die Wallet-Knöpfe samt Einwilligung.
+ * Die Wallet-Knöpfe samt der beiden Einwilligungen.
  *
- * Das Häkchen sitzt *über* den Knöpfen und ist leer voreingestellt: eine vorangekreuzte
- * Zustimmung ist keine. Es hängt an nichts weiter — wer nichts ankreuzt, bekommt seine
- * Karte trotzdem, nur eben keine Werbung. Die Karte gegen die Einwilligung zu tauschen
- * wäre eine Kopplung, die die Einwilligung wertlos machte.
+ * Beide Häkchen sitzen *über* den Knöpfen und sind leer voreingestellt: eine vorangekreuzte
+ * Zustimmung ist keine. Keines von beiden hängt an der Karte — wer nichts ankreuzt, bekommt
+ * sie trotzdem. Die Karte gegen eine Einwilligung zu tauschen wäre eine Kopplung, die die
+ * Einwilligung wertlos machte.
  *
- * Übergeben wird sie als Parameter am Ausgabe-Link, weil der Pass ohnehin erst dort
- * entsteht. Vorher wird nichts gespeichert, auch nicht das Häkchen.
+ * Übergeben werden sie als Parameter am Ausgabe-Link, weil der Pass ohnehin erst dort
+ * entsteht. Vorher wird nichts gespeichert.
  */
+const storageKey = (code: string) => `stampie.dev.${code}`
+
+/** 32 Byte aus dem Zufallsgenerator des Browsers, base64url — wer ihn hat, hat die Karte. */
+function newDeviceKey(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 export function WalletChoice({
   code,
   platform,
@@ -27,9 +43,40 @@ export function WalletChoice({
   imprintUrl: string | null
 }) {
   const [consent, setConsent] = React.useState(false)
+  const [deviceKey, setDeviceKey] = React.useState<string | null>(null)
+
+  /*
+   * Der Griff in den Speicher des Geräts passiert erst beim Ankreuzen — das Häkchen *ist*
+   * die Einwilligung nach § 25 TDDDG. Solange es leer ist, wird nichts gelesen und nichts
+   * abgelegt, auch nicht heimlich beim Laden der Seite.
+   *
+   * Schlägt der Zugriff fehl (privates Fenster, gesperrte Speicherung), bleibt es ohne
+   * Wiedererkennung: der Server würfelt dann wie bisher einen Schlüssel, den niemand
+   * wiederfindet. Das ist der alte Zustand, kein Fehler.
+   */
+  const toggleRecognition = (on: boolean) => {
+    if (!on) {
+      setDeviceKey(null)
+      return
+    }
+    try {
+      const existing = window.localStorage.getItem(storageKey(code))
+      if (existing) {
+        setDeviceKey(existing)
+        return
+      }
+      const fresh = newDeviceKey()
+      window.localStorage.setItem(storageKey(code), fresh)
+      setDeviceKey(fresh)
+    } catch {
+      setDeviceKey(null)
+    }
+  }
 
   const href = (p: 'apple' | 'google') =>
-    `/api/k/${code}?p=${p}${consent ? `&${CONSENT_PARAM}=1` : ''}`
+    `/api/k/${code}?p=${p}` +
+    (consent ? `&${CONSENT_PARAM}=1` : '') +
+    (deviceKey ? `&${DEVICE_PARAM}=${deviceKey}` : '')
 
   const apple = (
     <AppleWalletButton key="apple" href={href('apple')} size="lg" className="justify-center" />
@@ -42,15 +89,10 @@ export function WalletChoice({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <label className="flex max-w-sm cursor-pointer items-start gap-2.5 text-left text-[12.5px] leading-snug text-ink-2">
-        <input
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5 size-4 shrink-0 accent-accent"
-        />
-        <span>{CONSENT_TEXT}</span>
-      </label>
+      <div className="flex w-full max-w-sm flex-col gap-2.5">
+        <Choice checked={deviceKey !== null} onChange={toggleRecognition} label={RECOGNITION_TEXT} />
+        <Choice checked={consent} onChange={setConsent} label={CONSENT_TEXT} />
+      </div>
 
       <div className="flex w-full flex-col items-center gap-3">{buttons}</div>
 
@@ -79,5 +121,27 @@ export function WalletChoice({
         </Link>
       </p>
     </div>
+  )
+}
+
+function Choice({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 text-left text-[12.5px] leading-snug text-ink-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 size-4 shrink-0 accent-accent"
+      />
+      <span>{label}</span>
+    </label>
   )
 }

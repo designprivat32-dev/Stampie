@@ -505,6 +505,11 @@ model IssuedPass {
   /// und der ist ohne die Fassung des Textes keiner.
   marketingConsentText String?
 
+  /// Einwilligung in die Wiedererkennung dieses Geraets (§ 25 TDDDG).
+  /// Ohne sie wird `deviceKey` je Ausgabe neu gewuerfelt und niemand wiedererkannt.
+  recognitionConsentAt DateTime?
+  recognitionConsentText String?
+
   rewardCount  Int       @default(0)
 
   /// COUPON only: a coupon is single-use, so this is the hard latch against a second

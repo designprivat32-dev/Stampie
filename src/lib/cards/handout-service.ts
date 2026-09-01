@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { loadPassAssets } from './asset-service'
 import { loadPublishedDesign } from './repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
-import { consentRecord } from '@/lib/privacy/consent'
+import { consentRecord, recognitionRecord } from '@/lib/privacy/consent'
 import type { CardDesignInput, CardKind } from './schema'
 import type { OpeningHours } from '@/types/customer'
 import type { CardDesign } from '@/lib/pass/pass-builder'
@@ -147,6 +147,13 @@ export async function issuePassForDevice(
   deviceKey: string,
   /** Hat der Kunde auf der Ausgabeseite in Werbenachrichten eingewilligt? */
   marketingConsent = false,
+  /**
+   * Kam der Schlüssel vom Gerät des Kunden, weil er der Wiedererkennung zugestimmt hat?
+   *
+   * Nur dann taugt er als Kennung — ein frisch gewürfelter Schlüssel erkennt niemanden
+   * wieder und wird auch nicht als Einwilligung vermerkt.
+   */
+  recognized = false,
 ): Promise<{ serial: string; currentStamps: number; created: boolean }> {
   const existing = await findPassForDevice(resolved, deviceKey)
   if (existing) return { ...existing, created: false }
@@ -162,6 +169,7 @@ export async function issuePassForDevice(
       designVersion: 1,
       // Ohne Häkchen bleiben beide Felder null — und null heißt überall "keine Werbung".
       ...(marketingConsent ? consentRecord() : {}),
+      ...(recognized ? recognitionRecord() : {}),
     },
     select: { serial: true },
   })

@@ -41,3 +41,44 @@ export const CONSENT_PARAM = 'c'
 export function hasConsentParam(value: string | null): boolean {
   return value === '1'
 }
+
+/**
+ * Die Einwilligung in die Wiedererkennung des Geräts.
+ *
+ * Eine andere Frage als die Werbe-Einwilligung, und rechtlich sogar eine andere Baustelle:
+ * hier wird etwas *auf dem Gerät* abgelegt, und dafür verlangt § 25 TDDDG eine Zustimmung,
+ * sobald es nicht zwingend für den gewünschten Dienst nötig ist. Eine Statistik ist das
+ * nicht.
+ *
+ * Der Nutzen liegt trotzdem beim Kunden: ohne Wiedererkennung bekommt er beim zweiten
+ * Scannen eine *neue, leere* Karte statt seiner alten — die Stempel liegen dann auf zwei
+ * Karten. Deshalb steht dieser Nutzen im Text und nicht die Statistik.
+ */
+export const RECOGNITION_VERSION = 1
+
+export const RECOGNITION_TEXT =
+  'Diese Karte auf meinem Gerät wiedererkennen, damit ich beim erneuten Scannen meine bestehende Karte zurückbekomme statt einer neuen.'
+
+export function recognitionRecord(now: Date = new Date()): {
+  recognitionConsentAt: Date
+  recognitionConsentText: string
+} {
+  return {
+    recognitionConsentAt: now,
+    recognitionConsentText: `v${RECOGNITION_VERSION}: ${RECOGNITION_TEXT}`,
+  }
+}
+
+/** Der Parameter, unter dem die Ausgabeseite den wiedererkannten Schlüssel mitschickt. */
+export const DEVICE_PARAM = 'd'
+
+/**
+ * Ein vom Browser erzeugter Schlüssel, der als Kennung taugt.
+ *
+ * Wer ihn kennt, bekommt diese Karte — deshalb muss er lang und zufällig sein. Zu kurze
+ * oder fremdartige Werte werden verworfen, statt sie als Kennung zu übernehmen: ein
+ * geratener Schlüssel darf niemandem die Karte eines anderen öffnen.
+ */
+export function isValidDeviceKey(value: string | null): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{32,128}$/.test(value)
+}

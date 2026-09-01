@@ -88,6 +88,10 @@ export function PrivacyNotice({ shop, backHref }: { shop: PrivacyNoticeShop; bac
             aktualisieren kann
           </li>
           <li>ob Sie in Nachrichten eingewilligt haben, und der Wortlaut dieser Einwilligung</li>
+          <li>
+            falls Sie der Wiedererkennung zugestimmt haben: eine zufällige Kennung, die Ihr
+            Gerät speichert — samt Wortlaut dieser Zustimmung
+          </li>
         </ul>
         <p className="mt-3">
           <strong className="font-medium text-ink">
@@ -96,6 +100,24 @@ export function PrivacyNotice({ shop, backHref }: { shop: PrivacyNoticeShop; bac
           Beim Scannen wird nichts abgefragt. Aus den Zeitpunkten der Besuche lässt sich
           allerdings ablesen, wie oft Sie hier waren — deshalb behandeln wir sie als
           personenbezogene Daten.
+        </p>
+      </Section>
+
+      <Section title="Wiedererkennung Ihres Geräts">
+        <p>
+          Nur wenn Sie beim Hinzufügen der Karte ausdrücklich zugestimmt haben, legt Ihr
+          Browser eine zufällige Kennung ab. Scannen Sie später erneut, bekommen Sie damit{" "}
+          <strong className="font-medium text-ink">Ihre bestehende Karte</strong> zurück statt
+          einer neuen, leeren — ohne die Kennung landen Ihre Stempel auf zwei Karten.
+        </p>
+        <p>
+          Der Betrieb sieht dadurch außerdem, wie viele Personen seine Karten nutzen, statt
+          nur wie viele Karten ausgegeben wurden. Die Kennung enthält keine Angaben über Sie
+          und wird nur für dieses eine Kartenprogramm verwendet.
+        </p>
+        <p>
+          Sie können sie jederzeit entfernen, indem Sie die Websitedaten in Ihrem Browser
+          löschen. Ohne Zustimmung wird nichts auf Ihrem Gerät gespeichert.
         </p>
       </Section>
 

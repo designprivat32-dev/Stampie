@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getPassBuilder } from '@/lib/pass/mock-pass-builder'
 import { rateLimit } from '@/lib/rate-limit'
-import { hasConsentParam, CONSENT_PARAM } from '@/lib/privacy/consent'
+import {
+  CONSENT_PARAM,
+  DEVICE_PARAM,
+  hasConsentParam,
+  isValidDeviceKey,
+} from '@/lib/privacy/consent'
 import {
   issuePassForDevice,
   newDeviceKey,
@@ -40,10 +45,21 @@ export async function GET(
     )
   }
 
-  // Every tap mints its own card, so the key is per-pass rather than per-phone: it still
-  // distinguishes real handouts from test passes, it just never identifies a returning
-  // visitor.
-  const deviceKey = newDeviceKey()
+  /*
+   * Der Schlüssel, unter dem diese Karte wiedergefunden wird.
+   *
+   * Hat der Kunde der Wiedererkennung zugestimmt, schickt seine Seite den im Browser
+   * abgelegten Schlüssel mit — dann bekommt er beim erneuten Scannen *seine* Karte zurück
+   * statt einer zweiten leeren. Ohne Zustimmung wird er je Ausgabe neu gewürfelt und
+   * erkennt niemanden wieder; das war bis hierher der einzige Fall.
+   *
+   * Ein mitgeschickter Schlüssel wird auf Form und Länge geprüft, bevor er als Kennung
+   * gilt: wer ihn kennt, bekommt diese Karte, und ein geratener darf niemandem die Karte
+   * eines anderen öffnen.
+   */
+  const supplied = request.nextUrl.searchParams.get(DEVICE_PARAM)
+  const recognized = isValidDeviceKey(supplied)
+  const deviceKey = recognized ? supplied : newDeviceKey()
 
   // Minting is capped, and generously: every customer in a café sits behind the same WiFi
   // address, so a tight per-IP ceiling locks out real people on a busy afternoon. This is a
@@ -60,6 +76,7 @@ export async function GET(
     resolved,
     deviceKey,
     marketingConsent,
+    recognized,
   )
   const design = await toHandoutDesign(resolved, currentStamps, serial, marketingConsent)
   const builder = getPassBuilder()
