@@ -11,6 +11,22 @@ import type { CustomerSummary } from '@/types/customer'
 import { useCardEditor } from '@/stores/card-editor-provider'
 
 /**
+ * Der Platzhalter, wenn die Stammdaten noch keine Koordinaten haben: Berlin-Mitte.
+ *
+ * Als eigene Konstante, weil die Oberfläche ihn wiedererkennen können muss. Genau dieser
+ * Wert ist einmal unbemerkt in eine veröffentlichte Karte gewandert: der Standort wurde
+ * angelegt, als der Betrieb noch keine Adresse hatte, die Adresse kam später — und die
+ * Beschriftung sagte dann Oldenburg, während der Punkt in Berlin lag. Die Benachrichtigung
+ * hätte dort ausgelöst und am Laden nie.
+ */
+export const FALLBACK_GEO = { latitude: 52.520008, longitude: 13.404954 } as const
+
+/** Steht dieser Standort noch auf dem Platzhalter? */
+export function isFallbackGeo(geo: Pick<GeoLocation, 'latitude' | 'longitude'>): boolean {
+  return geo.latitude === FALLBACK_GEO.latitude && geo.longitude === FALLBACK_GEO.longitude
+}
+
+/**
  * The location a card gets when someone switches the alert on or presses "hinzufügen":
  * the shop itself. Berlin's centre only stands in where the master data has no
  * coordinates — a wrong pin the shop can drag beats an empty form it has to fill in.
@@ -19,8 +35,8 @@ export function defaultGeoLocation(customer: CustomerSummary): GeoLocation {
   return {
     id: newFieldId(),
     label: customer.name,
-    latitude: customer.latitude ?? 52.520008,
-    longitude: customer.longitude ?? 13.404954,
+    latitude: customer.latitude ?? FALLBACK_GEO.latitude,
+    longitude: customer.longitude ?? FALLBACK_GEO.longitude,
     maxDistance: 150,
     relevantText: 'Deine Stempelkarte ist bereit',
   }
@@ -68,6 +84,16 @@ export function GeoLocationsEditor({ customer }: { customer: CustomerSummary }) 
                 <Trash2 />
               </Button>
             </div>
+
+            {/* Der Platzhalter fällt sonst nicht auf: die Beschriftung nennt die Adresse
+                des Ladens, die Koordinaten zeigen nach Berlin. */}
+            {isFallbackGeo(geo) && hasCoordinates ? (
+              <p className="rounded-md border border-warn/40 bg-warn-soft px-2.5 py-1.5 text-[12px] leading-snug text-warn-ink">
+                Dieser Standort steht noch auf dem Platzhalter (Berlin-Mitte), obwohl für den
+                Betrieb Koordinaten hinterlegt sind. Mit „Standort übernehmen" korrigieren —
+                sonst löst die Benachrichtigung am falschen Ort aus.
+              </p>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">

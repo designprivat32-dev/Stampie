@@ -1,6 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import { designToRow } from '@/lib/cards/repository'
+import {
+  FALLBACK_GEO,
+  defaultGeoLocation,
+  isFallbackGeo,
+} from "@/app/dashboard/karten/[cardId]/_components/geo-locations-editor"
+
+/** Ein Kunde ohne hinterlegte Koordinaten — der Fall, der den Platzhalter ausloest. */
+const LEERER_KUNDE = {
+  id: "org-1",
+  name: "Hairlight by Rejin",
+  street: null, postalCode: null, city: null,
+  phone: null, email: null, website: null,
+  imprintUrl: null, privacyUrl: null,
+  latitude: null, longitude: null,
+  openingHours: [],
+} as never
 
 /**
  * Der Standort-Schalter aus der Kartenübersicht.
@@ -151,5 +167,41 @@ describe('setGeoNotificationsAction', () => {
     // die Fehlermeldung.
     expect(designUpdate).not.toHaveBeenCalled()
     expect(pushAppleWalletUpdateForCard).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Der Platzhalter-Standort.
+ *
+ * Er ist absichtlich da — ein Punkt, den der Betrieb verschieben kann, ist besser als ein
+ * leeres Formular. Gefährlich wird er erst, wenn die Adresse *später* nachgetragen wird:
+ * dann nennt die Beschriftung den Laden und der Punkt liegt weiter in Berlin. Genau das
+ * ist einmal in eine veröffentlichte Karte gelangt.
+ */
+describe('Platzhalter-Koordinaten', () => {
+  it('erkennt den Platzhalter', () => {
+    expect(isFallbackGeo(FALLBACK_GEO)).toBe(true)
+  })
+
+  it('haelt echte Koordinaten nicht faelschlich fuer den Platzhalter', () => {
+    // Oldenburg, Ammerländer Heerstraße.
+    expect(isFallbackGeo({ latitude: 53.1491832, longitude: 8.1815498 })).toBe(false)
+    // Nur eine Haelfte zufaellig gleich reicht nicht.
+    expect(isFallbackGeo({ latitude: FALLBACK_GEO.latitude, longitude: 8.18 })).toBe(false)
+    expect(isFallbackGeo({ latitude: 53.14, longitude: FALLBACK_GEO.longitude })).toBe(false)
+  })
+
+  it('nimmt die Koordinaten des Betriebs, sobald es welche gibt', () => {
+    const mitAdresse = defaultGeoLocation({
+      ...LEERER_KUNDE,
+      latitude: 53.1491832,
+      longitude: 8.1815498,
+    })
+    expect(isFallbackGeo(mitAdresse)).toBe(false)
+    expect(mitAdresse.latitude).toBe(53.1491832)
+  })
+
+  it('faellt nur ohne Stammdaten auf den Platzhalter zurueck', () => {
+    expect(isFallbackGeo(defaultGeoLocation(LEERER_KUNDE))).toBe(true)
   })
 })
