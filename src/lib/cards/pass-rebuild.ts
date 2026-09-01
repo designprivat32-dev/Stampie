@@ -28,7 +28,7 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       activeMessage: true,
       marketingConsentAt: true,
       card: {
-        select: { name: true, activeMessage: true, org: { select: { name: true } } },
+        select: { name: true, org: { select: { name: true } } },
       },
     },
   })
@@ -51,12 +51,16 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
       assets,
       appleAuthToken,
       /*
-       * Die Nachricht des Passes hat Vorrang: sie ist die an eine Gruppe, die der Karte
-       * die an alle. Wer zuletzt einzeln angeschrieben wurde, soll nicht plötzlich wieder
-       * den alten Rundruf sehen. Ein Versand an alle räumt die Pass-Nachrichten ab, damit
-       * dieser Vorrang nicht zur Sackgasse wird.
+       * Nur die Nachricht des Passes.
+       *
+       * Früher fiel das hier auf `card.activeMessage` zurück, weil ein Versand an alle den
+       * Text auf der Karte ablegte. Seit der Versand pro Pass läuft, schreibt nichts mehr
+       * dorthin — der Rückgriff hätte nur noch alte Texte an frisch ausgegebene Karten
+       * vererbt. Genau das ist passiert: eine Karte, die 2026-08-29 einmal "test" bekam,
+       * begrüßte jeden neuen Kunden damit. Und er umging die Einwilligung, weil ein Pass
+       * ohne Häkchen den Kartentext trotzdem erbte.
        */
-      message: pass.activeMessage ?? pass.card.activeMessage,
+      message: pass.activeMessage,
       // Traegt den Widerruf-Link auf die Rueckseite — automatisch, ohne Zutun im Designer.
       marketingConsent: pass.marketingConsentAt !== null,
     },

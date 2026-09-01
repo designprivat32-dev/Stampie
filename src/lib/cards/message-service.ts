@@ -44,7 +44,7 @@ export async function deliverCardMessage(messageId: string): Promise<MessageDeli
       headline: true,
       body: true,
       segment: true,
-      card: { select: { kind: true, activeMessage: true } },
+      card: { select: { kind: true } },
     },
   })
   if (!message) {
@@ -78,7 +78,7 @@ interface PendingMessage {
   cardId: string
   headline: string | null
   body: string
-  card: { kind: CardKind; activeMessage: string | null }
+  card: { kind: CardKind }
 }
 
 /**
@@ -126,9 +126,7 @@ async function deliverToSegment(
    * Wieder Apples Regel: gleicher Feldwert, keine Meldung. Was ein Pass gerade zeigt, ist
    * seine eigene Nachricht — und wenn er keine hat, die der Karte.
    */
-  const changed = targets.filter(
-    (pass) => (pass.activeMessage ?? message.card.activeMessage)?.trim() !== body,
-  )
+  const changed = targets.filter((pass) => pass.activeMessage?.trim() !== body)
 
   let appleDevices = 0
   if (changed.length === 0) {

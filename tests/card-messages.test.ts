@@ -173,6 +173,22 @@ describe('deliverCardMessage — an alle', () => {
     expect(result.error).toContain('2 Karten nicht erreicht')
   })
 
+  it('lässt sich von einer alten Nachricht auf der Karte nicht mehr blenden', async () => {
+    // Regression: solange der Vergleich auf `card.activeMessage` zurückfiel, galt ein Pass
+    // als "trägt den Text schon", nur weil die Karte ihn trug. Seit der Versand pro Pass
+    // läuft, schreibt nichts mehr auf die Karte — der Rückgriff vererbte alte Texte bloß
+    // an frisch ausgegebene Pässe weiter.
+    messageFindFirst.mockResolvedValue(
+      message({ card: { kind: 'STAMP', activeMessage: 'Heute doppelte Stempel.' } }),
+    )
+    passFindMany.mockResolvedValue([pass('p1', 3)])
+
+    const result = await deliverCardMessage('m1')
+
+    expect(pushForPasses).toHaveBeenCalledWith(['sn_p1'])
+    expect(result.error).toBeNull()
+  })
+
   it('does nothing for a message that already went out', async () => {
     messageFindFirst.mockResolvedValue(null)
 

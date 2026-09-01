@@ -399,7 +399,9 @@ describe('Widerruf auf der Kartenrückseite', () => {
   })
 
   it('verdrängt die eigenen Felder des Betriebs nicht, sondern hängt sich an', () => {
-    const eigene: BackField[] = [{ id: 'impressum', label: 'Impressum', value: 'https://x.de/i' }]
+    const eigene: BackField[] = [
+      { id: 'impressum', type: 'url', label: 'Impressum', value: 'https://x.de/i' },
+    ]
     const p = buildPassJson(design({ backFields: eigene }), { ...ctx, marketingConsent: true })
 
     expect(backOf(p).map((f) => f.key)).toEqual(['impressum', 'marketing-opt-out'])
