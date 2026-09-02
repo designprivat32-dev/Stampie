@@ -2,7 +2,7 @@
 
 import { randomBytes } from 'node:crypto'
 import QRCode from 'qrcode'
-import { assertCardAccess } from '@/lib/auth/session'
+import { assertCardAccess, requireSession } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
 import { createTestCardInputSchema, sendTestCardEmailInputSchema } from '@/lib/cards/schema'
@@ -137,6 +137,10 @@ export async function sendTestCardEmailAction(input: unknown): Promise<ActionRes
 
 export async function cleanupExpiredTokensAction(): Promise<ActionResult<number>> {
   return guarded(async () => {
+    // Löscht nur bereits abgelaufene Token, der Schaden wäre also gering — aber eine
+    // exportierte Server-Action ist von jedem aufrufbar, der ihre ID aus dem Bundle liest,
+    // und eine schreibende Aktion ohne Sitzung gehört nicht in diese Codebasis.
+    await requireSession()
     const result = await prisma.testCardToken.deleteMany({ where: { expiresAt: { lt: new Date() } } })
     return ok(result.count)
   })
