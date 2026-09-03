@@ -91,9 +91,10 @@ export function GoogleLoyaltyCard({
       </div>
 
       {/*
-        `loyaltyPoints`: label plus balance, nothing else. The goal is deliberately absent —
-        `buildLoyaltyObject` sends `balance: { int: stamps }`, so the phone prints "6", never
-        "6 / 10". The goal is only visible through the filled/empty stamps in the hero image.
+        `loyaltyPoints`: label plus balance, nothing else. `buildLoyaltyObject` sends
+        `balance: { string: "6/10" }`, so das Telefon druckt Stand *und* Ziel — genau wie
+        Apple es in der Kopfzeile hat. Hier steht dieselbe Rechnung, sonst zeigt die
+        Vorschau dem Betrieb etwas anderes als die Karte im Wallet des Kunden.
       */}
       <div className="px-4 pb-3">
         <div className="text-[11px] uppercase tracking-[0.05em]" style={{ color: muted }}>
@@ -106,7 +107,9 @@ export function GoogleLoyaltyCard({
             ariaLabel="Stempel-Bezeichnung"
           />
         </div>
-        <div className="text-[26px] font-normal leading-tight tabular-nums">{currentStamps}</div>
+        <div className="text-[26px] font-normal leading-tight tabular-nums">
+          {Math.max(0, Math.min(live.stampGoal, currentStamps))}/{live.stampGoal}
+        </div>
       </div>
 
       {/*

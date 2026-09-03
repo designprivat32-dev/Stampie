@@ -77,11 +77,12 @@ describe('GoogleLoyaltyCard inline edit', () => {
     expect(screen.queryByText('Gratis Kaffee')).toBeNull()
   })
 
-  it('shows the stamp balance alone — the goal is not part of loyaltyPoints', () => {
+  it('shows stamp balance and goal — loyaltyPoints carries both', () => {
     const storeRef = { current: null as CardEditorStore | null }
     render(<Harness design={{ stampGoal: 10 }} storeRef={storeRef} />)
-    expect(screen.getByText('2')).toBeTruthy()
-    expect(screen.queryByText(/\/\s*10/)).toBeNull()
+    // `buildLoyaltyObject` sendet "2/10" als String; die Vorschau muss dieselbe Zahl
+    // zeigen, sonst widerspricht sie der Karte im Wallet des Kunden.
+    expect(screen.getByText('2/10')).toBeTruthy()
   })
 
   it('keeps tier and account labels off the card face', () => {
