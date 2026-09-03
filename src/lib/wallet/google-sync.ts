@@ -188,6 +188,18 @@ export async function syncGoogleStampCount(
 
   const objectId = `${credentials.issuerId}.sn_${serial}`
 
+  /*
+   * Dasselbe Format wie beim Ausgeben — siehe `buildLoyaltyObject`.
+   *
+   * In Googles `LoyaltyPointsBalance` darf genau eines der Felder (`string`, `int`,
+   * `double`, `money`) gesetzt sein. Der Pass wird mit `string` ("1/7") angelegt; ein
+   * PATCH mit `int` legt ein zweites Feld daneben, und Google lehnt die ganze Anfrage ab
+   * — mitsamt dem `heroImage` im selben Body. Der Kunde sah dann weder den neuen Zähler
+   * noch die neue Stempelreihe, während Apple und die Kasse längst hochgezählt hatten.
+   */
+  const clamped = Math.max(0, Math.min(design.stampGoal, stamps))
+  const balance = `${clamped}/${design.stampGoal}`
+
   try {
     const accessToken = await getAccessToken(credentials.clientEmail, credentials.privateKey)
 
@@ -198,7 +210,7 @@ export async function syncGoogleStampCount(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        loyaltyPoints: { label: design.stampLabel, balance: { int: stamps } },
+        loyaltyPoints: { label: design.stampLabel, balance: { string: balance } },
         // New stamp count means a new URL, so Google re-fetches instead of using its cache.
         heroImage: {
           sourceUri: { uri: walletHeroUrl(appUrl(), cardId, design, stamps) },
@@ -209,11 +221,20 @@ export async function syncGoogleStampCount(
 
     if (response.status === 404) return { status: 'not_found' }
     if (!response.ok) {
-      return { status: 'error', message: `${response.status} ${await response.text()}` }
+      // Die Aufrufer werfen das Ergebnis weg (best effort an der Kasse). Ohne diese Zeile
+      // bleibt eine Absage von Google voellig unsichtbar — genau so konnte der Zaehler
+      // tagelang stehenbleiben, ohne dass irgendwo etwas auffiel.
+      const message = `${response.status} ${await response.text()}`
+      // eslint-disable-next-line no-console
+      console.error(`[google-wallet] stamp update for ${objectId} failed: ${message}`)
+      return { status: 'error', message }
     }
     return { status: 'updated' }
   } catch (e) {
-    return { status: 'error', message: e instanceof Error ? e.message : 'unknown' }
+    const message = e instanceof Error ? e.message : 'unknown'
+    // eslint-disable-next-line no-console
+    console.error(`[google-wallet] stamp update for ${objectId} threw: ${message}`)
+    return { status: 'error', message }
   }
 }
 
