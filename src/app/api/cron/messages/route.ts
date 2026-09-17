@@ -34,6 +34,16 @@ export async function GET(request: NextRequest): Promise<Response> {
     return NextResponse.json({ error: 'Nicht berechtigt.' }, { status: 401 })
   }
 
+  // Wer ruft? Der Endpunkt wird deutlich oefter getroffen als der taegliche Vercel-Cron
+  // erklaert (siehe Neon-Compute-Verbrauch). Solange die Quelle unbekannt ist, steht sie
+  // im Log: Vercels eigener Cron meldet sich als `vercel-cron/1.0`.
+  console.info('[cron/messages] Aufruf', {
+    userAgent: request.headers.get('user-agent'),
+    ip: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    host: request.headers.get('host'),
+    vercelCron: request.headers.get('x-vercel-cron'),
+  })
+
   const result = await deliverDueMessages()
   // Im selben Lauf: wiederkehrende Karten-Erinnerungen, die heute fällig sind.
   const reminders = await deliverDueReminders()
