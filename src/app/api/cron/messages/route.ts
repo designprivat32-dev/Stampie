@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { deliverDueMessages } from '@/lib/cards/message-service'
 import { deliverDueReminders } from '@/lib/cards/reminder-service'
 import { runRetention } from '@/lib/privacy/retention'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 /** Sending must never be served from a cache. */
@@ -19,7 +20,18 @@ export const dynamic = 'force-dynamic'
  * The secret is the whole access control: a public trigger would let anyone fire a shop's
  * queued messages at a time of their choosing. Without `CRON_SECRET` configured the
  * endpoint refuses outright rather than running unprotected.
+ *
+ * On top of that, one run per `MIN_INTERVAL_MS` — with the right secret or not. In
+ * September 2026 an unknown cron-job.org job hit this route every minute with a valid
+ * secret; each call ran three database jobs, the database never scaled to zero and Neon's
+ * free compute allowance was gone in sixteen days. Nothing here needs to run more often
+ * than every ten minutes, so anything faster is refused *before* the database is touched.
+ * The limiter is in-memory, i.e. per warm instance — a caller frequent enough to matter is
+ * also frequent enough to keep the instance warm, which is exactly when it bites.
  */
+
+/** Runs closer together than this are refused. Vercel's daily cron is far below it. */
+const MIN_INTERVAL_MS = 10 * 60 * 1000
 export async function GET(request: NextRequest): Promise<Response> {
   const secret = process.env.CRON_SECRET
   if (!secret) {
@@ -34,15 +46,18 @@ export async function GET(request: NextRequest): Promise<Response> {
     return NextResponse.json({ error: 'Nicht berechtigt.' }, { status: 401 })
   }
 
-  // Wer ruft? Der Endpunkt wird deutlich oefter getroffen als der taegliche Vercel-Cron
-  // erklaert (siehe Neon-Compute-Verbrauch). Solange die Quelle unbekannt ist, steht sie
-  // im Log: Vercels eigener Cron meldet sich als `vercel-cron/1.0`.
-  console.info('[cron/messages] Aufruf', {
-    userAgent: request.headers.get('user-agent'),
-    ip: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
-    host: request.headers.get('host'),
-    vercelCron: request.headers.get('x-vercel-cron'),
-  })
+  const gate = rateLimit('cron:messages', 1, MIN_INTERVAL_MS)
+  if (!gate.allowed) {
+    console.warn('[cron/messages] Aufruf zu dicht auf den letzten, abgewiesen', {
+      userAgent: request.headers.get('user-agent'),
+      ip: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+      nextAllowedAt: new Date(gate.resetAt).toISOString(),
+    })
+    return NextResponse.json(
+      { error: 'Zu häufig. Der Versand läuft höchstens alle zehn Minuten.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((gate.resetAt - Date.now()) / 1000)) } },
+    )
+  }
 
   const result = await deliverDueMessages()
   // Im selben Lauf: wiederkehrende Karten-Erinnerungen, die heute fällig sind.
