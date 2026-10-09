@@ -2,12 +2,13 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Building2, KeyRound, Mail, MapPin, Pencil, Phone, Plus, Search } from 'lucide-react'
+import { Building2, KeyRound, Mail, MapPin, Pencil, Phone, Plus, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/misc'
 import { CustomerDialog } from './customer-dialog'
 import { LoginsDialog } from './logins-dialog'
+import { DeleteCustomerDialog } from './delete-customer-dialog'
 import type { CustomerRecord } from '@/lib/customers/customer-service'
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; customer: CustomerRecord } | null
@@ -26,6 +27,7 @@ export function CustomersView({
   const [query, setQuery] = React.useState('')
   const [dialog, setDialog] = React.useState<DialogState>(null)
   const [loginsFor, setLoginsFor] = React.useState<CustomerRecord | null>(null)
+  const [deleting, setDeleting] = React.useState<CustomerRecord | null>(null)
 
   const term = query.trim().toLowerCase()
   const filtered = term
@@ -173,6 +175,15 @@ export function CustomersView({
                         >
                           <Pencil />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${c.name} löschen`}
+                          title="Löschen"
+                          onClick={() => setDeleting(c)}
+                        >
+                          <Trash2 />
+                        </Button>
                       </div>
                     </td>
                   ) : null}
@@ -185,6 +196,7 @@ export function CustomersView({
 
       <CustomerDialog state={dialog} onOpenChange={(open) => !open && setDialog(null)} />
       <LoginsDialog customer={loginsFor} onOpenChange={(open) => !open && setLoginsFor(null)} />
+      <DeleteCustomerDialog customer={deleting} onOpenChange={(open) => !open && setDeleting(null)} />
     </div>
   )
 }

@@ -5,10 +5,11 @@ import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
+import { assertPassword } from '@/lib/auth/reauth'
 import { geocodeAddress, GeocodeError, type GeocodeResult } from '@/lib/geo/geocode'
 
 /**
- * Customer (Firma) lifecycle: create and edit.
+ * Customer (Firma) lifecycle: create, edit and delete.
  *
  * A customer is an `Organization`. Single-operator setup: any logged-in user may manage
  * customers — there is no agency/owner gate here.
@@ -153,6 +154,54 @@ export async function updateCustomerAction(
         latitude: parsed.data.latitude,
         longitude: parsed.data.longitude,
       },
+    })
+
+    revalidatePath('/dashboard/kunden')
+    revalidatePath('/dashboard/karten')
+    return ok(null)
+  })
+}
+
+/**
+ * Löscht einen Kunden — nur mit bestätigtem Passwort.
+ *
+ * Mit dem Kunden gehen seine App-Zugänge: ein Login, der an keiner Firma mehr hängt, wäre
+ * ein offener Zugang ins Nichts. Ein Login, der noch zu einer anderen Firma gehört, bleibt
+ * und verliert nur diese Mitgliedschaft.
+ *
+ * Die Karten bleiben stehen und sind danach keinem Kunden zugewiesen (`onDelete: SetNull`).
+ * Sie liegen bei Endkunden im Wallet; die mitzulöschen wäre eine eigene, bewusste Aktion
+ * pro Karte.
+ */
+export async function deleteCustomerAction(
+  id: string,
+  password: string,
+): Promise<ActionResult<null>> {
+  return guarded(async () => {
+    const idParsed = z.string().cuid().safeParse(id)
+    if (!idParsed.success) return fail('Ungültige Kunden-ID.', 'validation')
+
+    await requireSession()
+    await assertPassword(password, 'customer-delete')
+
+    const existing = await prisma.organization.findFirst({
+      where: { id: idParsed.data },
+      select: { id: true },
+    })
+    if (!existing) return fail('Dieser Kunde wurde nicht gefunden.', 'not_found')
+
+    await prisma.$transaction(async (tx) => {
+      // Nur App-Logins (username gesetzt), die zu keiner anderen Firma gehören.
+      await tx.user.deleteMany({
+        where: {
+          username: { not: null },
+          memberships: {
+            some: { orgId: idParsed.data },
+            every: { orgId: idParsed.data },
+          },
+        },
+      })
+      await tx.organization.delete({ where: { id: idParsed.data } })
     })
 
     revalidatePath('/dashboard/kunden')
