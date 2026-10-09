@@ -63,6 +63,11 @@ function heroVersion(design: CardDesignInput): string {
       design.emptyStampStyle,
       design.stampIconAssetId ?? '',
       design.heroAssetId ?? '',
+      // Nur angehängt, wenn es weitere Stempelbilder gibt: die URLs aller bestehenden
+      // Karten bleiben damit Zeichen für Zeichen dieselben.
+      ...((design.stampIconExtraAssetIds ?? []).length > 0
+        ? [(design.stampIconExtraAssetIds ?? []).join(',')]
+        : []),
     ].join('|'),
   )
 }

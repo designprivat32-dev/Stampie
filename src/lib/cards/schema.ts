@@ -131,6 +131,9 @@ export type GeoLocation = z.infer<typeof geoLocationSchema>
 
 // --------------------------------------------------------------------- stamp icon
 
+/** Zusätzlich zum ersten eigenen Stempelbild — zusammen also höchstens 10 Bilder. */
+export const MAX_EXTRA_STAMP_ICONS = 9
+
 const stampIconSchema = z
   .string()
   .min(1)
@@ -161,6 +164,15 @@ export const cardDesignDraftSchema = z
       .max(STAMP_GOAL_MAX, `Höchstens ${STAMP_GOAL_MAX} Stempel.`),
     stampIcon: stampIconSchema,
     stampIconAssetId: z.string().cuid().nullable().default(null),
+    /**
+     * Weitere eigene Stempelbilder, die sich mit `stampIconAssetId` abwechseln. Wirkt nur
+     * bei `stampIcon === 'custom'`. Default leer, damit ältere Zeilen und Snapshots ohne
+     * das Feld unverändert weiter rendern.
+     */
+    stampIconExtraAssetIds: z
+      .array(z.string().cuid())
+      .max(MAX_EXTRA_STAMP_ICONS, `Höchstens ${MAX_EXTRA_STAMP_ICONS + 1} Stempelbilder.`)
+      .default([]),
     emptyStampStyle: emptyStampStyleSchema,
     rewardText: z.string().max(80, 'Belohnungstext ist zu lang (max. 80 Zeichen).'),
 

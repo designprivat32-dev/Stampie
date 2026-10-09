@@ -44,6 +44,7 @@ export interface CardSummary {
     stampIcon: string
     emptyStampStyle: string
     stampIconAssetId: string | null
+    stampIconExtraAssetIds: string[]
     heroAssetId: string | null
   } | null
 }
@@ -98,6 +99,7 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
           stampIcon: true,
           emptyStampStyle: true,
           stampIconAssetId: true,
+          stampIconExtraAssetIds: true,
           heroAssetId: true,
         },
       },
@@ -153,6 +155,7 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
             stampIcon: source.stampIcon,
             emptyStampStyle: source.emptyStampStyle,
             stampIconAssetId: source.stampIconAssetId,
+            stampIconExtraAssetIds: source.stampIconExtraAssetIds,
             heroAssetId: source.heroAssetId,
           }
         : null,

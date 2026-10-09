@@ -6,6 +6,7 @@ import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import {
   emptyStampStyleSchema,
   hexColorSchema,
+  MAX_EXTRA_STAMP_ICONS,
   STAMP_GOAL_MAX,
   STAMP_GOAL_MIN,
 } from '@/lib/cards/schema'
@@ -35,6 +36,13 @@ const querySchema = z.object({
   empty: emptyStampStyleSchema,
   iconAsset: z.string().cuid().nullable().catch(null),
   heroAsset: z.string().cuid().nullable().catch(null),
+  /** Weitere Stempelbilder, kommagetrennt. Ungültiges wird verworfen, nicht abgelehnt. */
+  iconAssets: z
+    .string()
+    .max(400)
+    .transform((v) => v.split(',').filter(Boolean))
+    .pipe(z.array(z.string().cuid()).max(MAX_EXTRA_STAMP_ICONS))
+    .catch([]),
   t: z.enum(['apple', 'google']).default('apple'),
   x: z.coerce.number().int().min(1).max(3).default(2),
 })
@@ -48,6 +56,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     bg: params.bg ? `#${params.bg.replace(/^#/, '')}` : undefined,
     iconAsset: params.iconAsset || null,
     heroAsset: params.heroAsset || null,
+    iconAssets: params.iconAssets ?? '',
   }
 
   const parsed = querySchema.safeParse(normalised)
@@ -78,6 +87,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       stampIcon: q.icon,
       emptyStampStyle: q.empty,
       stampIconAssetId: q.iconAsset,
+      stampIconExtraAssetIds: q.iconAssets,
       heroAssetId: q.heroAsset,
     },
   })

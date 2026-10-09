@@ -47,6 +47,8 @@ export function stripPreviewUrl(design: CardDesignInput, options: StripUrlOption
 
   if (design.stampIconAssetId) params.set('iconAsset', design.stampIconAssetId)
   if (design.heroAssetId) params.set('heroAsset', design.heroAssetId)
+  const extraIcons = design.stampIconExtraAssetIds ?? []
+  if (extraIcons.length > 0) params.set('iconAssets', extraIcons.join(','))
 
   // The renderer version goes into the hash, not the query: the server ignores `v`, so an
   // extra parameter would only be noise, while a changed hash is exactly the cache miss

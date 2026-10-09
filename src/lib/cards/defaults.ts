@@ -12,6 +12,7 @@ export const DEFAULT_CARD_DESIGN: CardDesignInput = {
   stampGoal: 10,
   stampIcon: 'coffee',
   stampIconAssetId: null,
+  stampIconExtraAssetIds: [],
   emptyStampStyle: 'outline',
   rewardText: '',
 

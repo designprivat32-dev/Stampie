@@ -19,6 +19,12 @@ export interface StripSvgInput {
   readonly emptyStampStyle: EmptyStampStyle
   /** Base64 PNG (no data: prefix) for custom or emoji stamp icons. */
   readonly customIconBase64?: string | null
+  /**
+   * Weitere Stempelbilder (Base64 PNG). Mit `customIconBase64` zusammen wechseln sie sich
+   * reihum ab: Feld 1 das erste Bild, Feld 2 das zweite, … und dann wieder von vorn.
+   * Leer oder fehlend = jedes Feld zeigt `customIconBase64`, wie bisher.
+   */
+  readonly extraIconsBase64?: readonly string[] | null
   /** Base64 PNG (no data: prefix) used as a full-bleed background. */
   readonly backgroundImageBase64?: string | null
 }
@@ -79,6 +85,11 @@ export function buildStripSvg(input: StripSvgInput, canvas: StripCanvas, scale =
   const goal = Math.max(1, Math.floor(input.stampGoal))
   const stamped = Math.max(0, Math.min(goal, Math.floor(input.currentStamps)))
   const layout: StampLayout = computeStampLayout(goal, canvas)
+  const icons = input.customIconBase64
+    ? [input.customIconBase64, ...(input.extraIconsBase64 ?? [])]
+    : []
+  const iconFor = (index: number): string | null =>
+    icons.length > 0 ? (icons[index % icons.length] ?? null) : null
 
   const parts: string[] = []
   parts.push(`<rect width="${canvas.width}" height="${canvas.height}" fill="${background}"/>`)
@@ -95,7 +106,7 @@ export function buildStripSvg(input: StripSvgInput, canvas: StripCanvas, scale =
     const isStamped = cell.index < stamped
     if (isStamped) {
       parts.push(
-        renderFilledIcon(cell.x, cell.y, cell.size, input.stampIcon, foreground, 1, input.customIconBase64),
+        renderFilledIcon(cell.x, cell.y, cell.size, input.stampIcon, foreground, 1, iconFor(cell.index)),
       )
       continue
     }
@@ -115,7 +126,7 @@ export function buildStripSvg(input: StripSvgInput, canvas: StripCanvas, scale =
             input.stampIcon,
             foreground,
             OPEN_STAMP_OPACITY,
-            input.customIconBase64,
+            iconFor(cell.index),
           ),
         )
         break

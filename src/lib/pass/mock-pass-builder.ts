@@ -71,6 +71,7 @@ export class MockPassBuilder implements PassBuilder {
       // Regenerated for this exact stamp count — the whole reason the renderer is server-side.
       const strip = await renderStripImageSet(design, design.currentStamps, {
         customIconPng: design.assets.stampIcon,
+      extraIconPngs: design.assets.extraStampIcons,
         backgroundPng: design.assets.hero,
       })
       files.push(
@@ -144,6 +145,7 @@ export class MockPassBuilder implements PassBuilder {
   async buildHeroImage(design: CardDesign): Promise<Buffer> {
     return renderHeroImage(design, design.currentStamps, {
       customIconPng: design.assets.stampIcon,
+      extraIconPngs: design.assets.extraStampIcons,
       backgroundPng: design.assets.hero,
     })
   }

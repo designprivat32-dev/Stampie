@@ -23,6 +23,7 @@ export type StripRenderFields = Pick<
   | 'stampIcon'
   | 'emptyStampStyle'
   | 'stampIconAssetId'
+  | 'stampIconExtraAssetIds'
   | 'heroAssetId'
 >
 
@@ -34,6 +35,7 @@ export function stripRenderFields(design: CardDesignInput): StripRenderFields {
     stampIcon: design.stampIcon,
     emptyStampStyle: design.emptyStampStyle,
     stampIconAssetId: design.stampIconAssetId,
+    stampIconExtraAssetIds: design.stampIconExtraAssetIds ?? [],
     heroAssetId: design.heroAssetId,
   }
 }
@@ -52,6 +54,8 @@ export function designRenderHash(design: CardDesignInput): string {
     f.emptyStampStyle,
     f.stampIconAssetId ?? '',
     f.heroAssetId ?? '',
+    // Nur angehängt, wenn es weitere Bilder gibt — bestehende Designs behalten ihren Hash.
+    ...(f.stampIconExtraAssetIds.length > 0 ? [f.stampIconExtraAssetIds.join(',')] : []),
   ].join('|')
   return createHash('sha256').update(canonical).digest('base64url').slice(0, 16)
 }
@@ -101,6 +105,7 @@ export async function renderStripCached(req: RenderStripRequest): Promise<Buffer
   const buffer = await renderStripImage(req.design, req.currentStamps, req.scale, {
     target: req.target,
     customIconPng: assets.customIconPng,
+    extraIconPngs: assets.extraIconPngs,
     backgroundPng: assets.backgroundPng,
   })
 

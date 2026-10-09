@@ -12,6 +12,7 @@ import { uploadAssetAction } from '@/actions/assets'
 import { MAX_UPLOAD_BYTES } from '@/lib/images/upload-constraints'
 import { useCardEditor } from '@/stores/card-editor-provider'
 import { cn } from '@/lib/utils'
+import { StampIconExtras } from './stamp-icon-extras'
 
 const EMOJI_SUGGESTIONS = [
   '☕', '🍕', '✂️', '🍦', '🥙', '🧁', '💅', '❤️', '⭐', '✅',
@@ -208,6 +209,9 @@ export function StampIconPicker() {
               <Check className="size-3.5" />
               Eigenes Symbol aktiv.
             </p>
+          ) : null}
+          {stampIcon === 'custom' && currentCustomUrl ? (
+            <StampIconExtras primaryUrl={currentCustomUrl} />
           ) : null}
         </TabsContent>
       </Tabs>

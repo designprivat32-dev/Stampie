@@ -365,6 +365,9 @@ model CardDesign {
   stampGoal        Int     @default(10)
   stampIcon        String  @default("coffee")
   stampIconAssetId String?
+  /// Weitere eigene Stempelbilder (nur bei stampIcon = "custom"). Die Stempel wechseln
+  /// reihum: Feld 1 = stampIconAssetId, Feld 2 = erstes Bild hier, usw. Leer = wie bisher.
+  stampIconExtraAssetIds String[] @default([])
   emptyStampStyle  String  @default("outline")
   rewardText       String  @default("")
 

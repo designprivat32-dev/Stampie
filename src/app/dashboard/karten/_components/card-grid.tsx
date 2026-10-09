@@ -355,6 +355,7 @@ function CardTile({
         stampIcon: preview.stampIcon,
         emptyStampStyle: preview.emptyStampStyle as typeof DEFAULT_CARD_DESIGN.emptyStampStyle,
         stampIconAssetId: preview.stampIconAssetId,
+        stampIconExtraAssetIds: preview.stampIconExtraAssetIds,
         heroAssetId: preview.heroAssetId,
       }
     : null

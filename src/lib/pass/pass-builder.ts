@@ -65,6 +65,8 @@ export interface PassAssets {
   logo: ScaledPng | null
   /** Custom stamp icon master, if the design uses one. */
   stampIcon: Buffer | null
+  /** Weitere Stempelbilder, die sich mit `stampIcon` abwechseln. Fehlt = keine. */
+  extraStampIcons?: Buffer[]
   /** Hero / strip background image, if set. */
   hero: Buffer | null
   logoUrl: string | null

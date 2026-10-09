@@ -27,6 +27,8 @@ export interface RenderStripOptions {
   target?: StripTarget
   /** PNG bytes for a custom or emoji stamp icon (design.stampIconAssetId / emoji sprite). */
   customIconPng?: Buffer | null
+  /** Weitere Stempelbilder, die sich mit `customIconPng` abwechseln. */
+  extraIconPngs?: readonly Buffer[] | null
   /** PNG bytes for the optional background / hero image. */
   backgroundPng?: Buffer | null
 }
@@ -48,6 +50,7 @@ function toSvgInput(
     stampIcon: design.stampIcon,
     emptyStampStyle: design.emptyStampStyle,
     customIconBase64: options.customIconPng ? options.customIconPng.toString('base64') : null,
+    extraIconsBase64: (options.extraIconPngs ?? []).map((png) => png.toString('base64')),
     backgroundImageBase64: options.backgroundPng ? options.backgroundPng.toString('base64') : null,
   }
 }
