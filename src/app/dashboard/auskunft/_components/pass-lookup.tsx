@@ -76,7 +76,6 @@ export function PassLookup() {
       `Eingelöste Belohnungen: ${r.rewardCount}`,
       `Zuletzt geändert: ${when(r.updatedAt)}`,
       `Registrierte Apple-Geräte: ${r.appleDevices}`,
-      `Erhaltene Erinnerungen: ${r.reminderDeliveries}`,
       '',
       `Gespeicherte Buchungen (${r.events.length}):`,
       ...r.events.map(
@@ -149,7 +148,6 @@ export function PassLookup() {
             <Row label="Belohnungen" value={String(record.rewardCount)} />
             <Row label="Zuletzt geändert" value={when(record.updatedAt)} />
             <Row label="Apple-Geräte" value={String(record.appleDevices)} />
-            <Row label="Erinnerungen" value={String(record.reminderDeliveries)} />
           </dl>
 
           <div>

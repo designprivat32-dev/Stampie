@@ -2,15 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetRateLimits } from '@/lib/rate-limit'
 
 // The jobs need a database; here we only care about who gets past the door.
-const { deliverDueMessages, deliverDueReminders, deliverDueMonthlyMessages, runRetention } =
-  vi.hoisted(() => ({
-    deliverDueMessages: vi.fn(async () => ({ delivered: 0, failed: 0 })),
-    deliverDueReminders: vi.fn(async () => ({ delivered: 0 })),
-    deliverDueMonthlyMessages: vi.fn(async () => ({ due: 0, sent: 0, errors: 0 })),
-    runRetention: vi.fn(async () => ({ deleted: 0 })),
-  }))
+const { deliverDueMessages, deliverDueMonthlyMessages, runRetention } = vi.hoisted(() => ({
+  deliverDueMessages: vi.fn(async () => ({ delivered: 0, failed: 0 })),
+  deliverDueMonthlyMessages: vi.fn(async () => ({ due: 0, sent: 0, errors: 0 })),
+  runRetention: vi.fn(async () => ({ deleted: 0 })),
+}))
 vi.mock('@/lib/cards/message-service', () => ({ deliverDueMessages }))
-vi.mock('@/lib/cards/reminder-service', () => ({ deliverDueReminders }))
 vi.mock('@/lib/cards/monthly-message-service', () => ({ deliverDueMonthlyMessages }))
 vi.mock('@/lib/privacy/retention', () => ({ runRetention }))
 
@@ -47,7 +44,6 @@ describe('GET /api/cron/messages', () => {
     const res = await call('richtig')
     expect(res.status).toBe(200)
     expect(deliverDueMessages).toHaveBeenCalledTimes(1)
-    expect(deliverDueReminders).toHaveBeenCalledTimes(1)
     expect(deliverDueMonthlyMessages).toHaveBeenCalledTimes(1)
     expect(runRetention).toHaveBeenCalledTimes(1)
   })

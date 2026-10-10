@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 /**
  * Die Einwilligung in Werbenachrichten.
@@ -7,21 +7,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * Deshalb prüft dieser Test vor allem die Abweisung: was nicht genau „1" ist, ist keine
  * Zustimmung, und wer nicht eingewilligt hat, taucht in keiner Empfängerabfrage auf.
  */
-
-const reminderFindMany = vi.fn()
-const passFindMany = vi.fn()
-
-vi.mock('@/lib/db', () => ({
-  prisma: {
-    cardReminder: { findMany: (...a: unknown[]) => reminderFindMany(...a) },
-    issuedPass: { findMany: (...a: unknown[]) => passFindMany(...a) },
-    stampEvent: { groupBy: vi.fn() },
-    cardReminderDelivery: { findMany: vi.fn() },
-    $transaction: vi.fn(),
-  },
-}))
-vi.mock('@/lib/wallet/apple-sync', () => ({ pushAppleWalletUpdateForPasses: vi.fn() }))
-vi.mock('@/lib/wallet/google-sync', () => ({ sendGoogleWalletMessageToPasses: vi.fn() }))
 
 import {
   CONSENT_PARAM,
@@ -34,7 +19,6 @@ import {
   RECOGNITION_VERSION,
   recognitionRecord,
 } from '@/lib/privacy/consent'
-import { deliverDueReminders } from '@/lib/cards/reminder-service'
 
 describe('hasConsentParam', () => {
   it('nimmt nur die exakte 1 als Zustimmung', () => {
@@ -69,43 +53,6 @@ describe('consentRecord', () => {
 
   it('kündigt den Widerruf im Text selbst an', () => {
     expect(CONSENT_TEXT.toLowerCase()).toContain('widerrufen')
-  })
-})
-
-describe('Erinnerungen', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    reminderFindMany.mockResolvedValue([
-      {
-        id: 'r1',
-        cardId: 'card-1',
-        headline: null,
-        body: 'Lange nicht gesehen.',
-        intervalMinutes: 43200,
-        card: { kind: 'STAMP' },
-      },
-    ])
-    passFindMany.mockResolvedValue([])
-  })
-
-  it('fragt nur Pässe mit Einwilligung ab', async () => {
-    await deliverDueReminders()
-
-    expect(passFindMany.mock.calls[0]?.[0].where).toEqual({
-      cardId: 'card-1',
-      isTest: false,
-      kind: 'STAMP',
-      // Nur Stempelkarten und Gutscheine — eine Visitenkarte bekommt keine Erinnerung.
-      card: { kind: { in: ['STAMP', 'COUPON'] } },
-      marketingConsentAt: { not: null },
-    })
-  })
-
-  it('sendet nichts, wenn niemand eingewilligt hat', async () => {
-    const result = await deliverDueReminders()
-
-    expect(result.sent).toBe(0)
-    expect(result.errors).toBe(0)
   })
 })
 

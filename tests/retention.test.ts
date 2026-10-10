@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  */
 
 const delStampEvent = vi.fn()
-const delReminderDelivery = vi.fn()
 const delMessage = vi.fn()
 const delToken = vi.fn()
 const delSession = vi.fn()
@@ -19,7 +18,6 @@ const delSession = vi.fn()
 vi.mock('@/lib/db', () => ({
   prisma: {
     stampEvent: { deleteMany: (...a: unknown[]) => delStampEvent(...a) },
-    cardReminderDelivery: { deleteMany: (...a: unknown[]) => delReminderDelivery(...a) },
     cardMessage: { deleteMany: (...a: unknown[]) => delMessage(...a) },
     testCardToken: { deleteMany: (...a: unknown[]) => delToken(...a) },
     appSession: { deleteMany: (...a: unknown[]) => delSession(...a) },
@@ -28,7 +26,6 @@ vi.mock('@/lib/db', () => ({
 
 const deleteMany = {
   stampEvent: delStampEvent,
-  cardReminderDelivery: delReminderDelivery,
   cardMessage: delMessage,
   testCardToken: delToken,
   appSession: delSession,
@@ -76,7 +73,7 @@ describe('cutoffsFor', () => {
 
   it('gibt jeder Datenart ihre eigene Frist', () => {
     const cut = cutoffsFor(
-      { stampEventDays: 400, reminderDeliveryDays: 400, sentMessageDays: 400, expiredTokenDays: 30 },
+      { stampEventDays: 400, sentMessageDays: 400, expiredTokenDays: 30 },
       JETZT,
     )
     expect(cut.expiredTokens.getTime()).toBeGreaterThan(cut.stampEvents.getTime())

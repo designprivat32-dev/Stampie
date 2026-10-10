@@ -8,9 +8,9 @@ export const runtime = 'nodejs'
 /**
  * Die monatliche Nachricht wieder abschalten.
  *
- * Als eigene POST-Route statt als DELETE auf die Sammelroute — dasselbe Muster wie bei den
- * Erinnerungen (`/api/app/reminders/delete`). Der kleine API-Helfer der PWA kennt nur GET
- * und POST, und ein zweiter Weg nur für dieses eine Löschen wäre Aufwand ohne Gewinn.
+ * Als eigene POST-Route statt als DELETE auf die Sammelroute: Der kleine API-Helfer der
+ * PWA kennt nur GET und POST, und ein zweiter Weg nur für dieses eine Löschen wäre Aufwand
+ * ohne Gewinn.
  *
  * Die Zeile wird wirklich entfernt und nicht nur stillgelegt: Was bereits verschickt
  * wurde, steht als `CardMessage` in der Historie und bleibt dort stehen.

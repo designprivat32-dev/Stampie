@@ -180,7 +180,6 @@ model Card {
   assets   Asset[]
 
   messages  CardMessage[]
-  reminders CardReminder[]
   monthly   CardMonthlyMessage[]
 
   @@index([orgId])
@@ -242,10 +241,6 @@ model CardMessage {
 
 /// Die monatliche Nachricht an alle Karteninhaber — einmal eingerichtet, läuft von selbst.
 ///
-/// Unterschied zu `CardReminder`: Die Erinnerung geht an den Einzelnen, der weggeblieben
-/// ist, und hört auf, sobald er wiederkommt. Diese hier geht jeden Monat an alle, die die
-/// Karte im Wallet haben, unabhängig davon, wann sie zuletzt da waren.
-///
 /// Je Karte höchstens eine. „Jeden Monat zweimal" ist keine Einstellung, die ein Betrieb
 /// treffen können soll: eine Stempelkarte, die zu oft meldet, fliegt aus dem Wallet.
 model CardMonthlyMessage {
@@ -278,70 +273,6 @@ model CardMonthlyMessage {
 
   @@index([enabled, nextSendAt])
   @@index([cardId])
-}
-
-/// Wiederkehrende Inaktivitäts-Erinnerung — pro Kunde, nicht an alle.
-///
-/// Steht z. B. auf 20 Tage, geht die Nachricht *nur* an Kunden dieser Karte, die seit 20
-/// Tagen nicht mehr da waren (kein Stempel), und danach alle 20 Tage erneut, solange sie
-/// wegbleiben. Kommt ein Kunde wieder (neuer Stempel), startet sein Zähler von vorn.
-///
-/// „Zuletzt da" wird aus der Stempel-Historie (`StampEvent`) gelesen — der Stempel-Code
-/// selbst bleibt unangetastet. „Zuletzt erinnert" steht pro Kunde in `CardReminderDelivery`.
-/// Der Versand nutzt denselben Einzel-Pass-Weg wie die Gruppen-Nachrichten
-/// (`IssuedPass.activeMessage` + Push/Google an einzelne Pässe).
-///
-/// Wie *oft* geprüft wird, hängt daran, wie oft der Cron-Endpunkt aufgerufen wird.
-model CardReminder {
-  id     String @id @default(cuid())
-  cardId String
-  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
-
-  /// Nur Google zeigt eine Überschrift; bei Apple ist der Text alles.
-  headline String?
-  /// Apple kappt bei 150 Zeichen — dieselbe Grenze wie bei CardMessage.
-  body     String
-  /// Inaktivitäts-Schwelle in **Minuten**: „so lange nicht da". Reale Werte (20 Tage =
-  /// 28800) wie Testwerte (5 Minuten, 1 Stunde = 60). Die App rechnet Minuten/Stunden/Tage um.
-  intervalMinutes Int
-
-  /// Aus lässt die Erinnerung liegen, ohne sie zu löschen.
-  enabled Boolean @default(true)
-
-  /// Nur Buchhaltung: wann der Lauf sie zuletzt geprüft/verschickt hat und wie viele
-  /// Einzel-Sendungen insgesamt rausgingen. (`nextSendAt` bleibt aus Kompatibilität, wird
-  /// vom Pro-Kunde-Lauf aber nicht mehr als globale Fälligkeit gebraucht.)
-  nextSendAt DateTime
-  lastSentAt DateTime?
-  sentCount  Int       @default(0)
-
-  createdAt DateTime @default(now())
-  createdBy String
-
-  deliveries CardReminderDelivery[]
-
-  @@index([enabled])
-  @@index([cardId])
-}
-
-/// Ein Versand einer Erinnerung an *einen* Kunden (Pass). Merkt sich, wann dieser Kunde
-/// zuletzt erinnert wurde, damit er nicht öfter als alle `intervalMinutes` angeschrieben
-/// wird — und damit ein neuer Besuch den Zähler sauber zurücksetzt.
-model CardReminderDelivery {
-  id         String       @id @default(cuid())
-  reminderId String
-  reminder   CardReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
-  passId     String
-  pass       IssuedPass   @relation(fields: [passId], references: [id], onDelete: Cascade)
-
-  sentAt DateTime @default(now())
-  /// Wie oft dieser Kunde von dieser Erinnerung schon angeschrieben wurde — treibt die
-  /// unsichtbare Apple-Variation, damit iOS jede Runde eine Meldung zeigt.
-  count  Int      @default(1)
-
-  @@unique([reminderId, passId])
-  @@index([reminderId, sentAt])
-  @@index([passId])
 }
 
 // ---------------------------------------------------------------- assets
@@ -587,7 +518,6 @@ model IssuedPass {
 
   events             StampEvent[]
   appleRegistrations AppleDeviceRegistration[]
-  reminderDeliveries CardReminderDelivery[]
 
   @@index([cardId, isTest])
   @@index([claimToken])
