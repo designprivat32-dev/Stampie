@@ -103,6 +103,30 @@ export function buildVCard({ contact, company, photoPng }: VCardInput): string {
   return lines.map(foldVCardLine).join(CRLF) + CRLF
 }
 
+/**
+ * Knappe vCard für einen QR-Code: nur, was ins Adressbuch gehört und auf einen Blick zählt.
+ * Ohne Foto, Adresse und weitere Links — jedes Zeichen macht den Code dichter und damit
+ * schwerer zu scannen. Zeilen werden nicht gefaltet; im QR-Code gibt es keine Zeilenlänge.
+ */
+export function buildCompactVCard({ contact, company }: VCardInput): string {
+  const e = escapeVCardValue
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `N:${e(contact.lastName)};${e(contact.firstName)};;;`,
+    `FN:${e(fullName(contact))}`,
+  ]
+  if (company) lines.push(`ORG:${e(company.company)}`)
+  if (contact.jobTitle) lines.push(`TITLE:${e(contact.jobTitle)}`)
+  if (contact.phone) lines.push(`TEL;TYPE=WORK,VOICE:${e(contact.phone)}`)
+  if (contact.mobile) lines.push(`TEL;TYPE=CELL:${e(contact.mobile)}`)
+  if (company?.phone && !contact.phone) lines.push(`TEL;TYPE=WORK,VOICE:${e(company.phone)}`)
+  if (contact.email) lines.push(`EMAIL;TYPE=INTERNET,WORK:${e(contact.email)}`)
+  if (company?.website) lines.push(`URL:${e(company.website)}`)
+  lines.push('END:VCARD')
+  return lines.join(CRLF)
+}
+
 /** Dateiname für den Download: ASCII, damit kein Browser ihn verstümmelt. */
 export function vCardFileName(contact: BusinessContact): string {
   const base = fullName(contact)

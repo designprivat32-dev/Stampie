@@ -242,3 +242,23 @@ describe('vCardFileName', () => {
     expect(vCardFileName(contact({ firstName: '★', lastName: '★' }))).toBe('kontakt.vcf')
   })
 })
+
+describe('buildCompactVCard', () => {
+  it('keeps only what a QR code needs, unfolded', async () => {
+    const { buildCompactVCard } = await import('@/lib/business-cards/vcard')
+    const v = buildCompactVCard({ contact: contact(), company: company(), photoPng: Buffer.from('x') })
+    expect(v.split('\r\n')).toEqual([
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      'N:Müller;Jürgen;;;',
+      'FN:Jürgen Müller',
+      'ORG:Müller & Söhne GmbH',
+      'TITLE:Geschäftsführer',
+      'TEL;TYPE=WORK,VOICE:+49 40 123456',
+      'TEL;TYPE=CELL:+49 170 1234567',
+      'EMAIL;TYPE=INTERNET,WORK:j.mueller@example.de',
+      'URL:https://mueller.example/',
+      'END:VCARD',
+    ])
+  })
+})

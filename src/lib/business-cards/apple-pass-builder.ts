@@ -8,12 +8,13 @@ import { readPassBuilderConfig, type PassBuilderConfig, type ScaledPng } from '@
 import { createZip, type ZipEntry } from '@/lib/pass/zip'
 import { buildBusinessPassJson, fullName, type BusinessPassRole } from './apple-pass-json'
 import type { BusinessCompany, BusinessContact } from './schema'
+import { renderBusinessStrip } from './render-strip'
 
 /**
  * Baut das .pkpass einer Visitenkarte.
  *
  * Gleicher Aufbau wie der Stempelkarten-Pass in `lib/pass/mock-pass-builder.ts` — Manifest
- * mit SHA-1 je Datei, Signatur sobald ein Zertifikat da ist —, aber ohne Stempelreihe.
+ * mit SHA-1 je Datei, Signatur sobald ein Zertifikat da ist —, mit Banner statt Stempelreihe.
  * Bewusst getrennt: der Stempel-Weg bleibt unberührt, und keine Bedingung dort muss
  * wissen, dass es Visitenkarten gibt.
  *
@@ -23,7 +24,7 @@ import type { BusinessCompany, BusinessContact } from './schema'
 export interface BusinessPassAssets {
   icon: ScaledPng | null
   logo: ScaledPng | null
-  /** Foto der Person; wird `thumbnail.png`. */
+  /** Foto der Person; sitzt rund im Bannerbild (`strip.png`). */
   photo: ScaledPng | null
 }
 
@@ -78,7 +79,14 @@ export async function buildBusinessApplePass(
     (await renderFallbackIconSet(input.design, input.company?.company ?? fullName(input.contact)))
   pushScaled(files, 'icon', icon)
   pushScaled(files, 'logo', input.assets.logo)
-  pushScaled(files, 'thumbnail', input.assets.photo)
+  // Das Banner füllt den oberen Teil der Karte, siehe `render-strip.ts`.
+  const photo = input.assets.photo
+  const strip = await renderBusinessStrip({
+    backgroundColor: input.design.backgroundColor,
+    foregroundColor: input.design.foregroundColor,
+    photoPng: photo?.['3x'] ?? photo?.['2x'] ?? photo?.['1x'] ?? null,
+  })
+  pushScaled(files, 'strip', strip)
 
   const manifest: Record<string, string> = {}
   for (const f of files) {
