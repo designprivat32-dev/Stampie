@@ -2,28 +2,37 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const cardFindFirst = vi.fn()
 const contactFindFirst = vi.fn()
-const contactCount = vi.fn()
+const contactFindMany = vi.fn()
 const contactCreate = vi.fn()
 const contactUpdate = vi.fn()
-const contactDelete = vi.fn()
+const contactUpdateMany = vi.fn()
+const companyFindFirst = vi.fn()
 const companyUpsert = vi.fn()
+const companyDeleteMany = vi.fn()
 const assetFindFirst = vi.fn()
-const passFindMany = vi.fn()
+const assetFindMany = vi.fn()
 
-vi.mock('@/lib/db', () => ({
-  prisma: {
-    card: { findFirst: (...a: unknown[]) => cardFindFirst(...a) },
-    businessContact: {
-      findFirst: (...a: unknown[]) => contactFindFirst(...a),
-      count: (...a: unknown[]) => contactCount(...a),
-      create: (...a: unknown[]) => contactCreate(...a),
-      update: (...a: unknown[]) => contactUpdate(...a),
-      delete: (...a: unknown[]) => contactDelete(...a),
-    },
-    businessCardCompany: { upsert: (...a: unknown[]) => companyUpsert(...a) },
-    asset: { findFirst: (...a: unknown[]) => assetFindFirst(...a) },
-    issuedPass: { findMany: (...a: unknown[]) => passFindMany(...a) },
+const db = {
+  card: { findFirst: (...a: unknown[]) => cardFindFirst(...a) },
+  businessContact: {
+    findFirst: (...a: unknown[]) => contactFindFirst(...a),
+    findMany: (...a: unknown[]) => contactFindMany(...a),
+    create: (...a: unknown[]) => contactCreate(...a),
+    update: (...a: unknown[]) => contactUpdate(...a),
+    updateMany: (...a: unknown[]) => contactUpdateMany(...a),
   },
+  businessCardCompany: {
+    findFirst: (...a: unknown[]) => companyFindFirst(...a),
+    upsert: (...a: unknown[]) => companyUpsert(...a),
+    deleteMany: (...a: unknown[]) => companyDeleteMany(...a),
+  },
+  asset: {
+    findFirst: (...a: unknown[]) => assetFindFirst(...a),
+    findMany: (...a: unknown[]) => assetFindMany(...a),
+  },
+}
+vi.mock('@/lib/db', () => ({
+  prisma: { ...db, $transaction: async (fn: (tx: typeof db) => Promise<unknown>) => fn(db) },
 }))
 
 const assertCardAccess = vi.fn()
@@ -35,222 +44,191 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
 const saveDraft = vi.fn()
 const publishDesign = vi.fn()
+const loadPublishedDesign = vi.fn()
 vi.mock('@/lib/cards/repository', async () => {
   const { DEFAULT_CARD_DESIGN } = await import('@/lib/cards/defaults')
   return {
-    loadOrCreateDraft: async () => ({ design: DEFAULT_CARD_DESIGN }),
+    loadOrCreateDraft: async () => ({ design: DEFAULT_CARD_DESIGN, publishedVersion: 2 }),
+    loadPublishedDesign: (...a: unknown[]) => loadPublishedDesign(...a),
     saveDraft: (...a: unknown[]) => saveDraft(...a),
     publishDesign: (...a: unknown[]) => publishDesign(...a),
   }
 })
 vi.mock('@/lib/cards/strip-service', () => ({ invalidateStripCache: () => {} }))
 
-const pushForCard = vi.fn()
-const pushForPasses = vi.fn()
+const syncCard = vi.fn()
+const syncContact = vi.fn()
 vi.mock('@/lib/business-cards/wallet-sync', () => ({
-  syncBusinessCard: (...a: unknown[]) => pushForCard(...a),
-  syncBusinessContact: (...a: unknown[]) => pushForPasses(...a),
+  syncBusinessCard: (...a: unknown[]) => syncCard(...a),
+  syncBusinessContact: (...a: unknown[]) => syncContact(...a),
 }))
 
-const {
-  createContactAction,
-  deleteContactAction,
-  renewOwnerLinkAction,
-  saveBusinessCompanyAction,
-  saveBusinessDesignAction,
-  updateContactAction,
-} = await import('@/actions/business-cards')
+const { saveBusinessCardAction, renewOwnerLinkAction, renewScanCodeAction } = await import('@/actions/business-cards')
+const { DEFAULT_CARD_DESIGN } = await import('@/lib/cards/defaults')
 
 const CARD = 'ckcard00000000000000000001'
-const CONTACT = 'ckcont00000000000000000001'
+const ANNA = 'ckcont00000000000000000001'
+const BEN = 'ckcont00000000000000000002'
+
+const design = {
+  backgroundColor: DEFAULT_CARD_DESIGN.backgroundColor,
+  foregroundColor: DEFAULT_CARD_DESIGN.foregroundColor,
+  labelColor: DEFAULT_CARD_DESIGN.labelColor,
+  cardTitle: '',
+  logoAssetId: null,
+}
+const company = { company: 'Nordlicht GmbH', website: null, phone: null, street: null, postalCode: null, city: null }
+const annaRow = {
+  id: ANNA,
+  firstName: 'Anna',
+  lastName: 'Schmidt',
+  jobTitle: null,
+  phone: null,
+  mobile: null,
+  email: null,
+  links: [],
+  photoAssetId: null,
+}
+const anna = { id: ANNA, key: ANNA, firstName: 'Anna', lastName: 'Schmidt', links: [] }
+
+function input(over: Record<string, unknown> = {}) {
+  return { cardId: CARD, design, company, contacts: [anna], deletedContactIds: [], ...over }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
   assertCardAccess.mockResolvedValue({ session: { userId: 'u1' }, cardId: CARD, orgId: 'o1' })
   cardFindFirst.mockResolvedValue({ id: CARD })
   contactFindFirst.mockResolvedValue({ cardId: CARD })
-  contactCount.mockResolvedValue(2)
-  contactCreate.mockResolvedValue({ id: CONTACT })
+  contactFindMany.mockResolvedValue([annaRow])
+  contactCreate.mockResolvedValue({ id: BEN })
+  companyFindFirst.mockResolvedValue(company)
+  assetFindMany.mockResolvedValue([])
+  // Veröffentlicht ist genau das, was der Editor schickt: nichts geändert.
+  loadPublishedDesign.mockResolvedValue({ ...DEFAULT_CARD_DESIGN, cardTitle: null, logoAssetId: null })
   publishDesign.mockResolvedValue({ version: 3 })
-  passFindMany.mockResolvedValue([{ serial: 'V-1' }, { serial: 'V-2' }])
-  pushForCard.mockResolvedValue({})
-  pushForPasses.mockResolvedValue({})
+  syncCard.mockResolvedValue({})
+  syncContact.mockResolvedValue({})
 })
 
-describe('access', () => {
+describe('saveBusinessCardAction — access', () => {
   it('refuses a card that is not a business card', async () => {
     cardFindFirst.mockResolvedValue(null)
-    const result = await saveBusinessCompanyAction({ cardId: CARD, company: 'X' })
+    const result = await saveBusinessCardAction(input())
     expect(result.success).toBe(false)
-    expect(result.error?.code).toBe('not_found')
-    expect(companyUpsert).not.toHaveBeenCalled()
     expect(cardFindFirst.mock.calls[0]![0].where).toEqual({ id: CARD, kind: 'BUSINESS_CARD' })
+    expect(companyUpsert).not.toHaveBeenCalled()
   })
 
-  it('refuses when the caller has no access to the card', async () => {
-    const { CardAccessError } = await import('@/lib/auth/session')
-    assertCardAccess.mockRejectedValue(new CardAccessError())
-    const result = await createContactAction({ cardId: CARD, firstName: 'A', lastName: 'B' })
+  it('refuses a person that belongs to another card', async () => {
+    contactFindMany.mockResolvedValue([])
+    const result = await saveBusinessCardAction(input())
     expect(result.success).toBe(false)
-    expect(contactCreate).not.toHaveBeenCalled()
+    expect(result.error?.fields?.['contacts.0']).toBeDefined()
+    expect(contactFindMany.mock.calls[0]![0].where).toMatchObject({ cardId: CARD, deletedAt: null })
   })
 
-  it('checks access through the contact’s own card', async () => {
-    await renewOwnerLinkAction(CONTACT)
-    expect(assertCardAccess).toHaveBeenCalledWith(CARD)
+  it('refuses a photo that is not a contact photo of this card', async () => {
+    const result = await saveBusinessCardAction(
+      input({ contacts: [{ ...anna, photoAssetId: 'ckasset0000000000000000001' }] }),
+    )
+    expect(result.success).toBe(false)
+    expect(result.error?.fields?.['contacts.0.photoAssetId']).toBeDefined()
+    expect(assetFindMany.mock.calls[0]![0].where).toMatchObject({ cardId: CARD, kind: 'CONTACT_PHOTO' })
   })
 })
 
-describe('saveBusinessDesignAction', () => {
-  it('saves and publishes in one go, then nudges the wallets', async () => {
-    const result = await saveBusinessDesignAction({
-      cardId: CARD,
-      backgroundColor: '#112233',
-      foregroundColor: '#ffffff',
-      labelColor: '#cccccc',
-      cardTitle: 'NL',
-      logoAssetId: null,
+describe('saveBusinessCardAction — one save for everything', () => {
+  it('does nothing and pushes nothing when nothing changed', async () => {
+    const result = await saveBusinessCardAction(input())
+    expect(result).toMatchObject({
+      success: true,
+      data: { changed: { design: false, company: false, contacts: 0, deleted: 0 } },
     })
-    expect(result).toMatchObject({ success: true, data: { version: 3 } })
-    expect(saveDraft.mock.calls[0]![1]).toMatchObject({ backgroundColor: '#112233', cardTitle: 'NL' })
-    expect(publishDesign).toHaveBeenCalled()
-    expect(pushForCard).toHaveBeenCalledWith(CARD)
-  })
-
-  it('refuses a logo that belongs to another card', async () => {
-    assetFindFirst.mockResolvedValue(null)
-    const result = await saveBusinessDesignAction({
-      cardId: CARD,
-      backgroundColor: '#112233',
-      foregroundColor: '#ffffff',
-      labelColor: '#cccccc',
-      cardTitle: null,
-      logoAssetId: 'ckasset0000000000000000001',
-    })
-    expect(result.success).toBe(false)
-    expect(assetFindFirst.mock.calls[0]![0].where).toMatchObject({ cardId: CARD, kind: 'LOGO' })
     expect(publishDesign).not.toHaveBeenCalled()
+    expect(companyUpsert).not.toHaveBeenCalled()
+    expect(syncCard).not.toHaveBeenCalled()
+    expect(syncContact).not.toHaveBeenCalled()
   })
 
-  it('rejects colours that are not hex', async () => {
-    const result = await saveBusinessDesignAction({
-      cardId: CARD,
-      backgroundColor: 'red',
-      foregroundColor: '#ffffff',
-      labelColor: '#cccccc',
-      cardTitle: null,
-      logoAssetId: null,
-    })
+  it('publishes a changed design and updates the whole card', async () => {
+    const result = await saveBusinessCardAction(input({ design: { ...design, backgroundColor: '#112233' } }))
+    expect(result).toMatchObject({ success: true, data: { version: 3, changed: { design: true } } })
+    expect(saveDraft.mock.calls[0]![1]).toMatchObject({ backgroundColor: '#112233' })
+    expect(syncCard).toHaveBeenCalledWith(CARD)
+  })
+
+  it('saves company changes and reports field errors with their path', async () => {
+    const ok = await saveBusinessCardAction(input({ company: { ...company, website: 'nordlicht.de' } }))
+    expect(ok.success).toBe(true)
+    expect(companyUpsert.mock.calls[0]![0].update).toMatchObject({ website: 'https://nordlicht.de/' })
+
+    const bad = await saveBusinessCardAction(input({ company: { company: '', city: 'Hamburg' } }))
+    expect(bad.success).toBe(false)
+    expect(bad.error?.fields?.['company.company']).toBeDefined()
+  })
+
+  it('creates new people with their own codes and maps them back', async () => {
+    const result = await saveBusinessCardAction(
+      input({ contacts: [anna, { id: null, key: 'new-1', firstName: 'Ben', lastName: 'Meier', links: [] }] }),
+    )
+    expect(result).toMatchObject({ success: true, data: { createdContactIds: { 'new-1': BEN } } })
+    const data = contactCreate.mock.calls[0]![0].data
+    expect(data).toMatchObject({ cardId: CARD, firstName: 'Ben', sortOrder: 1 })
+    expect(data.scanCode).toMatch(/^[A-Za-z0-9_-]{16,}$/)
+    expect(data.ownerClaimToken).toMatch(/^[A-Za-z0-9_-]{32,}$/)
+  })
+
+  it('updates only the person that changed and pushes only their passes', async () => {
+    await saveBusinessCardAction(input({ contacts: [{ ...anna, email: 'anna@example.de' }] }))
+    expect(contactUpdate.mock.calls[0]![0].data).toMatchObject({ email: 'anna@example.de' })
+    expect(syncContact).toHaveBeenCalledWith(ANNA)
+    expect(syncCard).not.toHaveBeenCalled()
+  })
+
+  it('soft-deletes removed people on save', async () => {
+    const result = await saveBusinessCardAction(input({ contacts: [], deletedContactIds: [ANNA] }))
+    expect(result).toMatchObject({ success: true, data: { changed: { deleted: 1 } } })
+    const call = contactUpdateMany.mock.calls[0]![0]
+    expect(call.where).toEqual({ id: { in: [ANNA] }, cardId: CARD })
+    expect(call.data.deletedAt).toBeInstanceOf(Date)
+    expect(call.data.ownerClaimToken).toBeNull()
+    expect(syncContact).toHaveBeenCalledWith(ANNA)
+  })
+
+  it('reports bad contact input under the contact’s path', async () => {
+    const result = await saveBusinessCardAction(input({ contacts: [{ ...anna, email: 'kein-at' }] }))
     expect(result.success).toBe(false)
-  })
-})
-
-describe('saveBusinessCompanyAction', () => {
-  it('normalizes and upserts', async () => {
-    const result = await saveBusinessCompanyAction({ cardId: CARD, company: ' Nordlicht ', website: 'nordlicht.de' })
-    expect(result.success).toBe(true)
-    expect(companyUpsert.mock.calls[0]![0]).toMatchObject({
-      where: { cardId: CARD },
-      update: { company: 'Nordlicht', website: 'https://nordlicht.de/' },
-    })
-    expect(pushForCard).toHaveBeenCalledWith(CARD)
+    expect(result.error?.fields?.['contacts.0.email']).toBeDefined()
   })
 
-  it('keeps the save when the wallet push fails', async () => {
+  it('keeps the save when the wallet update fails', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    pushForCard.mockRejectedValue(new Error('apns down'))
-    const result = await saveBusinessCompanyAction({ cardId: CARD, company: 'X' })
+    syncCard.mockRejectedValue(new Error('apns down'))
+    const result = await saveBusinessCardAction(input({ design: { ...design, backgroundColor: '#112233' } }))
     expect(result.success).toBe(true)
     spy.mockRestore()
   })
 })
 
-describe('contacts', () => {
-  it('creates a person with its own scan code and owner link', async () => {
-    const result = await createContactAction({ cardId: CARD, firstName: 'Anna', lastName: 'Schmidt' })
-    expect(result).toMatchObject({ success: true, data: { contactId: CONTACT } })
-    const data = contactCreate.mock.calls[0]![0].data
-    expect(data).toMatchObject({ cardId: CARD, firstName: 'Anna', sortOrder: 2 })
-    expect(data.scanCode).toMatch(/^[A-Za-z0-9_-]{16,}$/)
-    expect(data.ownerClaimToken).toMatch(/^[A-Za-z0-9_-]{32,}$/)
-    expect(data.scanCode).not.toBe(data.ownerClaimToken)
-  })
-
-  it('refuses a photo that is not a contact photo of this card', async () => {
-    assetFindFirst.mockResolvedValue(null)
-    const result = await createContactAction({
-      cardId: CARD,
-      firstName: 'A',
-      lastName: 'B',
-      photoAssetId: 'ckasset0000000000000000001',
-    })
-    expect(result.success).toBe(false)
-    expect(assetFindFirst.mock.calls[0]![0].where).toEqual({
-      id: 'ckasset0000000000000000001',
-      cardId: CARD,
-      kind: 'CONTACT_PHOTO',
-    })
-    expect(contactCreate).not.toHaveBeenCalled()
-  })
-
-  it('stores a valid photo with the person', async () => {
-    assetFindFirst.mockResolvedValue({ storageKey: 'k' })
-    await updateContactAction({
-      contactId: CONTACT,
-      firstName: 'A',
-      lastName: 'B',
-      photoAssetId: 'ckasset0000000000000000001',
-    })
-    expect(contactUpdate.mock.calls[0]![0].data.photoAssetId).toBe('ckasset0000000000000000001')
-  })
-
-  it('reports field errors for bad input', async () => {
-    const result = await createContactAction({ cardId: CARD, firstName: 'A', lastName: 'B', email: 'x' })
-    expect(result.success).toBe(false)
-    expect(result.error?.fields?.email).toBeDefined()
-  })
-
-  it('updates a person and pushes only their passes', async () => {
-    const result = await updateContactAction({ contactId: CONTACT, firstName: 'Anna', lastName: 'Meier' })
+describe('renew actions', () => {
+  it('renews the scan code and updates the passes', async () => {
+    const result = await renewScanCodeAction(ANNA)
     expect(result.success).toBe(true)
-    expect(contactUpdate.mock.calls[0]![0]).toMatchObject({ where: { id: CONTACT }, data: { lastName: 'Meier' } })
-    expect(pushForPasses).toHaveBeenCalledWith(CONTACT)
-    expect(pushForCard).not.toHaveBeenCalled()
+    expect(contactUpdate.mock.calls[0]![0].data.scanCode).toMatch(/^[A-Za-z0-9_-]{16,}$/)
+    expect(syncContact).toHaveBeenCalledWith(ANNA)
   })
 
   it('renews the owner link', async () => {
-    await renewOwnerLinkAction(CONTACT)
+    await renewOwnerLinkAction(ANNA)
     expect(contactUpdate.mock.calls[0]![0].data.ownerClaimToken).toMatch(/^[A-Za-z0-9_-]{32,}$/)
-  })
-
-  it('soft-deletes a person and voids their passes', async () => {
-    const result = await deleteContactAction(CONTACT)
-    expect(result.success).toBe(true)
-    expect(contactDelete).not.toHaveBeenCalled()
-    const update = contactUpdate.mock.calls[0]![0]
-    expect(update.where).toEqual({ id: CONTACT })
-    expect(update.data.deletedAt).toBeInstanceOf(Date)
-    expect(update.data.ownerClaimToken).toBeNull()
-    expect(pushForPasses).toHaveBeenCalledWith(CONTACT)
+    expect(assertCardAccess).toHaveBeenCalledWith(CARD)
   })
 
   it('ignores people that are already deleted', async () => {
-    await deleteContactAction(CONTACT)
-    expect(contactFindFirst.mock.calls[0]![0].where).toEqual({ id: CONTACT, deletedAt: null })
-  })
-
-  it('renews the scan code and updates the passes', async () => {
-    const { renewScanCodeAction } = await import('@/actions/business-cards')
-    const result = await renewScanCodeAction(CONTACT)
-    expect(result.success).toBe(true)
-    expect(contactUpdate.mock.calls[0]![0].data.scanCode).toMatch(/^[A-Za-z0-9_-]{16,}$/)
-    expect(pushForPasses).toHaveBeenCalledWith(CONTACT)
-  })
-
-  it('reports a missing person as not found', async () => {
     contactFindFirst.mockResolvedValue(null)
-    const result = await deleteContactAction(CONTACT)
+    const result = await renewOwnerLinkAction(ANNA)
     expect(result.success).toBe(false)
-    expect(contactDelete).not.toHaveBeenCalled()
+    expect(contactFindFirst.mock.calls[0]![0].where).toEqual({ id: ANNA, deletedAt: null })
   })
 })
