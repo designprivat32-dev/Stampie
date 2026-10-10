@@ -11,6 +11,7 @@ import { invalidateStripCache } from '@/lib/cards/strip-service'
 import { syncBusinessCard, syncBusinessContact } from '@/lib/business-cards/wallet-sync'
 import { businessCompanySchema, businessContactSchema } from '@/lib/business-cards/schema'
 import { newOwnerClaimToken, newScanCode } from '@/lib/business-cards/serial'
+import { isContactPhotoOfCard } from '@/lib/business-cards/photo-service'
 
 /**
  * Alles, was der Visitenkarten-Editor im Dashboard speichert.
@@ -135,12 +136,24 @@ export async function saveBusinessCompanyAction(input: unknown): Promise<ActionR
 
 // ---------------------------------------------------------------- contacts
 
+/** Das Foto läuft neben den Kontaktdaten mit: es ist eine Asset-Id, kein Feld der vCard. */
+const photoField = { photoAssetId: z.string().cuid().nullable().default(null) }
+
+async function assertPhoto(cardId: string, photoAssetId: string | null): Promise<string | null> {
+  if (photoAssetId && !(await isContactPhotoOfCard(cardId, photoAssetId))) {
+    return 'Das Foto wurde nicht gefunden.'
+  }
+  return null
+}
+
 export async function createContactAction(input: unknown): Promise<ActionResult<{ contactId: string }>> {
   return guarded(async () => {
-    const parsed = businessContactSchema.extend({ cardId: cardIdSchema }).safeParse(input)
+    const parsed = businessContactSchema.extend({ cardId: cardIdSchema, ...photoField }).safeParse(input)
     if (!parsed.success) return fromZodError(parsed.error)
     const { cardId, ...contact } = parsed.data
     await assertBusinessCardAccess(cardId)
+    const photoError = await assertPhoto(cardId, contact.photoAssetId)
+    if (photoError) return fail(photoError, 'not_found')
 
     const count = await prisma.businessContact.count({ where: { cardId } })
     const created = await prisma.businessContact.create({
@@ -161,10 +174,12 @@ export async function createContactAction(input: unknown): Promise<ActionResult<
 
 export async function updateContactAction(input: unknown): Promise<ActionResult<null>> {
   return guarded(async () => {
-    const parsed = businessContactSchema.extend({ contactId: z.string().cuid() }).safeParse(input)
+    const parsed = businessContactSchema.extend({ contactId: z.string().cuid(), ...photoField }).safeParse(input)
     if (!parsed.success) return fromZodError(parsed.error)
     const { contactId, ...contact } = parsed.data
     const { cardId } = await assertContactAccess(contactId)
+    const photoError = await assertPhoto(cardId, contact.photoAssetId)
+    if (photoError) return fail(photoError, 'not_found')
 
     await prisma.businessContact.update({ where: { id: contactId }, data: contact })
     await pushQuietly(() => syncBusinessContact(contactId))

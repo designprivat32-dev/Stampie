@@ -10,7 +10,7 @@ export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 export const ACCEPTED_UPLOAD_MIME = 'image/png,image/jpeg,image/svg+xml'
 
-export type AssetKind = 'LOGO' | 'SQUARE_LOGO' | 'ICON' | 'HERO' | 'STAMP_ICON'
+export type AssetKind = 'LOGO' | 'SQUARE_LOGO' | 'ICON' | 'HERO' | 'STAMP_ICON' | 'CONTACT_PHOTO'
 
 export interface CropRect {
   x: number
@@ -39,4 +39,6 @@ export const KIND_SPECS: Record<AssetKind, KindSpec> = {
   HERO: { width: 1032, height: 336, fit: 'cover', scales: [1] },
   // Custom stamp icon: one square master, scaled down by the strip renderer.
   STAMP_ICON: { width: 128, height: 128, fit: 'contain', scales: [1] },
+  // thumbnail.png der Visitenkarte — Apple nennt 90x90; quadratisch zugeschnitten.
+  CONTACT_PHOTO: { width: 90, height: 90, fit: 'cover', scales: [1, 2, 3] },
 }

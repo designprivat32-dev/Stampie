@@ -291,6 +291,8 @@ enum AssetKind {
   ICON
   HERO
   STAMP_ICON
+  /// Foto einer Person auf der Visitenkarte; wird `thumbnail.png` im Apple-Pass.
+  CONTACT_PHOTO
 }
 
 model Asset {

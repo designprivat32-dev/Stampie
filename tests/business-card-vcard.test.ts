@@ -216,6 +216,22 @@ describe('buildVCard', () => {
   })
 })
 
+describe('buildVCard photo', () => {
+  it('embeds the photo as base64 PNG and keeps every line within 75 octets', () => {
+    const png = Buffer.alloc(300, 7)
+    const vcard = buildVCard({ contact: contact(), company: null, photoPng: png })
+    const unfolded = lines(vcard)
+    expect(unfolded).toContain(`PHOTO;ENCODING=b;TYPE=PNG:${png.toString('base64')}`)
+    for (const line of vcard.split('\r\n')) {
+      expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75)
+    }
+  })
+
+  it('leaves the photo out when there is none', () => {
+    expect(buildVCard({ contact: contact(), company: null, photoPng: null })).not.toContain('PHOTO')
+  })
+})
+
 describe('vCardFileName', () => {
   it('turns umlauts into plain ASCII', () => {
     expect(vCardFileName(contact())).toBe('Jurgen-Muller.vcf')

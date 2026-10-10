@@ -6,6 +6,7 @@ import { loadOrCreateDraft } from '@/lib/cards/repository'
 import { getStorage, variantKey } from '@/lib/storage'
 import { scanUrlFor, toBusinessCompany, toBusinessContact } from './mapping'
 import type { BusinessCompany, BusinessContact } from './schema'
+import { contactPhotoUrl } from './photo-service'
 
 /**
  * Was der Visitenkarten-Editor im Dashboard braucht, in einer Abfrage-Runde.
@@ -27,6 +28,8 @@ export interface ContactStats {
 export interface EditorContact {
   id: string
   contact: BusinessContact
+  photoAssetId: string | null
+  photoUrl: string | null
   scanUrl: string
   scanQr: string
   ownerUrl: string | null
@@ -79,6 +82,7 @@ export async function loadBusinessEditor(cardId: string): Promise<BusinessEditor
           links: true,
           scanCode: true,
           ownerClaimToken: true,
+          photoAssetId: true,
         },
       },
     },
@@ -118,10 +122,16 @@ export async function loadBusinessEditor(cardId: string): Promise<BusinessEditor
     card.contacts.map(async (row): Promise<EditorContact> => {
       const scanUrl = scanUrlFor(row.scanCode)
       const ownerUrl = row.ownerClaimToken ? `${appUrl()}/v/claim/${row.ownerClaimToken}` : null
-      const [scanQr, ownerQr] = await Promise.all([qr(scanUrl), ownerUrl ? qr(ownerUrl) : null])
+      const [scanQr, ownerQr, photoUrl] = await Promise.all([
+        qr(scanUrl),
+        ownerUrl ? qr(ownerUrl) : null,
+        contactPhotoUrl(cardId, row.photoAssetId),
+      ])
       return {
         id: row.id,
         contact: toBusinessContact(row),
+        photoAssetId: row.photoAssetId,
+        photoUrl,
         scanUrl,
         scanQr,
         ownerUrl,

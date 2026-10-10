@@ -92,6 +92,11 @@ export function ContactsSection({
         cardId={cardId}
         contactId={editing && editing !== 'new' ? editing.id : null}
         contact={editing && editing !== 'new' ? editing.contact : null}
+        photo={
+          editing && editing !== 'new' && editing.photoAssetId
+            ? { assetId: editing.photoAssetId, url: editing.photoUrl }
+            : null
+        }
       />
       <WalletLinkDialog contact={walletFor} onClose={() => setWalletFor(null)} />
       <DeleteContactDialog contact={deleting} onClose={() => setDeleting(null)} />

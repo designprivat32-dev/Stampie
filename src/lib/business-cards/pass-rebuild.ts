@@ -4,6 +4,7 @@ import { loadPassAssets } from '@/lib/cards/asset-service'
 import { loadOrCreateDraft, loadPublishedDesign } from '@/lib/cards/repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
 import { buildBusinessApplePass } from './apple-pass-builder'
+import { loadContactPhoto } from './photo-service'
 import { privacyUrlFor, scanUrlFor, toBusinessCompany, toBusinessContact } from './mapping'
 
 /**
@@ -36,6 +37,7 @@ export async function rebuildBusinessPass(serial: string): Promise<Buffer | null
           links: true,
           scanCode: true,
           deletedAt: true,
+          photoAssetId: true,
         },
       },
       card: {
@@ -58,9 +60,10 @@ export async function rebuildBusinessPass(serial: string): Promise<Buffer | null
 
   const design =
     (await loadPublishedDesign(pass.cardId)) ?? (await loadOrCreateDraft(pass.cardId)).design
-  const [assets, appleAuthToken] = await Promise.all([
+  const [assets, appleAuthToken, photo] = await Promise.all([
     loadPassAssets(design, pass.cardId),
     ensureAppleAuthToken(pass.serial),
+    loadContactPhoto(pass.cardId, pass.contact.photoAssetId),
   ])
 
   return buildBusinessApplePass({
@@ -71,8 +74,7 @@ export async function rebuildBusinessPass(serial: string): Promise<Buffer | null
     serial: pass.serial,
     scanUrl: scanUrlFor(pass.contact.scanCode),
     privacyUrl: privacyUrlFor(pass.contact.scanCode),
-    // Das Foto kommt mit dem Upload in Phase 5.
-    assets: { icon: assets.icon, logo: assets.logo, photo: null },
+    assets: { icon: assets.icon, logo: assets.logo, photo },
     appleAuthToken,
     voided: pass.contact.deletedAt !== null,
   })

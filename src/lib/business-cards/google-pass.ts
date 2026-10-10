@@ -37,6 +37,7 @@ export interface BusinessGoogleInput {
   scanUrl: string
   privacyUrl: string
   voided?: boolean
+  photoUrl?: string | null
 }
 
 const FALLBACK_ISSUER_ID = '3388000000022000000'
@@ -54,6 +55,7 @@ function savePayload(input: BusinessGoogleInput, issuerId: string): Record<strin
         scanUrl: input.scanUrl,
         privacyUrl: input.privacyUrl,
         logoUrl: walletLogoUrl(base, input.cardId, input.design),
+        photoUrl: input.photoUrl ?? null,
       }),
     ],
   }
@@ -120,6 +122,7 @@ export async function syncBusinessGoogleObjects(
           privacyUrl: input.privacyUrl,
           logoUrl: walletLogoUrl(base, input.cardId, input.design),
           voided: input.voided ?? false,
+          photoUrl: input.photoUrl ?? null,
         })
         const id = businessObjectId(credentials.issuerId, input.serial)
         try {

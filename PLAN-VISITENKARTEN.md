@@ -326,7 +326,14 @@ und Gutschein jedes Mal mit testen).
   Links nur http/https, Texte in Wallet-HTML maskiert, Codes 16/32 Zufallsbytes.
 - Bekannt und nicht Teil dieses Plans: 3 Tests in `tests/app-stamp-redeem.test.ts` schlagen schon vor
   Phase 0 fehl.
-- Offen für später: Foto-Upload der Person.
+- Foto der Person: umgesetzt nach Phase 7 (siehe unten).
+
+### Foto der Person
+
+- Neue Bildart `CONTACT_PHOTO` (90×90, quadratisch zugeschnitten, @1x–@3x), Upload im Personen-Dialog.
+- Apple: `thumbnail.png`; Google: Bild-Modul in den Details; Scan- und Aussteller-Seite: rundes Foto
+  statt Logo; „Kontakt speichern": Foto eingebettet in der vCard.
+- Beim Speichern geprüft, dass das Foto zu dieser Karte gehört und wirklich ein Kontaktfoto ist.
 
 ## 10. Datenschutz
 

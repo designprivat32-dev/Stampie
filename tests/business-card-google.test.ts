@@ -79,6 +79,17 @@ describe('buildBusinessGenericObject', () => {
     expect(o).not.toHaveProperty('barcode')
   })
 
+  it('shows the photo as an image module', () => {
+    const o = buildBusinessGenericObject(
+      DEFAULT_CARD_DESIGN,
+      contact(),
+      company(),
+      ctx({ photoUrl: 'https://cdn.example/photo@3x.png' }),
+    )
+    expect(o.imageModulesData?.[0]?.mainImage.sourceUri.uri).toBe('https://cdn.example/photo@3x.png')
+    expect(buildBusinessGenericObject(DEFAULT_CARD_DESIGN, contact(), company(), ctx())).not.toHaveProperty('imageModulesData')
+  })
+
   it('makes phone, mail, web and links tappable', () => {
     const uris = buildBusinessGenericObject(DEFAULT_CARD_DESIGN, contact(), company(), ctx()).linksModuleData.uris
     const byId = Object.fromEntries(uris.map((u) => [u.id, u]))

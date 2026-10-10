@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { loadPublishedDesign } from '@/lib/cards/repository'
 import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
 import { syncBusinessGoogleObjects, type BusinessGoogleInput } from './google-pass'
+import { contactPhotoUrl } from './photo-service'
 import { privacyUrlFor, scanUrlFor, toBusinessCompany, toBusinessContact } from './mapping'
 
 /**
@@ -47,6 +48,7 @@ async function syncWhere(
           links: true,
           scanCode: true,
           deletedAt: true,
+          photoAssetId: true,
         },
       },
       card: {
@@ -80,6 +82,12 @@ async function syncWhere(
     // Alle Pässe hängen an derselben Karte, also an einem Design.
     const design = await loadPublishedDesign(passes[0]!.cardId)
     if (design) {
+      // Ein Foto je Person, nicht je Pass nachschlagen.
+      const photoUrls = new Map<string, string | null>()
+      for (const p of passes) {
+        const id = p.contact?.photoAssetId
+        if (id && !photoUrls.has(id)) photoUrls.set(id, await contactPhotoUrl(p.cardId, id))
+      }
       const inputs: BusinessGoogleInput[] = passes.flatMap((p) =>
         p.contact
           ? [
@@ -93,6 +101,7 @@ async function syncWhere(
                 scanUrl: scanUrlFor(p.contact.scanCode),
                 privacyUrl: privacyUrlFor(p.contact.scanCode),
                 voided: options.voidAll === true || p.contact.deletedAt !== null,
+                photoUrl: p.contact.photoAssetId ? (photoUrls.get(p.contact.photoAssetId) ?? null) : null,
               },
             ]
           : [],

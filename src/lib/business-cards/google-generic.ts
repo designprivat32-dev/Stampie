@@ -37,6 +37,7 @@ export interface GenericObject {
   textModulesData: GoogleTextModule[]
   linksModuleData: { uris: GoogleLinkModuleUri[] }
   barcode?: { type: 'QR_CODE'; value: string; alternateText: string }
+  imageModulesData?: Array<{ id: string; mainImage: GoogleImageUri }>
 }
 
 export interface BusinessGoogleContext {
@@ -49,6 +50,8 @@ export interface BusinessGoogleContext {
   logoUrl: string
   /** Die Person wurde gelöscht — Objekt deaktivieren, Code entfernen. */
   voided?: boolean
+  /** Öffentliche Adresse des Fotos; Google zeigt es in den Details der Karte. */
+  photoUrl?: string | null
 }
 
 function text(value: string): LocalizedString {
@@ -120,6 +123,12 @@ export function buildBusinessGenericObject(
   }
 
   if (contact.jobTitle) object.subheader = text(contact.jobTitle)
+
+  if (ctx.photoUrl) {
+    object.imageModulesData = [
+      { id: 'photo', mainImage: { sourceUri: { uri: ctx.photoUrl }, contentDescription: text(name) } },
+    ]
+  }
 
   if (ctx.role === 'OWNER' && !ctx.voided) {
     object.barcode = {

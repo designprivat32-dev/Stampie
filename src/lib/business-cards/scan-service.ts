@@ -7,6 +7,7 @@ import type { CardDesignInput } from '@/lib/cards/schema'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
 import { buildBusinessApplePass } from './apple-pass-builder'
 import { buildBusinessGoogleSaveUrl } from './google-pass'
+import { contactPhotoUrl, loadContactPhoto } from './photo-service'
 import type { BusinessPassRole } from './apple-pass-json'
 import { privacyUrlFor, scanUrlFor, toBusinessCompany, toBusinessContact } from './mapping'
 import type { BusinessCompany, BusinessContact } from './schema'
@@ -32,6 +33,9 @@ export interface ResolvedBusinessCard {
   design: CardDesignInput
   contact: BusinessContact
   company: BusinessCompany | null
+  /** Foto der Person, falls hochgeladen. */
+  photoAssetId: string | null
+  photoUrl: string | null
   /** Verantwortlicher für die Datenschutzinformation: der Kunde, dem die Karte gehört. */
   owner: {
     name: string
@@ -55,6 +59,7 @@ const contactSelect = {
   mobile: true,
   email: true,
   links: true,
+  photoAssetId: true,
   card: {
     select: {
       name: true,
@@ -87,6 +92,7 @@ async function resolve(row: ContactWithCard | null): Promise<ResolvedBusinessCar
 
   const company = toBusinessCompany(row.card.businessCompany)
   const org = row.card.org
+  const photoUrl = await contactPhotoUrl(row.cardId, row.photoAssetId)
   return {
     cardId: row.cardId,
     contactId: row.id,
@@ -94,6 +100,8 @@ async function resolve(row: ContactWithCard | null): Promise<ResolvedBusinessCar
     design,
     contact: toBusinessContact(row),
     company,
+    photoAssetId: row.photoAssetId,
+    photoUrl,
     owner: {
       name: org?.name ?? company?.company ?? row.card.name,
       street: org?.street ?? company?.street ?? null,
@@ -191,9 +199,10 @@ export async function buildIssuedBusinessPass(
   serial: string,
   role: BusinessPassRole,
 ): Promise<Buffer> {
-  const [assets, appleAuthToken] = await Promise.all([
+  const [assets, appleAuthToken, photo] = await Promise.all([
     loadPassAssets(resolved.design, resolved.cardId),
     ensureAppleAuthToken(serial),
+    loadContactPhoto(resolved.cardId, resolved.photoAssetId),
   ])
   return buildBusinessApplePass({
     design: resolved.design,
@@ -203,7 +212,7 @@ export async function buildIssuedBusinessPass(
     serial,
     scanUrl: scanUrlFor(resolved.scanCode),
     privacyUrl: privacyUrlFor(resolved.scanCode),
-    assets: { icon: assets.icon, logo: assets.logo, photo: null },
+    assets: { icon: assets.icon, logo: assets.logo, photo },
     appleAuthToken,
   })
 }
@@ -223,6 +232,7 @@ export function googleSaveUrlFor(
     serial,
     scanUrl: scanUrlFor(resolved.scanCode),
     privacyUrl: privacyUrlFor(resolved.scanCode),
+    photoUrl: resolved.photoUrl,
   })
 }
 

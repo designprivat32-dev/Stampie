@@ -16,6 +16,8 @@ const MAX_LINE_OCTETS = 75
 export interface VCardInput {
   contact: BusinessContact
   company: BusinessCompany | null
+  /** Foto als PNG; landet eingebettet im Kontakt. */
+  photoPng?: Buffer | null
 }
 
 /** Maskiert, was in einem vCard-Wert eine Bedeutung hat: `\`, `,`, `;` und Zeilenumbrüche. */
@@ -59,7 +61,7 @@ function fullName(contact: BusinessContact): string {
   return `${contact.firstName} ${contact.lastName}`.trim()
 }
 
-export function buildVCard({ contact, company }: VCardInput): string {
+export function buildVCard({ contact, company, photoPng }: VCardInput): string {
   const e = escapeVCardValue
   const lines: string[] = [
     'BEGIN:VCARD',
@@ -91,6 +93,11 @@ export function buildVCard({ contact, company }: VCardInput): string {
     lines.push(`${item}.URL:${e(link.url)}`)
     lines.push(`${item}.X-ABLabel:${e(link.label)}`)
   })
+
+  // Eingebettet statt verlinkt: iOS und Android laden kein Foto von einer Adresse nach.
+  if (photoPng && photoPng.length > 0) {
+    lines.push(`PHOTO;ENCODING=b;TYPE=PNG:${photoPng.toString('base64')}`)
+  }
 
   lines.push('END:VCARD')
   return lines.map(foldVCardLine).join(CRLF) + CRLF

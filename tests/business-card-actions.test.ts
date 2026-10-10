@@ -176,6 +176,34 @@ describe('contacts', () => {
     expect(data.scanCode).not.toBe(data.ownerClaimToken)
   })
 
+  it('refuses a photo that is not a contact photo of this card', async () => {
+    assetFindFirst.mockResolvedValue(null)
+    const result = await createContactAction({
+      cardId: CARD,
+      firstName: 'A',
+      lastName: 'B',
+      photoAssetId: 'ckasset0000000000000000001',
+    })
+    expect(result.success).toBe(false)
+    expect(assetFindFirst.mock.calls[0]![0].where).toEqual({
+      id: 'ckasset0000000000000000001',
+      cardId: CARD,
+      kind: 'CONTACT_PHOTO',
+    })
+    expect(contactCreate).not.toHaveBeenCalled()
+  })
+
+  it('stores a valid photo with the person', async () => {
+    assetFindFirst.mockResolvedValue({ storageKey: 'k' })
+    await updateContactAction({
+      contactId: CONTACT,
+      firstName: 'A',
+      lastName: 'B',
+      photoAssetId: 'ckasset0000000000000000001',
+    })
+    expect(contactUpdate.mock.calls[0]![0].data.photoAssetId).toBe('ckasset0000000000000000001')
+  })
+
   it('reports field errors for bad input', async () => {
     const result = await createContactAction({ cardId: CARD, firstName: 'A', lastName: 'B', email: 'x' })
     expect(result.success).toBe(false)

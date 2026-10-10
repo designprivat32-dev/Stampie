@@ -184,7 +184,7 @@ describe('asset kinds stay in one place', () => {
 
   it('covers the kinds the Prisma AssetKind enum declares', () => {
     expect(Object.keys(KIND_SPECS).sort()).toEqual(
-      ['HERO', 'ICON', 'LOGO', 'SQUARE_LOGO', 'STAMP_ICON'].sort(),
+      ['CONTACT_PHOTO', 'HERO', 'ICON', 'LOGO', 'SQUARE_LOGO', 'STAMP_ICON'].sort(),
     )
   })
 })

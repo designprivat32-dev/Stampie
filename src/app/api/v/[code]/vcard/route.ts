@@ -3,6 +3,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { detectPlatform } from '@/lib/cards/test-card-service'
 import { recordBusinessCardEvent, resolveScanCode } from '@/lib/business-cards/scan-service'
 import { buildVCard } from '@/lib/business-cards/vcard'
+import { loadContactPhoto } from '@/lib/business-cards/photo-service'
 import {
   clientIp,
   notFoundResponse,
@@ -28,5 +29,11 @@ export async function GET(
   const platform = detectPlatform(request.headers.get('user-agent'))
   await recordBusinessCardEvent(resolved.contactId, 'CONTACT_SAVED', platform)
 
-  return vCardResponse(buildVCard({ contact: resolved.contact, company: resolved.company }), resolved.contact)
+  const photo = await loadContactPhoto(resolved.cardId, resolved.photoAssetId)
+  const photoPng = photo?.['3x'] ?? photo?.['2x'] ?? photo?.['1x'] ?? null
+
+  return vCardResponse(
+    buildVCard({ contact: resolved.contact, company: resolved.company, photoPng }),
+    resolved.contact,
+  )
 }

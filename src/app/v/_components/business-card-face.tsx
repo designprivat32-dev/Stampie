@@ -19,14 +19,20 @@ export function BusinessCardFace({ card }: { card: ResolvedBusinessCard }) {
           borderColor: `${design.foregroundColor}2b`,
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/api/wallet/logo/${card.cardId}`}
-          alt=""
-          width={88}
-          height={88}
-          className="h-[72px] w-[72px] object-contain"
-        />
+        {/* Das Foto der Person, wo es eins gibt — sonst das Zeichen der Firma. */}
+        {card.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={card.photoUrl} alt="" width={88} height={88} className="h-full w-full object-cover" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/wallet/logo/${card.cardId}`}
+            alt=""
+            width={88}
+            height={88}
+            className="h-[72px] w-[72px] object-contain"
+          />
+        )}
       </div>
 
       {company ? (
