@@ -1,50 +1,39 @@
 import type { MessageSegment } from './message-segments'
 
 /**
- * Wie viele Nachrichten ein Betrieb je Karte und Monat verschicken darf.
+ * Wie oft ein Betrieb seine Karteninhaber anschreiben darf.
  *
  * Die Grenze schützt den Endkunden, nicht den Server: Eine Stempelkarte, die jede Woche
- * meldet, fliegt aus dem Wallet. Erlaubt ist deshalb **eine sofortige und eine geplante
- * Nachricht je Karte und Kalendermonat** — zwei Kontingente nebeneinander, damit eine
- * spontane Ankündigung die geplante Monatsnachricht nicht auffrisst und umgekehrt.
+ * meldet, fliegt aus dem Wallet. Erlaubt sind deshalb zwei Wege nebeneinander:
  *
- * Die wiederkehrende Inaktivitäts-Erinnerung (`CardReminder`) zählt bewusst nicht mit:
- * Sie geht nicht an alle, sondern nur an den Einzelnen, der weggeblieben ist, und sie
- * hört auf, sobald er wiederkommt.
+ *  - **eine selbst verschickte Nachricht je Karte und Kalendermonat** — die spontane
+ *    Ankündigung, die jemand im Laden tippt;
+ *  - **eine monatliche Nachricht**, die einmal eingerichtet wird und von selbst läuft
+ *    (`CardMonthlyMessage`, höchstens eine aktive je Karte).
+ *
+ * Zwei getrennte Kontingente, damit der Automatismus die spontane Nachricht nicht
+ * auffrisst — und umgekehrt.
+ *
+ * Die wiederkehrende Inaktivitäts-Erinnerung (`CardReminder`) zählt bei beidem nicht mit:
+ * Sie geht nicht an alle, sondern nur an den Einzelnen, der weggeblieben ist, und sie hört
+ * auf, sobald er wiederkommt.
  */
 
 export const MONTHLY_IMMEDIATE_LIMIT = 1
-export const MONTHLY_SCHEDULED_LIMIT = 1
+/** Je Karte eine aktive Monatsnachricht. „Zweimal im Monat" soll keine Einstellung sein. */
+export const MONTHLY_RECURRING_LIMIT = 1
 
-export type MessageKind = 'IMMEDIATE' | 'SCHEDULED'
-
-/**
- * Zeitpuffer, in dem „geplant für jetzt" noch als sofort gilt.
- *
- * Eine sofortige Nachricht bekommt ihr `scheduledFor` aus der Uhr der Anwendung, ihr
- * `createdAt` aus der Uhr der Datenbank. Das sind zwei Maschinen; ein paar Millisekunden
- * Versatz sind normal, und ohne Puffer würde ein minimal vorgehender Anwendungsserver
- * eine sofortige Nachricht als geplant einstufen. Echte Planungen liegen Stunden oder
- * Tage in der Zukunft — zwei Minuten trennen die beiden Fälle zuverlässig.
- */
-const CLOCK_SKEW_MS = 2 * 60 * 1000
-
-/** Frühestens so weit in der Zukunft darf eine geplante Nachricht liegen. */
-export const MIN_SCHEDULE_AHEAD_MS = 5 * 60 * 1000
-/** Und höchstens so weit — alles darüber ist ein Vertipper im Jahr. */
-export const MAX_SCHEDULE_AHEAD_MS = 366 * 24 * 60 * 60 * 1000
+/** Woher eine verschickte Nachricht stammt. */
+export type MessageOrigin = 'MANUAL' | 'MONTHLY'
 
 /**
- * War diese Nachricht eine sofortige oder eine geplante?
+ * Hat der Betrieb diese Nachricht selbst geschrieben oder der Monatslauf sie erzeugt?
  *
- * Steht nicht in der Datenbank, sondern ergibt sich aus den beiden Zeitstempeln: Wer
- * sofort sendet, setzt `scheduledFor` auf das Jetzt und liegt damit nie nennenswert hinter
- * `createdAt`. Das spart eine Spalte, die nur wiederholt hätte, was ohnehin dasteht.
+ * Steht als Fremdschlüssel in der Zeile und wird nicht aus Zeitstempeln erraten: Der
+ * Monatslauf setzt `monthlyMessageId`, sonst niemand.
  */
-export function classifyMessage(message: { scheduledFor: Date; createdAt: Date }): MessageKind {
-  return message.scheduledFor.getTime() > message.createdAt.getTime() + CLOCK_SKEW_MS
-    ? 'SCHEDULED'
-    : 'IMMEDIATE'
+export function classifyMessage(message: { monthlyMessageId: string | null }): MessageOrigin {
+  return message.monthlyMessageId ? 'MONTHLY' : 'MANUAL'
 }
 
 /** Anfang und Ende des Kalendermonats, in den dieser Zeitpunkt fällt. */
@@ -54,43 +43,29 @@ export function monthRange(when: Date): { start: Date; end: Date } {
   return { start, end }
 }
 
-export interface MonthlyUsage {
-  immediate: number
-  scheduled: number
-}
-
-/** Zählt die Nachrichten eines Monats nach Art. */
-export function countUsage(
-  messages: Array<{ scheduledFor: Date; createdAt: Date }>,
-): MonthlyUsage {
-  let immediate = 0
-  let scheduled = 0
-  for (const m of messages) {
-    if (classifyMessage(m) === 'SCHEDULED') scheduled++
-    else immediate++
-  }
-  return { immediate, scheduled }
-}
-
 /**
- * Darf diese Art Nachricht in diesem Monat noch raus?
+ * Wie viele selbst verschickte Nachrichten in diesem Monat schon draußen sind.
  *
- * Gezählt wird nach dem Monat, in dem die Nachricht **ankommt**, nicht nach dem, in dem
- * sie angelegt wurde. Sonst ließen sich im Oktober zwölf Nachrichten für Dezember
- * einstellen und die Grenze wäre eine Formalie.
+ * Nachrichten aus dem Dashboard zählen mit: Für den Kunden am anderen Ende macht es keinen
+ * Unterschied, von welchem Bildschirm aus jemand ihn angeschrieben hat.
  */
-export function remaining(usage: MonthlyUsage, kind: MessageKind): number {
-  return kind === 'SCHEDULED'
-    ? Math.max(0, MONTHLY_SCHEDULED_LIMIT - usage.scheduled)
-    : Math.max(0, MONTHLY_IMMEDIATE_LIMIT - usage.immediate)
+export function countManual(messages: Array<{ monthlyMessageId: string | null }>): number {
+  let manual = 0
+  for (const m of messages) if (classifyMessage(m) === 'MANUAL') manual++
+  return manual
+}
+
+/** Wie viele selbst verschickte Nachrichten diesen Monat noch gehen. */
+export function remainingManual(usedThisMonth: number): number {
+  return Math.max(0, MONTHLY_IMMEDIATE_LIMIT - usedThisMonth)
 }
 
 /** Was die Oberfläche anzeigt, wenn das Kontingent aufgebraucht ist. */
-export function quotaMessage(kind: MessageKind): string {
-  return kind === 'SCHEDULED'
-    ? 'Für diesen Monat ist bereits eine Nachricht geplant. Pro Monat ist eine geplante Nachricht je Karte möglich.'
-    : 'Diesen Monat wurde bereits eine Nachricht sofort verschickt. Pro Monat ist eine sofortige Nachricht je Karte möglich.'
-}
+export const QUOTA_MESSAGE_IMMEDIATE =
+  'Diesen Monat wurde bereits eine Nachricht verschickt. Pro Monat ist eine selbst verschickte Nachricht je Karte möglich.'
+
+export const QUOTA_MESSAGE_MONTHLY =
+  'Für diese Karte läuft bereits eine monatliche Nachricht. Bitte zuerst die bestehende löschen.'
 
 /** Die Gruppe, an die die PWA verschickt — sie bietet keine Auswahl an. */
 export const PWA_DEFAULT_SEGMENT: MessageSegment = 'ALL'

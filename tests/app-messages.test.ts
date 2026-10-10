@@ -1,20 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * Nachrichten aus der Betriebs-App — und ihre Monatsgrenze.
+ * Nachrichten aus der Betriebs-App — und ihre zwei Kontingente.
  *
- * Die PWA konnte bisher nur wiederkehrende Erinnerungen anlegen. Mit dieser Route kann sie
- * auch an alle Karteninhaber schreiben, sofort oder zu einem Zeitpunkt.
+ * Die PWA konnte bisher nur Erinnerungen an einzelne Kunden anlegen. Mit dieser Route kann
+ * sie auch an alle Karteninhaber schreiben: sofort, oder als Monatsnachricht, die einmal
+ * eingerichtet wird und von selbst läuft.
  *
- * Der eigentliche Prüfgegenstand ist die Grenze: je Karte und Kalendermonat eine sofortige
- * und eine geplante Nachricht. Sie liegt absichtlich im Server — eine Grenze, die nur die
- * Oberfläche kennt, ist in den Entwicklerwerkzeugen des Browsers zwei Klicks weit weg.
+ * Der eigentliche Prüfgegenstand sind die Grenzen. Sie liegen absichtlich im Server — eine
+ * Grenze, die nur die Oberfläche kennt, ist in den Entwicklerwerkzeugen des Browsers zwei
+ * Klicks weit weg.
  */
 
 const cardFindFirst = vi.fn()
 const cardFindMany = vi.fn()
 const messageFindMany = vi.fn()
 const messageCreate = vi.fn()
+const monthlyFindMany = vi.fn()
+const monthlyCount = vi.fn()
+const monthlyCreate = vi.fn()
 vi.mock('@/lib/db', () => ({
   prisma: {
     card: {
@@ -24,6 +28,11 @@ vi.mock('@/lib/db', () => ({
     cardMessage: {
       findMany: (...a: unknown[]) => messageFindMany(...a),
       create: (...a: unknown[]) => messageCreate(...a),
+    },
+    cardMonthlyMessage: {
+      findMany: (...a: unknown[]) => monthlyFindMany(...a),
+      count: (...a: unknown[]) => monthlyCount(...a),
+      create: (...a: unknown[]) => monthlyCreate(...a),
     },
   },
 }))
@@ -42,6 +51,7 @@ vi.mock('@/lib/cards/message-service', () => ({
 const { GET, POST } = await import('@/app/api/app/messages/route')
 
 const NOW = new Date('2026-10-10T12:00:00.000Z')
+const CARD = 'ckxyz00000000000000000000'
 
 const post = (body: unknown) =>
   new Request('https://karte.stampie.de/api/app/messages', {
@@ -55,14 +65,10 @@ const get = () =>
     headers: { authorization: 'Bearer t' },
   })
 
-/** Eine bereits verschickte Sofort-Nachricht: geplant für genau den Moment des Anlegens. */
-function sofort(at: string) {
-  return { cardId: 'c1', scheduledFor: new Date(at), createdAt: new Date(at) }
-}
-/** Eine geplante: Versand liegt deutlich hinter dem Anlegen. */
-function geplant(created: string, due: string) {
-  return { cardId: 'c1', scheduledFor: new Date(due), createdAt: new Date(created) }
-}
+/** Eine selbst geschriebene Nachricht — kein Automatismus dahinter. */
+const selbst = { cardId: 'c1', monthlyMessageId: null }
+/** Eine, die der Monatslauf erzeugt hat. */
+const automatisch = { cardId: 'c1', monthlyMessageId: 'mm1' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -73,6 +79,9 @@ beforeEach(() => {
   cardFindMany.mockResolvedValue([{ id: 'c1', name: 'Stempelkarte' }])
   messageFindMany.mockResolvedValue([])
   messageCreate.mockResolvedValue({ id: 'm1' })
+  monthlyFindMany.mockResolvedValue([])
+  monthlyCount.mockResolvedValue(0)
+  monthlyCreate.mockResolvedValue({ id: 'mm1' })
   deliverCardMessage.mockResolvedValue({ ok: true })
 })
 
@@ -82,111 +91,88 @@ afterEach(() => {
 
 describe('POST /api/app/messages — sofort', () => {
   it('legt die Nachricht an und verschickt sie gleich', async () => {
-    const res = await POST(post({ cardId: 'ckxyz00000000000000000000', body: 'Heute Happy Hour' }))
+    const res = await POST(post({ cardId: CARD, body: 'Heute Happy Hour' }))
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.kind).toBe('IMMEDIATE')
-    // Sofort heisst sofort: nicht auf einen Lauf warten, der Stunden entfernt sein kann.
+    expect(body.mode).toBe('now')
     expect(deliverCardMessage).toHaveBeenCalledWith('m1')
   })
 
   it('schickt an alle Karteninhaber — die PWA kennt keine Gruppen', async () => {
-    await POST(post({ cardId: 'ckxyz00000000000000000000', body: 'Hallo' }))
+    await POST(post({ cardId: CARD, body: 'Hallo' }))
 
     expect(messageCreate.mock.calls[0]![0].data.segment).toBe('ALL')
   })
 
   it('lehnt die zweite im selben Monat ab', async () => {
-    messageFindMany.mockResolvedValue([sofort('2026-10-02T09:00:00.000Z')])
+    messageFindMany.mockResolvedValue([selbst])
 
-    const res = await POST(post({ cardId: 'ckxyz00000000000000000000', body: 'Noch eine' }))
-    const body = await res.json()
+    const res = await POST(post({ cardId: CARD, body: 'Noch eine' }))
 
     expect(res.status).toBe(409)
-    expect(body.code).toBe('quota')
+    expect((await res.json()).code).toBe('quota')
     expect(messageCreate).not.toHaveBeenCalled()
   })
 
-  it('laesst sich von einer geplanten Nachricht nicht blockieren', async () => {
-    // Zwei Kontingente nebeneinander: die geplante Monatsnachricht darf die spontane
-    // Ankuendigung nicht aufbrauchen.
-    messageFindMany.mockResolvedValue([
-      geplant('2026-10-01T08:00:00.000Z', '2026-10-20T10:00:00.000Z'),
-    ])
+  it('laesst sich vom Monatslauf nicht das Kontingent wegnehmen', async () => {
+    /*
+     * Der wichtigste Fall: Die automatische Monatsnachricht ist auch eine CardMessage.
+     * Wuerde sie mitgezaehlt, haette der Betrieb ab dem Ersten nie wieder die Moeglichkeit,
+     * selbst etwas zu schicken.
+     */
+    messageFindMany.mockResolvedValue([automatisch])
 
-    const res = await POST(post({ cardId: 'ckxyz00000000000000000000', body: 'Spontan' }))
+    const res = await POST(post({ cardId: CARD, body: 'Spontan' }))
 
     expect(res.status).toBe(200)
     expect(messageCreate).toHaveBeenCalled()
   })
 })
 
-describe('POST /api/app/messages — geplant', () => {
-  const future = '2026-10-25T17:00:00.000Z'
-
-  it('legt sie an, ohne sie schon zu verschicken', async () => {
-    const res = await POST(
-      post({ cardId: 'ckxyz00000000000000000000', body: 'Oktoberfest', scheduledFor: future }),
-    )
+describe('POST /api/app/messages — monatlich', () => {
+  it('richtet sie ein, ohne sofort zu verschicken', async () => {
+    const res = await POST(post({ cardId: CARD, body: 'Monatsgruss', mode: 'monthly', dayOfMonth: 15 }))
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.kind).toBe('SCHEDULED')
+    expect(body.mode).toBe('monthly')
     expect(deliverCardMessage).not.toHaveBeenCalled()
+    expect(monthlyCreate.mock.calls[0]![0].data.dayOfMonth).toBe(15)
   })
 
-  it('lehnt die zweite im selben Monat ab', async () => {
-    messageFindMany.mockResolvedValue([
-      geplant('2026-10-01T08:00:00.000Z', '2026-10-20T10:00:00.000Z'),
-    ])
+  it('nennt den ersten Termin', async () => {
+    const res = await POST(post({ cardId: CARD, body: 'Monatsgruss', mode: 'monthly', dayOfMonth: 15 }))
+    const body = await res.json()
 
-    const res = await POST(
-      post({ cardId: 'ckxyz00000000000000000000', body: 'Noch eine', scheduledFor: future }),
-    )
+    // Heute ist der 10., der 15. kommt noch: erster Versand in diesem Monat.
+    expect(new Date(body.nextSendAt).getDate()).toBe(15)
+    expect(new Date(body.nextSendAt).getMonth()).toBe(9)
+  })
+
+  it('laesst nur eine je Karte laufen', async () => {
+    monthlyCount.mockResolvedValue(1)
+
+    const res = await POST(post({ cardId: CARD, body: 'Noch eine', mode: 'monthly' }))
 
     expect(res.status).toBe(409)
-    expect(messageCreate).not.toHaveBeenCalled()
+    expect((await res.json()).code).toBe('quota')
+    expect(monthlyCreate).not.toHaveBeenCalled()
   })
 
-  it('zaehlt im Monat des Versands, nicht im Monat des Anlegens', async () => {
-    /*
-     * Sonst liessen sich im Oktober zwoelf Nachrichten fuer Dezember einstellen: jede
-     * einzelne waere "die erste im Oktober", und der Kunde bekaeme im Dezember zwoelf.
-     */
-    await POST(
-      post({ cardId: 'ckxyz00000000000000000000', body: 'Weihnachten', scheduledFor: '2026-12-20T10:00:00.000Z' }),
-    )
-
-    const where = messageFindMany.mock.calls[0]![0].where
-    expect(where.scheduledFor.gte.getMonth()).toBe(11)
-    expect(where.scheduledFor.lt.getMonth()).toBe(0)
-  })
-
-  it('weist einen Zeitpunkt ab, der schon fast da ist', async () => {
-    const res = await POST(
-      post({
-        cardId: 'ckxyz00000000000000000000',
-        body: 'Gleich',
-        scheduledFor: '2026-10-10T12:01:00.000Z',
-      }),
-    )
+  it('weist Tage ab, die es nicht in jedem Monat gibt', async () => {
+    const res = await POST(post({ cardId: CARD, body: 'Zum Dreissigsten', mode: 'monthly', dayOfMonth: 30 }))
 
     expect(res.status).toBe(400)
-    expect((await res.json()).code).toBe('too_soon')
+    expect(monthlyCreate).not.toHaveBeenCalled()
   })
 
-  it('weist einen Zeitpunkt in ferner Zukunft ab', async () => {
-    const res = await POST(
-      post({
-        cardId: 'ckxyz00000000000000000000',
-        body: 'Irgendwann',
-        scheduledFor: '2030-01-01T10:00:00.000Z',
-      }),
-    )
+  it('blockiert die sofortige Nachricht nicht', async () => {
+    monthlyCount.mockResolvedValue(1)
 
-    expect(res.status).toBe(400)
-    expect((await res.json()).code).toBe('too_far')
+    const res = await POST(post({ cardId: CARD, body: 'Spontan' }))
+
+    expect(res.status).toBe(200)
   })
 })
 
@@ -194,7 +180,7 @@ describe('POST /api/app/messages — Absicherung', () => {
   it('schreibt nur an Karten des eigenen Betriebs', async () => {
     cardFindFirst.mockResolvedValue(null)
 
-    const res = await POST(post({ cardId: 'ckxyz00000000000000000000', body: 'Fremd' }))
+    const res = await POST(post({ cardId: CARD, body: 'Fremd' }))
 
     expect(res.status).toBe(404)
     expect(messageCreate).not.toHaveBeenCalled()
@@ -205,14 +191,14 @@ describe('POST /api/app/messages — Absicherung', () => {
   it('weist Agentur-Konten ab', async () => {
     requireAppUser.mockResolvedValue({ userId: 'u1', orgId: 'org-1', role: 'AGENCY' })
 
-    const res = await POST(post({ cardId: 'ckxyz00000000000000000000', body: 'Hallo' }))
+    const res = await POST(post({ cardId: CARD, body: 'Hallo' }))
 
     expect(res.status).toBe(403)
     expect(messageCreate).not.toHaveBeenCalled()
   })
 
   it('weist einen leeren Text ab', async () => {
-    const res = await POST(post({ cardId: 'ckxyz00000000000000000000', body: '   ' }))
+    const res = await POST(post({ cardId: CARD, body: '   ' }))
 
     expect(res.status).toBe(400)
     expect(messageCreate).not.toHaveBeenCalled()
@@ -221,16 +207,34 @@ describe('POST /api/app/messages — Absicherung', () => {
 
 describe('GET /api/app/messages', () => {
   it('sagt je Karte, was diesen Monat noch uebrig ist', async () => {
-    messageFindMany
-      .mockResolvedValueOnce([sofort('2026-10-02T09:00:00.000Z')])
-      .mockResolvedValueOnce([])
+    messageFindMany.mockResolvedValueOnce([selbst]).mockResolvedValueOnce([])
 
     const res = await GET(get())
     const body = await res.json()
 
     expect(body.quota).toEqual([
-      { cardId: 'c1', cardName: 'Stempelkarte', immediateLeft: 0, scheduledLeft: 1 },
+      { cardId: 'c1', cardName: 'Stempelkarte', immediateLeft: 0, monthlyActive: false },
     ])
+  })
+
+  it('meldet eine laufende Monatsnachricht', async () => {
+    monthlyFindMany.mockResolvedValue([
+      {
+        id: 'mm1',
+        cardId: 'c1',
+        body: 'Monatsgruss',
+        dayOfMonth: 1,
+        nextSendAt: new Date('2026-11-01T00:00:00.000Z'),
+        lastSentAt: null,
+        card: { name: 'Stempelkarte' },
+      },
+    ])
+
+    const res = await GET(get())
+    const body = await res.json()
+
+    expect(body.quota[0].monthlyActive).toBe(true)
+    expect(body.monthly[0].dayOfMonth).toBe(1)
   })
 
   it('kommt ohne Karten klar', async () => {
