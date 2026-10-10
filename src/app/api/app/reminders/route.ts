@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 import { MESSAGE_MAX_LENGTH } from '@/lib/cards/message-service'
 
@@ -53,7 +54,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
   const rows = await prisma.cardReminder.findMany({
-    where: { card: { orgId: appUser.orgId } },
+    where: { card: { orgId: appUser.orgId, ...loyaltyCardWhere() } },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -102,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // Die Karte muss zu diesem Betrieb gehören — sonst könnte man fremde Kunden anschreiben.
   const card = await prisma.card.findFirst({
-    where: { id: parsed.data.cardId, orgId: appUser.orgId },
+    where: { id: parsed.data.cardId, orgId: appUser.orgId, ...loyaltyCardWhere() },
     select: { id: true },
   })
   if (!card) {

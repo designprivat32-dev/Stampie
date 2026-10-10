@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 import { appUrl } from '@/lib/app-url'
 import { newNfcCode } from '@/lib/cards/handout-service'
@@ -43,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return NextResponse.json({ error: 'Keine Karte angegeben.' }, { status: 400 })
 
   const card = await prisma.card.findFirst({
-    where: { id: parsed.data.cardId },
+    where: { id: parsed.data.cardId, ...loyaltyCardWhere() },
     select: { id: true, name: true, orgId: true, nfcCode: true },
   })
 

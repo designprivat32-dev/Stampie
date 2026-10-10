@@ -1,0 +1,298 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`existing passes stay as they are > Apple coupon 1`] = `
+{
+  "authenticationToken": "tok",
+  "backgroundColor": "rgb(26,26,26)",
+  "barcode": {
+    "altText": "SN-123",
+    "format": "PKBarcodeFormatQR",
+    "message": "https://stampie.de/s/SN-123",
+    "messageEncoding": "iso-8859-1",
+  },
+  "barcodes": [
+    {
+      "altText": "SN-123",
+      "format": "PKBarcodeFormatQR",
+      "message": "https://stampie.de/s/SN-123",
+      "messageEncoding": "iso-8859-1",
+    },
+  ],
+  "coupon": {
+    "auxiliaryFields": [
+      {
+        "key": "customer",
+        "label": "Kunde",
+        "value": "Alex",
+      },
+    ],
+    "backFields": [
+      {
+        "changeMessage": "%@",
+        "key": "message",
+        "label": "Neuigkeit",
+        "value": "Heute doppelte Stempel",
+      },
+      {
+        "key": "fine-print",
+        "label": "Einlösebedingungen",
+        "value": "Nicht mit anderen Aktionen kombinierbar",
+      },
+      {
+        "attributedValue": "<a href="https://stampie.de/s/SN-123/datenschutz">Was diese Karte speichert</a>",
+        "key": "card-privacy",
+        "label": "Datenschutz zur Karte",
+        "value": "https://stampie.de/s/SN-123/datenschutz",
+      },
+      {
+        "attributedValue": "<a href="https://stampie.de/s/SN-123">Keine Nachrichten mehr erhalten</a>",
+        "key": "marketing-opt-out",
+        "label": "Nachrichten",
+        "value": "https://stampie.de/s/SN-123",
+      },
+    ],
+    "headerFields": [],
+    "primaryFields": [
+      {
+        "key": "offer",
+        "value": "20 % auf alles",
+      },
+    ],
+    "secondaryFields": [
+      {
+        "key": "details",
+        "value": "Nur im Laden",
+      },
+    ],
+  },
+  "description": "20 % auf alles",
+  "foregroundColor": "rgb(255,255,255)",
+  "formatVersion": 1,
+  "labelColor": "rgb(204,204,204)",
+  "organizationName": "Café Nord",
+  "passTypeIdentifier": "pass.de.stampie.card",
+  "serialNumber": "SN-123",
+  "teamIdentifier": "ABCDE12345",
+  "webServiceURL": "https://stampie.de/api/apple-passkit",
+}
+`;
+
+exports[`existing passes stay as they are > Apple stamp card 1`] = `
+{
+  "authenticationToken": "tok",
+  "backgroundColor": "rgb(26,26,26)",
+  "barcode": {
+    "altText": "SN-123",
+    "format": "PKBarcodeFormatQR",
+    "message": "https://stampie.de/s/SN-123",
+    "messageEncoding": "iso-8859-1",
+  },
+  "barcodes": [
+    {
+      "altText": "SN-123",
+      "format": "PKBarcodeFormatQR",
+      "message": "https://stampie.de/s/SN-123",
+      "messageEncoding": "iso-8859-1",
+    },
+  ],
+  "description": "Kaffeekarte",
+  "foregroundColor": "rgb(255,255,255)",
+  "formatVersion": 1,
+  "labelColor": "rgb(204,204,204)",
+  "organizationName": "Café Nord",
+  "passTypeIdentifier": "pass.de.stampie.card",
+  "serialNumber": "SN-123",
+  "storeCard": {
+    "auxiliaryFields": [
+      {
+        "key": "customer",
+        "label": "Kunde",
+        "value": "Alex",
+      },
+      {
+        "key": "member-since",
+        "label": "Mitglied seit",
+        "value": "15.01.2026",
+      },
+    ],
+    "backFields": [
+      {
+        "changeMessage": "%@",
+        "key": "message",
+        "label": "Neuigkeit",
+        "value": "Heute doppelte Stempel",
+      },
+      {
+        "attributedValue": "<a href="https://stampie.de/s/SN-123/datenschutz">Was diese Karte speichert</a>",
+        "key": "card-privacy",
+        "label": "Datenschutz zur Karte",
+        "value": "https://stampie.de/s/SN-123/datenschutz",
+      },
+      {
+        "attributedValue": "<a href="https://stampie.de/s/SN-123">Keine Nachrichten mehr erhalten</a>",
+        "key": "marketing-opt-out",
+        "label": "Nachrichten",
+        "value": "https://stampie.de/s/SN-123",
+      },
+    ],
+    "headerFields": [
+      {
+        "key": "stamps",
+        "label": "Stempel",
+        "textAlignment": "PKTextAlignmentRight",
+        "value": "6/10",
+      },
+    ],
+    "primaryFields": [],
+    "secondaryFields": [
+      {
+        "key": "reward",
+        "label": "Belohnung",
+        "value": "Jeder 10. Kaffee gratis",
+      },
+      {
+        "key": "program",
+        "label": "Programm",
+        "value": "Kaffeekarte",
+      },
+    ],
+  },
+  "teamIdentifier": "ABCDE12345",
+  "webServiceURL": "https://stampie.de/api/apple-passkit",
+}
+`;
+
+exports[`existing passes stay as they are > Google loyalty class and object 1`] = `
+{
+  "heroImage": {
+    "contentDescription": {
+      "defaultValue": {
+        "language": "de",
+        "value": "Stempelkarte",
+      },
+    },
+    "sourceUri": {
+      "uri": "https://stampie.de/api/wallet/hero/card_1?s=6",
+    },
+  },
+  "hexBackgroundColor": "#1a1a1a",
+  "id": "3388000000000000000.card_1",
+  "issuerName": "Café Nord",
+  "multipleDevicesAndHoldersAllowedStatus": "MULTIPLE_HOLDERS",
+  "programLogo": {
+    "contentDescription": {
+      "defaultValue": {
+        "language": "de",
+        "value": "Logo",
+      },
+    },
+    "sourceUri": {
+      "uri": "https://stampie.de/api/wallet/logo/card_1",
+    },
+  },
+  "programName": "Kaffeekarte",
+  "reviewStatus": "UNDER_REVIEW",
+  "textModulesData": [
+    {
+      "body": "Jeder 10. Kaffee gratis",
+      "header": "Belohnung",
+      "id": "reward",
+    },
+  ],
+}
+`;
+
+exports[`existing passes stay as they are > Google loyalty class and object 2`] = `
+{
+  "accountId": "SN-123",
+  "barcode": {
+    "alternateText": "SN-123",
+    "type": "QR_CODE",
+    "value": "https://stampie.de/s/SN-123",
+  },
+  "classId": "3388000000000000000.card_1",
+  "heroImage": {
+    "contentDescription": {
+      "defaultValue": {
+        "language": "de",
+        "value": "Stempelkarte",
+      },
+    },
+    "sourceUri": {
+      "uri": "https://stampie.de/api/wallet/hero/card_1?s=6",
+    },
+  },
+  "id": "3388000000000000000.sn_123",
+  "loyaltyPoints": {
+    "balance": {
+      "string": "6/10",
+    },
+    "label": "Stempel",
+  },
+  "state": "ACTIVE",
+  "textModulesData": [
+    {
+      "body": "Was diese Karte speichert: https://stampie.de/s/SN-123/datenschutz",
+      "header": "Datenschutz zur Karte",
+      "id": "card-privacy",
+    },
+    {
+      "body": "Keine Nachrichten mehr erhalten: https://stampie.de/s/SN-123",
+      "header": "Nachrichten",
+      "id": "marketing-opt-out",
+    },
+  ],
+}
+`;
+
+exports[`existing passes stay as they are > Google offer class and object 1`] = `
+{
+  "details": "Nur im Laden",
+  "finePrint": "Nicht mit anderen Aktionen kombinierbar",
+  "hexBackgroundColor": "#1a1a1a",
+  "id": "3388000000000000000.card_1",
+  "issuerName": "Café Nord",
+  "multipleDevicesAndHoldersAllowedStatus": "MULTIPLE_HOLDERS",
+  "programLogo": {
+    "contentDescription": {
+      "defaultValue": {
+        "language": "de",
+        "value": "Logo",
+      },
+    },
+    "sourceUri": {
+      "uri": "https://stampie.de/api/wallet/logo/card_1",
+    },
+  },
+  "provider": "Café Nord",
+  "redemptionChannel": "INSTORE",
+  "reviewStatus": "UNDER_REVIEW",
+  "title": "20 % auf alles",
+}
+`;
+
+exports[`existing passes stay as they are > Google offer class and object 2`] = `
+{
+  "barcode": {
+    "alternateText": "SN-123",
+    "type": "QR_CODE",
+    "value": "https://stampie.de/s/SN-123",
+  },
+  "classId": "3388000000000000000.card_1",
+  "id": "3388000000000000000.sn_123",
+  "state": "ACTIVE",
+}
+`;
+
+exports[`existing passes stay as they are > Google offer class and object 3`] = `
+{
+  "barcode": {
+    "alternateText": "SN-123",
+    "type": "QR_CODE",
+    "value": "https://stampie.de/s/SN-123",
+  },
+  "classId": "3388000000000000000.card_1",
+  "id": "3388000000000000000.sn_123",
+  "state": "EXPIRED",
+}
+`;

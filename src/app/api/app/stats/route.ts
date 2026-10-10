@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 
 export const runtime = 'nodejs'
@@ -40,7 +41,7 @@ export async function GET(request: Request): Promise<Response> {
 
   // Karten des Betriebs + aktuelles Stempel-Ziel (veröffentlicht, sonst Entwurf, sonst 10).
   const cards = await prisma.card.findMany({
-    where: { orgId: appUser.orgId },
+    where: { orgId: appUser.orgId, ...loyaltyCardWhere() },
     orderBy: { createdAt: 'desc' },
     select: { id: true, name: true, designs: { select: { status: true, stampGoal: true } } },
   })

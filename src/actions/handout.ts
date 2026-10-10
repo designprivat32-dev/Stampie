@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { assertCardAccess } from '@/lib/auth/session'
 import { fail, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { appUrl } from '@/lib/app-url'
 import { newNfcCode } from '@/lib/cards/handout-service'
 import { assertPassword } from '@/lib/auth/reauth'
@@ -57,7 +58,7 @@ export async function getHandoutStateAction(cardId: string): Promise<ActionResul
 
     const [card, published] = await Promise.all([
       prisma.card.findFirst({
-        where: { id: parsed.data },
+        where: { id: parsed.data, ...loyaltyCardWhere() },
         select: {
           nfcCode: true,
           kind: true,
@@ -96,7 +97,7 @@ export async function enableHandoutAction(cardId: string): Promise<ActionResult<
     }
 
     const card = await prisma.card.findFirst({
-      where: { id: parsed.data },
+      where: { id: parsed.data, ...loyaltyCardWhere() },
       select: { nfcCode: true },
     })
     if (!card) return fail('Karte nicht gefunden.', 'not_found')

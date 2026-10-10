@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
 import { sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
 import {
@@ -98,6 +99,7 @@ async function deliverToSegment(
       cardId: message.cardId,
       // Testkarten bleiben außen vor, wie überall: sie sind Werkzeug, kein Kunde.
       isTest: false,
+      ...loyaltyPassWhere(),
       // Stempelgruppen zählen Stempel; "alle" schließt Gutscheine mit ein.
       ...(segment === 'ALL' ? {} : { kind: 'STAMP' as const }),
       // Ohne Einwilligung keine Werbenachricht.

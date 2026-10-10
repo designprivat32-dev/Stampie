@@ -9,6 +9,7 @@ import {
   UnauthorizedError,
 } from '@/lib/auth/session'
 import { prisma } from '@/lib/db'
+import { isLoyaltyKind } from '@/lib/cards/kind'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +56,8 @@ export default async function StempelnPage({
     where: { id: access.cardId },
     select: { name: true, kind: true, org: { select: { name: true } } },
   })
-  if (!card) notFound()
+  // Nur Stempelkarten und Gutscheine haben eine Kasse.
+  if (!card || !isLoyaltyKind(card.kind)) notFound()
 
   return (
     <div className="min-h-dvh bg-canvas">

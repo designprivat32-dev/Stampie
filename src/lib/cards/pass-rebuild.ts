@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { getPassBuilder } from '@/lib/pass/mock-pass-builder'
 import { loadPassAssets } from './asset-service'
 import { loadOrCreateDraft, loadPublishedDesign } from './repository'
@@ -16,10 +17,13 @@ import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
  * The design used is the published one where it exists, falling back to the draft for a
  * card still being set up — same rule the till uses, so a pass never shows a state the
  * counter disagrees with.
+ *
+ * Only stamp cards and coupons are built here; any other card kind resolves to null, the
+ * same as an unknown serial, rather than being rendered as a stamp card.
  */
 export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> {
   const pass = await prisma.issuedPass.findFirst({
-    where: { serial },
+    where: { serial, ...loyaltyPassWhere() },
     select: {
       serial: true,
       stamps: true,

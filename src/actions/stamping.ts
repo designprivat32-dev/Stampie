@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { assertStampAccess, assertCardAccess } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { decideRedeem, decideStamp, extractSerial, formatCooldown } from '@/lib/cards/stamping'
 import { expireGoogleOffer, syncGoogleStampCount } from '@/lib/wallet/google-sync'
 import { pushAppleWalletUpdate } from '@/lib/wallet/apple-sync'
@@ -105,7 +106,7 @@ export async function lookupPassAction(input: unknown): Promise<ActionResult<Pas
     if (!serial) return fail('Dieser Code enthält keine gültige Kartennummer.', 'validation')
 
     const pass = await prisma.issuedPass.findFirst({
-      where: { serial, cardId: parsed.data.cardId },
+      where: { serial, cardId: parsed.data.cardId, ...loyaltyPassWhere() },
     })
     if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Karte.`, 'not_found')
 
@@ -142,7 +143,7 @@ export async function stampAction(input: unknown): Promise<ActionResult<StampRes
       return fail('Ein Gutschein wird eingelöst, nicht gestempelt.', 'validation')
     }
 
-    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId } })
+    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId, ...loyaltyPassWhere() } })
     if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Stempelkarte.`, 'not_found')
 
     const last = await prisma.stampEvent.findFirst({
@@ -220,7 +221,7 @@ export async function redeemAction(input: unknown): Promise<ActionResult<StampRe
     const serial = extractSerial(parsed.data.scanned)
     if (!serial) return fail('Dieser Code enthält keine gültige Kartennummer.', 'validation')
 
-    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId } })
+    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId, ...loyaltyPassWhere() } })
     if (!pass) return fail(`Karte ${serial} gehört nicht zu dieser Stempelkarte.`, 'not_found')
 
     const design = await currentDesign(cardId)
@@ -329,7 +330,7 @@ export async function redeemCouponAction(input: unknown): Promise<ActionResult<P
       return fail('Diese Karte ist kein Gutschein.', 'validation')
     }
 
-    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId } })
+    const pass = await prisma.issuedPass.findFirst({ where: { serial, cardId, ...loyaltyPassWhere() } })
     if (!pass) return fail(`Gutschein ${serial} gehört nicht zu dieser Aktion.`, 'not_found')
 
     if (pass.redeemedAt) {

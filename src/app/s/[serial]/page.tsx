@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { getSession } from '@/lib/auth/session'
 import { ConsentWithdraw } from './_components/consent-withdraw'
 import { redirect } from 'next/navigation'
@@ -23,7 +24,7 @@ export default async function ScanLandingPage({
   const { serial } = await params
 
   const pass = await prisma.issuedPass.findFirst({
-    where: { serial: serial.toUpperCase() },
+    where: { serial: serial.toUpperCase(), ...loyaltyPassWhere() },
     select: {
       serial: true,
       stamps: true,

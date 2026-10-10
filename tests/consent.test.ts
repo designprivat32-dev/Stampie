@@ -95,6 +95,8 @@ describe('Erinnerungen', () => {
       cardId: 'card-1',
       isTest: false,
       kind: 'STAMP',
+      // Nur Stempelkarten und Gutscheine — eine Visitenkarte bekommt keine Erinnerung.
+      card: { kind: { in: ['STAMP', 'COUPON'] } },
       marketingConsentAt: { not: null },
     })
   })

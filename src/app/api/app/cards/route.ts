@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 
 export const runtime = 'nodejs'
@@ -10,7 +11,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
   const cards = await prisma.card.findMany({
-    where: { orgId: appUser.orgId },
+    where: { orgId: appUser.orgId, ...loyaltyCardWhere() },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

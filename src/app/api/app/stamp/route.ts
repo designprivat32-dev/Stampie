@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 import {
   MAX_STAMPS_PER_BOOKING,
@@ -70,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const pass = await prisma.issuedPass.findFirst({
-    where: { serial },
+    where: { serial, ...loyaltyPassWhere() },
     select: {
       id: true,
       stamps: true,

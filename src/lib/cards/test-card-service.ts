@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from './kind'
 import { cardDesignDraftSchema, type CardDesignInput, type CardKind } from './schema'
 import { loadPassAssets } from './asset-service'
 import type { CardDesign } from '@/lib/pass/pass-builder'
@@ -24,7 +25,7 @@ export async function resolveTestCardToken(token: string): Promise<ResolvedTestC
   if (!token || token.length < 10 || token.length > 128) return null
 
   const record = await prisma.testCardToken.findFirst({
-    where: { token, expiresAt: { gt: new Date() } },
+    where: { token, expiresAt: { gt: new Date() }, card: loyaltyCardWhere() },
     select: {
       id: true,
       cardId: true,

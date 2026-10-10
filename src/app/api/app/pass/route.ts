@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 import { extractSerial } from '@/lib/cards/stamping'
 import { loadPublishedDesign } from '@/lib/cards/repository'
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   const pass = await prisma.issuedPass.findFirst({
-    where: { serial },
+    where: { serial, ...loyaltyPassWhere() },
     select: {
       serial: true,
       stamps: true,

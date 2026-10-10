@@ -1,6 +1,7 @@
 import 'server-only'
 import type { CardKind } from '@/lib/cards/schema'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
 import { sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
 
@@ -74,6 +75,7 @@ async function deliverReminderToDueCustomers(reminder: ReminderRow, now: Date): 
       cardId: reminder.cardId,
       isTest: false,
       kind: 'STAMP',
+      ...loyaltyPassWhere(),
       marketingConsentAt: { not: null },
     },
     select: { id: true, serial: true, createdAt: true },

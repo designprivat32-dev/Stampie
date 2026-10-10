@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { assertCardAccess } from '@/lib/auth/session'
 import { fail, fromZodError, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
+import { loyaltyPassWhere } from '@/lib/cards/kind'
 import { deliverCardMessage, MESSAGE_MAX_LENGTH } from '@/lib/cards/message-service'
 import {
   matchesSegment,
@@ -152,7 +153,7 @@ export async function messageSegmentCountsAction(
     await assertCardAccess(parsed.data)
 
     const passes = await prisma.issuedPass.findMany({
-      where: { cardId: parsed.data, isTest: false },
+      where: { cardId: parsed.data, isTest: false, ...loyaltyPassWhere() },
       select: { stamps: true, stampGoal: true, kind: true },
     })
 

@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { loadPassAssets } from './asset-service'
 import { loadPublishedDesign } from './repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
@@ -70,7 +71,7 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
   if (!code || code.length < 10 || code.length > 128) return null
 
   const card = await prisma.card.findFirst({
-    where: { nfcCode: code },
+    where: { nfcCode: code, ...loyaltyCardWhere() },
     select: {
       id: true,
       name: true,
