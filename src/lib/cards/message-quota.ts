@@ -13,10 +13,6 @@ import type { MessageSegment } from './message-segments'
  *
  * Zwei getrennte Kontingente, damit der Automatismus die spontane Nachricht nicht
  * auffrisst — und umgekehrt.
- *
- * Die wiederkehrende Inaktivitäts-Erinnerung (`CardReminder`) zählt bei beidem nicht mit:
- * Sie geht nicht an alle, sondern nur an den Einzelnen, der weggeblieben ist, und sie hört
- * auf, sobald er wiederkommt.
  */
 
 export const MONTHLY_IMMEDIATE_LIMIT = 1

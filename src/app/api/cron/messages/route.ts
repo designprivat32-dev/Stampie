@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { deliverDueMessages } from '@/lib/cards/message-service'
 import { deliverDueMonthlyMessages } from '@/lib/cards/monthly-message-service'
-import { deliverDueReminders } from '@/lib/cards/reminder-service'
 import { runRetention } from '@/lib/privacy/retention'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -61,13 +60,11 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   const result = await deliverDueMessages()
-  // Im selben Lauf: wiederkehrende Karten-Erinnerungen, die heute fällig sind.
-  const reminders = await deliverDueReminders()
   // Und die Monatsnachrichten, die der Betrieb einmal eingerichtet hat. Sie legen eine
   // ganz normale CardMessage an, laufen also durch denselben Versand wie alles andere.
   const monthly = await deliverDueMonthlyMessages()
   // Und zuletzt das Aufräumen — nach dem Versand, damit ein Fehler beim Löschen niemals
   // eine fällige Nachricht verschluckt.
   const retention = await runRetention()
-  return NextResponse.json({ ok: true, ...result, reminders, monthly, retention })
+  return NextResponse.json({ ok: true, ...result, monthly, retention })
 }

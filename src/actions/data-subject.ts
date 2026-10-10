@@ -49,7 +49,6 @@ export interface PassRecord {
   redeemedAt: string | null
   hasActiveMessage: boolean
   appleDevices: number
-  reminderDeliveries: number
   events: StampEntry[]
 }
 
@@ -72,14 +71,13 @@ export async function lookupPassAction(serial: string): Promise<ActionResult<Pas
     // Mandantenprüfung: eine geratene Nummer darf keine fremde Karte offenlegen.
     await assertCardAccess(pass.cardId)
 
-    const [events, appleDevices, reminderDeliveries] = await Promise.all([
+    const [events, appleDevices] = await Promise.all([
       prisma.stampEvent.findMany({
         where: { passId: pass.id },
         orderBy: { createdAt: 'desc' },
         select: { kind: true, delta: true, balance: true, createdAt: true },
       }),
       prisma.appleDeviceRegistration.count({ where: { passId: pass.id } }),
-      prisma.cardReminderDelivery.count({ where: { passId: pass.id } }),
     ])
 
     return ok({
@@ -97,7 +95,6 @@ export async function lookupPassAction(serial: string): Promise<ActionResult<Pas
       redeemedAt: pass.redeemedAt?.toISOString() ?? null,
       hasActiveMessage: pass.activeMessage !== null,
       appleDevices,
-      reminderDeliveries,
       events: events.map((e) => ({
         kind: e.kind,
         delta: e.delta,

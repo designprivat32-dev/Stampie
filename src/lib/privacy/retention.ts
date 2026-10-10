@@ -22,8 +22,6 @@ import { prisma } from '@/lib/db'
 export interface RetentionPolicy {
   /** Historie der einzelnen Stempelbuchungen. */
   stampEventDays: number
-  /** Nachweis, wer wann eine Erinnerung bekommen hat. */
-  reminderDeliveryDays: number
   /** Bereits versendete Nachrichten. */
   sentMessageDays: number
   /** Testkarten-Token, gerechnet ab ihrem Ablauf. */
@@ -32,14 +30,12 @@ export interface RetentionPolicy {
 
 export const DEFAULT_RETENTION: RetentionPolicy = {
   stampEventDays: 400,
-  reminderDeliveryDays: 400,
   sentMessageDays: 400,
   expiredTokenDays: 30,
 }
 
 const ENV_KEYS: Record<keyof RetentionPolicy, string> = {
   stampEventDays: 'RETENTION_STAMP_EVENT_DAYS',
-  reminderDeliveryDays: 'RETENTION_REMINDER_DELIVERY_DAYS',
   sentMessageDays: 'RETENTION_SENT_MESSAGE_DAYS',
   expiredTokenDays: 'RETENTION_EXPIRED_TOKEN_DAYS',
 }
@@ -67,7 +63,6 @@ export function readRetentionPolicy(
 
 export interface Cutoffs {
   stampEvents: Date
-  reminderDeliveries: Date
   sentMessages: Date
   expiredTokens: Date
 }
@@ -77,7 +72,6 @@ export function cutoffsFor(policy: RetentionPolicy, now: Date): Cutoffs {
   const back = (days: number) => new Date(now.getTime() - days * DAY_MS)
   return {
     stampEvents: back(policy.stampEventDays),
-    reminderDeliveries: back(policy.reminderDeliveryDays),
     sentMessages: back(policy.sentMessageDays),
     expiredTokens: back(policy.expiredTokenDays),
   }
@@ -85,7 +79,6 @@ export function cutoffsFor(policy: RetentionPolicy, now: Date): Cutoffs {
 
 export interface RetentionResult {
   stampEvents: number
-  reminderDeliveries: number
   sentMessages: number
   expiredTokens: number
   expiredSessions: number
@@ -96,10 +89,9 @@ export async function runRetention(now: Date = new Date()): Promise<RetentionRes
   const policy = readRetentionPolicy()
   const cut = cutoffsFor(policy, now)
 
-  const [stampEvents, reminderDeliveries, sentMessages, expiredTokens, expiredSessions] =
+  const [stampEvents, sentMessages, expiredTokens, expiredSessions] =
     await Promise.all([
       prisma.stampEvent.deleteMany({ where: { createdAt: { lt: cut.stampEvents } } }),
-      prisma.cardReminderDelivery.deleteMany({ where: { sentAt: { lt: cut.reminderDeliveries } } }),
       // Nur Versendetes: geplante Nachrichten haben ihren Zweck noch vor sich.
       prisma.cardMessage.deleteMany({ where: { sentAt: { lt: cut.sentMessages } } }),
       prisma.testCardToken.deleteMany({ where: { expiresAt: { lt: cut.expiredTokens } } }),
@@ -109,7 +101,6 @@ export async function runRetention(now: Date = new Date()): Promise<RetentionRes
 
   return {
     stampEvents: stampEvents.count,
-    reminderDeliveries: reminderDeliveries.count,
     sentMessages: sentMessages.count,
     expiredTokens: expiredTokens.count,
     expiredSessions: expiredSessions.count,

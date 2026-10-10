@@ -12,7 +12,6 @@ const passFindFirst = vi.fn()
 const passDelete = vi.fn()
 const eventFindMany = vi.fn()
 const appleCount = vi.fn()
-const deliveryCount = vi.fn()
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -22,7 +21,6 @@ vi.mock('@/lib/db', () => ({
     },
     stampEvent: { findMany: (...a: unknown[]) => eventFindMany(...a) },
     appleDeviceRegistration: { count: (...a: unknown[]) => appleCount(...a) },
-    cardReminderDelivery: { count: (...a: unknown[]) => deliveryCount(...a) },
   },
 }))
 
@@ -68,7 +66,6 @@ beforeEach(() => {
     { kind: 'STAMP', delta: 1, balance: 3, createdAt: new Date('2026-08-20T10:00:00Z') },
   ])
   appleCount.mockResolvedValue(1)
-  deliveryCount.mockResolvedValue(0)
   assertCardAccess.mockResolvedValue({ cardId: 'c1' })
   assertPassword.mockResolvedValue(undefined)
   passDelete.mockResolvedValue({ id: 'p1' })
