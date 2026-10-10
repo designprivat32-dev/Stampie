@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { loyaltyPassWhere } from '@/lib/cards/kind'
+import { assertLoyaltyKind, loyaltyPassWhere } from '@/lib/cards/kind'
 import { getPassBuilder } from '@/lib/pass/mock-pass-builder'
 import { loadPassAssets } from './asset-service'
 import { loadOrCreateDraft, loadPublishedDesign } from './repository'
@@ -50,7 +50,7 @@ export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> 
     {
       ...design,
       cardId: pass.cardId,
-      kind: pass.kind,
+      kind: assertLoyaltyKind(pass.kind),
       organizationName: pass.card.org?.name ?? pass.card.name,
       currentStamps: pass.stamps,
       assets,

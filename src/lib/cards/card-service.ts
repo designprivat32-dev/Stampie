@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { isAdminSession } from '@/lib/auth/session'
 import { newFieldId } from './defaults'
 import { geoLocationSchema, type CardKind, type GeoLocation } from './schema'
+import { assertLoyaltyKind } from './kind'
 
 /**
  * Reads around the `Card` aggregate.
@@ -56,7 +57,9 @@ export interface CardSummary {
  */
 export async function cardKind(cardId: string): Promise<CardKind> {
   const card = await prisma.card.findFirst({ where: { id: cardId }, select: { kind: true } })
-  return card?.kind ?? 'STAMP'
+  // Eine Visitenkarte hat hier nichts verloren: Veröffentlichen und Google-Klassen dieser
+  // Wege kennen nur Stempelkarte und Gutschein.
+  return assertLoyaltyKind(card?.kind ?? 'STAMP')
 }
 
 /** The name shown as the pass issuer. Falls back sensibly for unassigned cards. */

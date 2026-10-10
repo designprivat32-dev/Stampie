@@ -1,7 +1,7 @@
 import 'server-only'
 import type { CardKind } from '@/lib/cards/schema'
 import { prisma } from '@/lib/db'
-import { loyaltyPassWhere } from '@/lib/cards/kind'
+import { assertLoyaltyKind, loyaltyCardWhere, loyaltyPassWhere } from '@/lib/cards/kind'
 import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
 import { sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
 
@@ -41,7 +41,7 @@ interface ReminderRow {
 
 export async function deliverDueReminders(now: Date = new Date()): Promise<ReminderRunResult> {
   const reminders = await prisma.cardReminder.findMany({
-    where: { enabled: true },
+    where: { enabled: true, card: loyaltyCardWhere() },
     select: {
       id: true,
       cardId: true,
@@ -56,7 +56,10 @@ export async function deliverDueReminders(now: Date = new Date()): Promise<Remin
   let errors = 0
   for (const reminder of reminders) {
     try {
-      sent += await deliverReminderToDueCustomers(reminder, now)
+      sent += await deliverReminderToDueCustomers(
+        { ...reminder, card: { kind: assertLoyaltyKind(reminder.card.kind) } },
+        now,
+      )
     } catch {
       errors++
     }

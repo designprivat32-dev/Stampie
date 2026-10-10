@@ -6,7 +6,7 @@ import QRCode from 'qrcode'
 import { assertCardAccess } from '@/lib/auth/session'
 import { fail, guarded, ok, type ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/db'
-import { loyaltyCardWhere } from '@/lib/cards/kind'
+import { assertLoyaltyKind, loyaltyCardWhere } from '@/lib/cards/kind'
 import { appUrl } from '@/lib/app-url'
 import { newNfcCode } from '@/lib/cards/handout-service'
 import { assertPassword } from '@/lib/auth/reauth'
@@ -73,7 +73,7 @@ export async function getHandoutStateAction(cardId: string): Promise<ActionResul
     return ok({
       link: card.nfcCode ? await buildLink(parsed.data, card.nfcCode) : null,
       isPublished: published !== null,
-      kind: card.kind,
+      kind: assertLoyaltyKind(card.kind),
       startStamps: card.handoutStartStamps,
       greeting: card.handoutGreeting ?? '',
     })
