@@ -56,7 +56,9 @@ export async function GET(
   // get a coffee cup on a discount voucher. `star` is the icon library's own neutral
   // fallback and carries no claim about what is being sold.
   const card = await prisma.card.findFirst({ where: { id: cardId }, select: { kind: true } })
-  const logoDesign = card?.kind === 'COUPON' ? { ...design, stampIcon: 'star' } : design
+  // Dasselbe für die Visitenkarte: sie verkauft nichts, ein Kaffeebecher wäre dort falsch.
+  const neutralMark = card?.kind === 'COUPON' || card?.kind === 'BUSINESS_CARD'
+  const logoDesign = neutralMark ? { ...design, stampIcon: 'star' } : design
 
   const png = await renderLogoImage(logoDesign, WALLET_LOGO_SIZE, uploaded)
 

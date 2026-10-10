@@ -1,4 +1,6 @@
-import { AppleWalletButton } from '@/components/wallet-badges'
+import { headers } from 'next/headers'
+import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
+import { detectPlatform } from '@/lib/cards/test-card-service'
 import { resolveOwnerClaim } from '@/lib/business-cards/scan-service'
 import { BusinessCardFace } from '../../_components/business-card-face'
 
@@ -26,6 +28,8 @@ export default async function OwnerClaimPage({ params }: { params: Promise<{ tok
     )
   }
 
+  const platform = detectPlatform((await headers()).get('user-agent'))
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10">
       <div className="flex flex-1 flex-col justify-center gap-8">
@@ -39,8 +43,13 @@ export default async function OwnerClaimPage({ params }: { params: Promise<{ tok
           </p>
         </div>
 
-        <div className="flex justify-center">
-          <AppleWalletButton href={`/api/v/claim/${token}`} size="lg" className="justify-center" />
+        <div className="flex flex-col items-center gap-3">
+          {platform !== 'google' ? (
+            <AppleWalletButton href={`/api/v/claim/${token}`} size="lg" className="justify-center" />
+          ) : null}
+          {platform !== 'apple' ? (
+            <GoogleWalletButton href={`/api/v/claim/${token}?p=google`} size="lg" className="justify-center" />
+          ) : null}
         </div>
       </div>
     </main>

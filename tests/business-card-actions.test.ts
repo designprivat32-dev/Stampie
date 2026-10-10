@@ -47,9 +47,9 @@ vi.mock('@/lib/cards/strip-service', () => ({ invalidateStripCache: () => {} }))
 
 const pushForCard = vi.fn()
 const pushForPasses = vi.fn()
-vi.mock('@/lib/wallet/apple-sync', () => ({
-  pushAppleWalletUpdateForCard: (...a: unknown[]) => pushForCard(...a),
-  pushAppleWalletUpdateForPasses: (...a: unknown[]) => pushForPasses(...a),
+vi.mock('@/lib/business-cards/wallet-sync', () => ({
+  syncBusinessCard: (...a: unknown[]) => pushForCard(...a),
+  syncBusinessContact: (...a: unknown[]) => pushForPasses(...a),
 }))
 
 const {
@@ -186,7 +186,7 @@ describe('contacts', () => {
     const result = await updateContactAction({ contactId: CONTACT, firstName: 'Anna', lastName: 'Meier' })
     expect(result.success).toBe(true)
     expect(contactUpdate.mock.calls[0]![0]).toMatchObject({ where: { id: CONTACT }, data: { lastName: 'Meier' } })
-    expect(pushForPasses).toHaveBeenCalledWith(['V-1', 'V-2'])
+    expect(pushForPasses).toHaveBeenCalledWith(CONTACT)
     expect(pushForCard).not.toHaveBeenCalled()
   })
 

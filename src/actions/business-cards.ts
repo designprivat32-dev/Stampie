@@ -8,7 +8,7 @@ import { prisma } from '@/lib/db'
 import { cardDesignDraftSchema, hexColorSchema } from '@/lib/cards/schema'
 import { loadOrCreateDraft, publishDesign, saveDraft } from '@/lib/cards/repository'
 import { invalidateStripCache } from '@/lib/cards/strip-service'
-import { pushAppleWalletUpdateForCard, pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
+import { syncBusinessCard, syncBusinessContact } from '@/lib/business-cards/wallet-sync'
 import { businessCompanySchema, businessContactSchema } from '@/lib/business-cards/schema'
 import { newOwnerClaimToken, newScanCode } from '@/lib/business-cards/serial'
 
@@ -17,8 +17,8 @@ import { newOwnerClaimToken, newScanCode } from '@/lib/business-cards/serial'
  *
  * Jede Aktion prüft zuerst den Zugriff auf die Karte und dann, dass es wirklich eine
  * Visitenkarte ist — eine Stempelkarte bekommt hier weder Firmendaten noch Personen.
- * Nach dem Speichern wird an die ausgegebenen Pässe geklopft, damit Wallet die neue
- * Fassung holt; scheitert das, bleibt das Gespeicherte trotzdem gespeichert.
+ * Nach dem Speichern werden die ausgegebenen Pässe in Apple und Google Wallet
+ * nachgezogen; scheitert das, bleibt das Gespeicherte trotzdem gespeichert.
  */
 
 const cardIdSchema = z.string().cuid()
@@ -50,11 +50,6 @@ async function pushQuietly(run: () => Promise<unknown>): Promise<void> {
     // eslint-disable-next-line no-console
     console.error('[business-card] wallet update failed', error)
   }
-}
-
-async function pushContact(contactId: string): Promise<void> {
-  const passes = await prisma.issuedPass.findMany({ where: { contactId }, select: { serial: true } })
-  await pushQuietly(() => pushAppleWalletUpdateForPasses(passes.map((p) => p.serial)))
 }
 
 function revalidate(cardId: string): void {
@@ -110,7 +105,7 @@ export async function saveBusinessDesignAction(input: unknown): Promise<ActionRe
       note: 'Visitenkarte',
     })
     invalidateStripCache()
-    await pushQuietly(() => pushAppleWalletUpdateForCard(cardId))
+    await pushQuietly(() => syncBusinessCard(cardId))
 
     revalidate(cardId)
     return ok({ version: published.version })
@@ -131,7 +126,7 @@ export async function saveBusinessCompanyAction(input: unknown): Promise<ActionR
       create: { cardId, ...company },
       update: company,
     })
-    await pushQuietly(() => pushAppleWalletUpdateForCard(cardId))
+    await pushQuietly(() => syncBusinessCard(cardId))
 
     revalidate(cardId)
     return ok(null)
@@ -172,7 +167,7 @@ export async function updateContactAction(input: unknown): Promise<ActionResult<
     const { cardId } = await assertContactAccess(contactId)
 
     await prisma.businessContact.update({ where: { id: contactId }, data: contact })
-    await pushContact(contactId)
+    await pushQuietly(() => syncBusinessContact(contactId))
 
     revalidate(cardId)
     return ok(null)

@@ -6,6 +6,7 @@ import { loadPublishedDesign } from '@/lib/cards/repository'
 import type { CardDesignInput } from '@/lib/cards/schema'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
 import { buildBusinessApplePass } from './apple-pass-builder'
+import { buildBusinessGoogleSaveUrl } from './google-pass'
 import type { BusinessPassRole } from './apple-pass-json'
 import { privacyUrlFor, scanUrlFor, toBusinessCompany, toBusinessContact } from './mapping'
 import type { BusinessCompany, BusinessContact } from './schema'
@@ -191,6 +192,24 @@ export async function buildIssuedBusinessPass(
     privacyUrl: privacyUrlFor(resolved.scanCode),
     assets: { icon: assets.icon, logo: assets.logo, photo: null },
     appleAuthToken,
+  })
+}
+
+/** Der „Zu Google Wallet hinzufügen"-Link für einen ausgegebenen Pass. */
+export function googleSaveUrlFor(
+  resolved: ResolvedBusinessCard,
+  serial: string,
+  role: BusinessPassRole,
+): string {
+  return buildBusinessGoogleSaveUrl({
+    cardId: resolved.cardId,
+    design: resolved.design,
+    contact: resolved.contact,
+    company: resolved.company,
+    role,
+    serial,
+    scanUrl: scanUrlFor(resolved.scanCode),
+    privacyUrl: privacyUrlFor(resolved.scanCode),
   })
 }
 

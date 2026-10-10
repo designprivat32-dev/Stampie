@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { AppleWalletButton } from '@/components/wallet-badges'
+import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
 import { detectPlatform } from '@/lib/cards/test-card-service'
 import { displayUrl } from '@/lib/business-cards/apple-pass-json'
 import { recordBusinessCardEvent, resolveScanCode } from '@/lib/business-cards/scan-service'
@@ -14,8 +14,8 @@ export const dynamic = 'force-dynamic'
  * Wie bei der Stempelkarte kein direkter Sprung zum Pass, sondern eine Seite mit Knopf:
  * nur so öffnet sich Wallet *über* dieser Seite statt über einer leeren.
  *
- * Google Wallet folgt in Phase 4. Bis dahin bekommt ein Android-Telefon „Kontakt
- * speichern" — das funktioniert überall.
+ * Das Gerät entscheidet, welcher Wallet-Knopf erscheint; nur wenn der Browser keins von
+ * beiden verrät, stehen beide da. „Kontakt speichern" gibt es immer.
  */
 export default async function BusinessCardScanPage({
   params,
@@ -39,6 +39,7 @@ export default async function BusinessCardScanPage({
 
   const { contact, company } = card
   const showApple = platform !== 'google'
+  const showGoogle = platform !== 'apple'
   const phone = contact.mobile ?? contact.phone ?? company?.phone ?? null
 
   return (
@@ -49,6 +50,9 @@ export default async function BusinessCardScanPage({
         <div className="flex flex-col items-center gap-3">
           {showApple ? (
             <AppleWalletButton href={`/api/v/${code}/apple`} size="lg" className="justify-center" />
+          ) : null}
+          {showGoogle ? (
+            <GoogleWalletButton href={`/api/v/${code}/google`} size="lg" className="justify-center" />
           ) : null}
           <a
             href={`/api/v/${code}/vcard`}

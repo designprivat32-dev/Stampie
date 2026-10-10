@@ -1,7 +1,8 @@
-import type { NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
 import {
   buildIssuedBusinessPass,
+  googleSaveUrlFor,
   issueOwnerPass,
   resolveOwnerClaim,
 } from '@/lib/business-cards/scan-service'
@@ -15,7 +16,8 @@ import {
 export const runtime = 'nodejs'
 
 /**
- * Der Aussteller-Pass mit QR-Code, über den Link aus dem Dashboard.
+ * Der Aussteller-Pass mit QR-Code, über den Link aus dem Dashboard. `?p=google` leitet zu
+ * Google Wallet weiter, sonst kommt das .pkpass für Apple.
  *
  * Liefert bei jedem Aufruf denselben Pass (siehe `issueOwnerPass`), damit ein zweiter Klick
  * oder ein abgebrochener Download keinen zweiten Aussteller-Pass erzeugt.
@@ -35,6 +37,9 @@ export async function GET(
   if (!resolved) return notFoundResponse()
 
   const serial = await issueOwnerPass(resolved)
+  if (request.nextUrl.searchParams.get('p') === 'google') {
+    return NextResponse.redirect(googleSaveUrlFor(resolved, serial, 'OWNER'), 302)
+  }
   const bundle = await buildIssuedBusinessPass(resolved, serial, 'OWNER')
   return pkpassResponse(bundle, resolved.contact)
 }

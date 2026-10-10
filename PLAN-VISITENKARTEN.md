@@ -229,7 +229,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 | 1 ✅ | Schema additiv, `lib/business-cards/schema.ts`, `vcard.ts` + Tests | Daten stehen |
 | 2 ✅ | Apple-`generic`-Pass OWNER/HOLDER + Tests | Pass auf iPhone testbar |
 | 3 ✅ | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
-| 4 | Google Generic Pass + Ausgabe | Android läuft |
+| 4 ✅ | Google Generic Pass + Ausgabe | Android läuft |
 | 5 ✅ | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
 | 6 | Updates/Löschen an alle Pässe, Statistik im Dashboard | fertig |
 | 7 | Datenschutztext, Rate-Limits, Review, „Visitenkarte“ im Dialog freischalten | live |
@@ -289,6 +289,16 @@ und Gutschein jedes Mal mit testen).
   und „Neuen Link erzeugen", Zahlen je Person.
 - Speichern stößt Apple-Updates an (Firma/Design: alle Pässe der Karte, Person: nur ihre Pässe).
 - Offen: Foto-Upload der Person, Google Wallet (Phase 4), sauberes Entwerten gelöschter Pässe (Phase 6).
+
+### Stand Phase 4
+
+- `lib/business-cards/google-generic.ts`: GenericClass `<issuer>.bcard_<cardId>`, GenericObject
+  `<issuer>.bsn_<serial>` — eigene Präfixe, nie eine Stempelkarten-Klasse. Aussteller mit QR, Empfänger ohne.
+- `/api/v/<code>/google` und `/api/v/claim/<token>?p=google` leiten zu Google Wallet weiter; Scan- und
+  Aussteller-Seite zeigen je nach Gerät den passenden Knopf.
+- `lib/business-cards/wallet-sync.ts`: nach Speichern im Editor Apple-Push **und** Google-Objekte
+  überschreiben (404 = nie bei Google gespeichert, kein Fehler).
+- Logo-Fallback ohne hochgeladenes Logo: neutraler Stern statt Kaffeebecher (wie beim Gutschein).
 
 ## 10. Datenschutz
 

@@ -19,7 +19,7 @@ import type { CardDesignInput, CardKind } from '@/lib/cards/schema'
  */
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
-const WALLET_API = 'https://walletobjects.googleapis.com/walletobjects/v1'
+export const WALLET_API = 'https://walletobjects.googleapis.com/walletobjects/v1'
 const SCOPE = 'https://www.googleapis.com/auth/wallet_object.issuer'
 
 function base64url(input: string): string {
@@ -33,7 +33,8 @@ interface CachedToken {
 
 let cached: CachedToken | null = null
 
-async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
+/** Auch für die Visitenkarte (`lib/business-cards/google-pass.ts`), die eigene Objekte pflegt. */
+export async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
   // Tokens last an hour; re-minting one per stamp would add a round trip to every scan.
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
 
