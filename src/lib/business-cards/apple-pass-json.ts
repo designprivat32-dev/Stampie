@@ -2,44 +2,41 @@ import { toPassKitRgb } from '@/lib/color/convert'
 import type { PassField } from '@/lib/cards/apple-pass-json'
 import type { CardDesignInput } from '@/lib/cards/schema'
 import type { BusinessCompany, BusinessContact } from './schema'
-import { buildCompactVCard } from './vcard'
 
 /**
- * Visitenkarte -> pass.json im Stil `storeCard`.
+ * Visitenkarte -> pass.json, je nach Rolle in einem anderen Stil.
  *
  * Eigene Datei statt einer weiteren Weiche in `lib/cards/apple-pass-json.ts`: die Stempel-
  * und Gutschein-Pässe bleiben damit Byte für Byte, wie sie sind (siehe
  * `tests/card-kind-guard.test.ts`).
  *
- * `storeCard` statt `generic`, weil Apple jede Karte gleich hoch zeichnet: im `generic`-Stil
- * blieb unter den Feldern eine große leere Fläche. Der Store-Card-Stil hat oben ein breites
- * Bannerbild (`strip.png`, siehe `render-strip.ts`), das den Platz füllt.
+ * Apple zeichnet jede Karte gleich hoch, und vorne ist die Zahl der Felder je Stil begrenzt.
+ * Deshalb zwei Stile:
  *
- * Aufteilung (PassKit, storeCard):
- *   primaryFields    Name — groß über dem Banner
- *   secondaryFields  Position, Telefon, E-Mail
- *   backFields       alle Kontaktwege, Adresse, Links, Datenschutz
+ *   Aussteller (OWNER) — `storeCard`
+ *     Banner oben (`strip.png`, siehe `render-strip.ts`) mit Name und Foto, darunter eine
+ *     Zeile mit Position, Telefon, E-Mail (Store Card erlaubt höchstens vier Felder), unten
+ *     der QR-Code zur Scan-Seite — wer ihn scannt, bekommt die Karte ins Wallet.
  *
- * Unten der Code, je nach Rolle:
- *   Aussteller  QR zur Scan-Seite — wer ihn scannt, bekommt die Karte ins Wallet.
- *   Empfänger   QR mit den Kontaktdaten selbst (vCard) — scannen = Kontakt speichern. Er
- *               führt nicht zur Scan-Seite, die Wallet-Karte lässt sich also nicht weitergeben.
+ *   Empfänger (HOLDER) — `generic`, **ohne Code** (ausdrücklich gewünscht)
+ *     Foto als `thumbnail.png` neben dem Namen, darunter zwei Zeilen Kontaktdaten und oben
+ *     rechts der Ort — so viele Felder, wie Apple vorne zulässt, damit die Karte voll wirkt.
+ *     Ein Banner gibt es in diesem Stil nicht.
+ *
+ * Auf der Rückseite stehen bei beiden alle Kontaktwege, Adresse, Links und der Datenschutz.
  */
 
 export type BusinessPassRole = 'OWNER' | 'HOLDER'
 
-/**
- * Eigener Barcode-Typ, weil der Empfänger-Code Umlaute trägt: Apple kodiert die Nachricht
- * im angegebenen Zeichensatz, und UTF-8 ist das, was Kameras bei einer vCard erwarten.
- */
+/** Der QR-Code des Aussteller-Passes: eine reine ASCII-Adresse zur Scan-Seite. */
 export interface BusinessBarcode {
   format: 'PKBarcodeFormatQR'
   message: string
-  messageEncoding: 'iso-8859-1' | 'utf-8'
+  messageEncoding: 'iso-8859-1'
   altText?: string
 }
 
-export interface StoreCardStructure {
+export interface PassStructure {
   headerFields: PassField[]
   primaryFields: PassField[]
   secondaryFields: PassField[]
@@ -57,9 +54,11 @@ export interface BusinessPassJson {
   backgroundColor: string
   foregroundColor: string
   labelColor: string
-  storeCard: StoreCardStructure
+  /** Genau einer von beiden ist gesetzt — der Schlüssel ist der Stil. */
+  storeCard?: PassStructure
+  generic?: PassStructure
   logoText?: string
-  /** Fehlt nur bei einer entwerteten Karte. */
+  /** Nur am Aussteller-Pass, und nicht nach dem Entwerten. */
   barcode?: BusinessBarcode
   barcodes?: BusinessBarcode[]
   sharingProhibited?: boolean
@@ -158,6 +157,47 @@ function backFields(
   return fields
 }
 
+/** Aussteller: Banner, eine Zeile Felder, unten der Code. */
+function ownerStructure(name: string, contact: BusinessContact, company: BusinessCompany | null): PassStructure {
+  const secondaryFields: PassField[] = []
+  if (contact.jobTitle) secondaryFields.push({ key: 'title', label: 'Position', value: contact.jobTitle })
+  const phone = contact.mobile ?? contact.phone ?? company?.phone ?? null
+  if (phone) secondaryFields.push({ key: 'front-phone', label: 'Telefon', value: phone })
+  if (contact.email) secondaryFields.push({ key: 'front-email', label: 'E-Mail', value: contact.email })
+  return {
+    headerFields: [],
+    primaryFields: [{ key: 'name', value: name }],
+    // Store Card erlaubt höchstens vier Felder in der Zeile unter dem Banner.
+    secondaryFields: secondaryFields.slice(0, 4),
+    auxiliaryFields: [],
+    backFields: [],
+  }
+}
+
+/** Empfänger: Name mit Foto, zwei Zeilen Kontaktdaten, Ort oben rechts — kein Code. */
+function holderStructure(name: string, contact: BusinessContact, company: BusinessCompany | null): PassStructure {
+  const headerFields: PassField[] = []
+  if (company?.city) headerFields.push({ key: 'city', label: 'Ort', value: company.city })
+
+  const secondaryFields: PassField[] = []
+  if (company) secondaryFields.push({ key: 'company', label: 'Firma', value: company.company })
+  const phone = contact.phone ?? company?.phone ?? null
+  if (phone) secondaryFields.push({ key: 'front-phone', label: 'Telefon', value: phone })
+  if (contact.mobile) secondaryFields.push({ key: 'front-mobile', label: 'Mobil', value: contact.mobile })
+
+  const auxiliaryFields: PassField[] = []
+  if (contact.email) auxiliaryFields.push({ key: 'front-email', label: 'E-Mail', value: contact.email })
+  if (company?.website) auxiliaryFields.push({ key: 'front-web', label: 'Web', value: displayUrl(company.website) })
+
+  return {
+    headerFields: headerFields.slice(0, 3),
+    primaryFields: [{ key: 'name', label: contact.jobTitle ?? 'Visitenkarte', value: name }],
+    secondaryFields: secondaryFields.slice(0, 4),
+    auxiliaryFields: auxiliaryFields.slice(0, 4),
+    backFields: [],
+  }
+}
+
 export function buildBusinessPassJson(
   design: DesignColors,
   contact: BusinessContact,
@@ -165,13 +205,9 @@ export function buildBusinessPassJson(
   ctx: BuildBusinessPassContext,
 ): BusinessPassJson {
   const name = fullName(contact)
-
-  // Firma steht oben als Titel; hier, was man auf einen Blick braucht.
-  const secondaryFields: PassField[] = []
-  if (contact.jobTitle) secondaryFields.push({ key: 'title', label: 'Position', value: contact.jobTitle })
-  const phone = contact.mobile ?? contact.phone ?? company?.phone ?? null
-  if (phone) secondaryFields.push({ key: 'front-phone', label: 'Telefon', value: phone })
-  if (contact.email) secondaryFields.push({ key: 'front-email', label: 'E-Mail', value: contact.email })
+  const structure =
+    ctx.role === 'OWNER' ? ownerStructure(name, contact, company) : holderStructure(name, contact, company)
+  structure.backFields = backFields(contact, company, ctx)
 
   const pass: BusinessPassJson = {
     formatVersion: 1,
@@ -184,14 +220,7 @@ export function buildBusinessPassJson(
     backgroundColor: toPassKitRgb(design.backgroundColor),
     foregroundColor: toPassKitRgb(design.foregroundColor),
     labelColor: toPassKitRgb(design.labelColor),
-    storeCard: {
-      headerFields: [],
-      primaryFields: [{ key: 'name', value: name }],
-      // Store Card erlaubt höchstens vier Felder in der Zeile unter dem Banner.
-      secondaryFields: secondaryFields.slice(0, 4),
-      auxiliaryFields: [],
-      backFields: backFields(contact, company, ctx),
-    },
+    ...(ctx.role === 'OWNER' ? { storeCard: structure } : { generic: structure }),
   }
 
   const title = design.cardTitle?.trim() || company?.company
@@ -199,26 +228,18 @@ export function buildBusinessPassJson(
 
   if (ctx.voided) {
     pass.voided = true
-    pass.storeCard.backFields.unshift({
+    structure.backFields.unshift({
       key: 'voided',
       label: 'Hinweis',
       value: 'Diese Visitenkarte ist nicht mehr gültig.',
     })
-  } else {
-    const barcode: BusinessBarcode =
-      ctx.role === 'OWNER'
-        ? {
-            format: 'PKBarcodeFormatQR',
-            message: ctx.scanUrl,
-            messageEncoding: 'iso-8859-1',
-            altText: 'Scannen für meine Visitenkarte',
-          }
-        : {
-            format: 'PKBarcodeFormatQR',
-            message: buildCompactVCard({ contact, company }),
-            messageEncoding: 'utf-8',
-            altText: 'Scannen, um den Kontakt zu speichern',
-          }
+  } else if (ctx.role === 'OWNER') {
+    const barcode: BusinessBarcode = {
+      format: 'PKBarcodeFormatQR',
+      message: ctx.scanUrl,
+      messageEncoding: 'iso-8859-1',
+      altText: 'Scannen für meine Visitenkarte',
+    }
     pass.barcode = barcode
     pass.barcodes = [barcode]
   }

@@ -48,9 +48,16 @@ const ctx = (over: Partial<BuildBusinessPassContext> = {}): BuildBusinessPassCon
   ...over,
 })
 
+/** Der Stil ist je Rolle ein anderer; die Felder liegen unter dem jeweiligen Schlüssel. */
+function structureOf(p: ReturnType<typeof buildBusinessPassJson>) {
+  const s = p.storeCard ?? p.generic
+  if (!s) throw new Error('pass has neither storeCard nor generic')
+  return s
+}
+
 describe('buildBusinessPassJson', () => {
-  it('uses the store card style, so the banner fills the card', () => {
-    const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx())
+  it('gives the owner a store card, so the banner fills the card', () => {
+    const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER' }))
     expect(p.storeCard).toBeDefined()
     expect(p).not.toHaveProperty('generic')
     expect(p).not.toHaveProperty('coupon')
@@ -58,15 +65,11 @@ describe('buildBusinessPassJson', () => {
     expect(p.organizationName).toBe('Nordlicht GmbH')
   })
 
-  it('puts the name over the banner, title and contact below', () => {
-    const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx())
-    expect(p.storeCard.primaryFields).toEqual([{ key: 'name', value: 'Anna Schmidt' }])
-    expect(p.storeCard.secondaryFields.map((f) => f.value)).toEqual([
-      'Vertrieb',
-      '+49 170 1234567',
-      'anna@example.de',
-    ])
-    expect(p.storeCard.auxiliaryFields).toEqual([])
+  it('puts the owner name over the banner, title and contact below', () => {
+    const s = structureOf(buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER' })))
+    expect(s.primaryFields).toEqual([{ key: 'name', value: 'Anna Schmidt' }])
+    expect(s.secondaryFields.map((f) => f.value)).toEqual(['Vertrieb', '+49 170 1234567', 'anna@example.de'])
+    expect(s.auxiliaryFields).toEqual([])
   })
 
   it('gives the owner pass a QR code pointing at the scan page', () => {
@@ -78,18 +81,28 @@ describe('buildBusinessPassJson', () => {
     expect(p.barcode!.messageEncoding).toBe('iso-8859-1')
   })
 
-  it('gives the recipient pass a contact code, not a link to the scan page', () => {
+  it('gives the recipient a generic card without any code', () => {
     const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'HOLDER' }))
-    expect(p.barcode!.format).toBe('PKBarcodeFormatQR')
-    expect(p.barcode!.messageEncoding).toBe('utf-8')
-    expect(p.barcode!.message.startsWith('BEGIN:VCARD')).toBe(true)
-    expect(p.barcode!.message).toContain('FN:Anna Schmidt')
-    expect(p.barcode!.message).toContain('ORG:Nordlicht GmbH')
-    // Kein Weg zur Wallet-Karte: der Code führt nicht zur Scan-Seite.
-    expect(p.barcode!.message).not.toContain('/v/')
-    // Knapp gehalten, damit der Code gut scannbar bleibt.
-    expect(p.barcode!.message).not.toContain('PHOTO')
-    expect(p.barcode!.message).not.toContain('ADR')
+    expect(p.generic).toBeDefined()
+    expect(p).not.toHaveProperty('storeCard')
+    expect(p).not.toHaveProperty('barcode')
+    expect(p).not.toHaveProperty('barcodes')
+    expect(JSON.stringify(p)).not.toContain('PKBarcodeFormat')
+  })
+
+  it('fills the recipient card with as many contact details as Apple allows on the front', () => {
+    const s = structureOf(buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'HOLDER' })))
+    expect(s.headerFields).toEqual([{ key: 'city', label: 'Ort', value: 'Hamburg' }])
+    expect(s.primaryFields).toEqual([{ key: 'name', label: 'Vertrieb', value: 'Anna Schmidt' }])
+    expect(s.secondaryFields.map((f) => [f.label, f.value])).toEqual([
+      ['Firma', 'Nordlicht GmbH'],
+      ['Telefon', '+49 40 123456'],
+      ['Mobil', '+49 170 1234567'],
+    ])
+    expect(s.auxiliaryFields.map((f) => [f.label, f.value])).toEqual([
+      ['E-Mail', 'anna@example.de'],
+      ['Web', 'nordlicht.example'],
+    ])
   })
 
   it('prohibits sharing for both roles', () => {
@@ -98,7 +111,7 @@ describe('buildBusinessPassJson', () => {
   })
 
   it('lists every contact channel on the back', () => {
-    const back = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx()).storeCard.backFields
+    const back = structureOf(buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx())).backFields
     const byKey = Object.fromEntries(back.map((f) => [f.key, f]))
     expect(byKey.phone!.value).toBe('+49 40 123456')
     expect(byKey.mobile!.value).toBe('+49 170 1234567')
@@ -111,22 +124,22 @@ describe('buildBusinessPassJson', () => {
   })
 
   it('does not repeat the company phone when it is the person’s own number', () => {
-    const back = buildBusinessPassJson(
+    const back = structureOf(buildBusinessPassJson(
       DEFAULT_CARD_DESIGN,
       contact({ phone: '+49 40 100' }),
       company(),
       ctx(),
-    ).storeCard.backFields
+    )).backFields
     expect(back.find((f) => f.key === 'company-phone')).toBeUndefined()
   })
 
   it('escapes HTML in link texts', () => {
-    const back = buildBusinessPassJson(
+    const back = structureOf(buildBusinessPassJson(
       DEFAULT_CARD_DESIGN,
       contact({ links: [{ label: 'X', url: 'https://a.de/?q="<b>"' }] }),
       null,
       ctx(),
-    ).storeCard.backFields
+    )).backFields
     const attr = back.find((f) => f.key === 'link-0')!.attributedValue!
     expect(attr).not.toContain('<b>')
     expect(attr).toContain('&lt;b&gt;')
@@ -140,9 +153,9 @@ describe('buildBusinessPassJson', () => {
       ctx(),
     )
     expect(p.organizationName).toBe('Anna Schmidt')
-    expect(p.storeCard.secondaryFields).toEqual([])
-    expect(p.storeCard.auxiliaryFields).toEqual([])
-    expect(p.storeCard.backFields.map((f) => f.key)).toEqual(['card-privacy'])
+    expect(structureOf(p).secondaryFields).toEqual([])
+    expect(structureOf(p).auxiliaryFields).toEqual([])
+    expect(structureOf(p).backFields.map((f) => f.key)).toEqual(['card-privacy'])
   })
 
   it('advertises the web service only with a token', () => {
@@ -161,7 +174,7 @@ describe('buildBusinessPassJson', () => {
     const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER', voided: true }))
     expect(p.voided).toBe(true)
     expect(p).not.toHaveProperty('barcode')
-    expect(p.storeCard.backFields[0]).toMatchObject({ key: 'voided', value: 'Diese Visitenkarte ist nicht mehr gültig.' })
+    expect(structureOf(p).backFields[0]).toMatchObject({ key: 'voided', value: 'Diese Visitenkarte ist nicht mehr gültig.' })
   })
 
   it('leaves live passes unvoided', () => {
@@ -296,19 +309,28 @@ describe('buildBusinessApplePass', () => {
     const zip = await buildBusinessApplePass(input('HOLDER'), config)
     const pass = JSON.parse(readZipEntry(zip, 'pass.json')!.toString('utf8'))
     expect(pass.webServiceURL).toBeUndefined()
-    expect(pass.barcode.message.startsWith('BEGIN:VCARD')).toBe(true)
+    expect(pass.barcode).toBeUndefined()
+    expect(pass.generic).toBeDefined()
     expect(readZipEntry(zip, 'signature')).toBeNull()
   })
 
-  it('puts the photo into the banner at the strip sizes Apple asks for', async () => {
+  it('puts the owner photo into the banner at the store card size (375×144)', async () => {
     const sharp = (await import('sharp')).default
     const png = await sharp({ create: { width: 60, height: 60, channels: 3, background: '#aa5500' } }).png().toBuffer()
     const zip = await buildBusinessApplePass(
-      { ...input('HOLDER'), assets: { icon: null, logo: null, photo: { '1x': png } } },
+      { ...input('OWNER'), assets: { icon: null, logo: null, photo: { '1x': png } } },
       config,
     )
     expect(readZipEntry(zip, 'thumbnail.png')).toBeNull()
     const meta = await sharp(readZipEntry(zip, 'strip@2x.png')!).metadata()
     expect([meta.width, meta.height]).toEqual([750, 288])
+  })
+
+  it('shows the recipient photo next to the name, without a banner', async () => {
+    const photo = { '1x': Buffer.from('p1'), '2x': Buffer.from('p2') }
+    const zip = await buildBusinessApplePass({ ...input('HOLDER'), assets: { icon: null, logo: null, photo } }, config)
+    expect(readZipEntry(zip, 'thumbnail.png')!.toString()).toBe('p1')
+    expect(readZipEntry(zip, 'thumbnail@2x.png')!.toString()).toBe('p2')
+    expect(readZipEntry(zip, 'strip.png')).toBeNull()
   })
 })

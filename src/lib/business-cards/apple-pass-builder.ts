@@ -24,7 +24,7 @@ import { renderBusinessStrip } from './render-strip'
 export interface BusinessPassAssets {
   icon: ScaledPng | null
   logo: ScaledPng | null
-  /** Foto der Person; sitzt rund im Bannerbild (`strip.png`). */
+  /** Foto der Person: beim Aussteller rund im Banner, beim Empfänger als `thumbnail.png`. */
   photo: ScaledPng | null
 }
 
@@ -79,14 +79,19 @@ export async function buildBusinessApplePass(
     (await renderFallbackIconSet(input.design, input.company?.company ?? fullName(input.contact)))
   pushScaled(files, 'icon', icon)
   pushScaled(files, 'logo', input.assets.logo)
-  // Das Banner füllt den oberen Teil der Karte, siehe `render-strip.ts`.
   const photo = input.assets.photo
-  const strip = await renderBusinessStrip({
-    backgroundColor: input.design.backgroundColor,
-    foregroundColor: input.design.foregroundColor,
-    photoPng: photo?.['3x'] ?? photo?.['2x'] ?? photo?.['1x'] ?? null,
-  })
-  pushScaled(files, 'strip', strip)
+  if (input.role === 'OWNER') {
+    // Store Card: das Banner füllt den oberen Teil der Karte, siehe `render-strip.ts`.
+    const strip = await renderBusinessStrip({
+      backgroundColor: input.design.backgroundColor,
+      foregroundColor: input.design.foregroundColor,
+      photoPng: photo?.['3x'] ?? photo?.['2x'] ?? photo?.['1x'] ?? null,
+    })
+    pushScaled(files, 'strip', strip)
+  } else {
+    // Generic: das Foto steht neben dem Namen; ein Banner gibt es in diesem Stil nicht.
+    pushScaled(files, 'thumbnail', photo)
+  }
 
   const manifest: Record<string, string> = {}
   for (const f of files) {
