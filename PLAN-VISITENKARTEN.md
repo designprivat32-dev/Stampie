@@ -232,7 +232,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 | 4 ✅ | Google Generic Pass + Ausgabe | Android läuft |
 | 5 ✅ | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
 | 6 ✅ | Updates/Löschen an alle Pässe, Statistik im Dashboard | fertig |
-| 7 | Datenschutztext, Rate-Limits, Review, „Visitenkarte“ im Dialog freischalten | live |
+| 7 ✅ | Datenschutztext, Rate-Limits, Review, „Visitenkarte“ im Dialog freischalten | live |
 
 Jede Phase: `npm run typecheck`, `npm test`, nach `main` mergen, auf Vercel-Production prüfen (Stempelkarte
 und Gutschein jedes Mal mit testen).
@@ -309,6 +309,24 @@ und Gutschein jedes Mal mit testen).
 - „QR-Code der Karte erneuern" je Person: neuer Scan-Code, alte Links tot, Pässe ziehen nach.
 - Statistik je Person steht seit Phase 5 im Editor.
 - Offen: Aufräumen weich gelöschter Personen nach einer Frist; Foto-Upload.
+
+### Stand Phase 7
+
+- Es gibt keine allgemeine Datenschutzerklärung im Projekt; die Hinweise stehen je Karte. Der Hinweis der
+  Visitenkarte (`/v/<code>/datenschutz`) nennt jetzt Apple **und** Google, das Entwerten zurückgezogener
+  Karten und beide Fristen; er bleibt auch für gelöschte Personen erreichbar (der Link steht auf dem Pass).
+- Aufbewahrung (`lib/privacy/retention.ts`, täglicher Cron): Zählungen nach 400 Tagen, weich gelöschte
+  Personen samt entwerteter Pässe nach 90 Tagen (`RETENTION_BUSINESS_CARD_EVENT_DAYS`,
+  `RETENTION_DELETED_CONTACT_DAYS`).
+- Rate-Limits: Pass ausstellen 60/h, vCard 120/h je Person und Anschluss, Aussteller-Link 30/h je Anschluss,
+  Aufrufzählung 5/h je Person und Anschluss.
+- Personen-Formular weist darauf hin, dass die Daten öffentlich werden und nur mit Einverständnis
+  eingetragen werden.
+- Review: Stempel-/Gutschein-Snapshots unverändert, Wege getrennt (`/v`, `lib/business-cards/`), alle
+  Links nur http/https, Texte in Wallet-HTML maskiert, Codes 16/32 Zufallsbytes.
+- Bekannt und nicht Teil dieses Plans: 3 Tests in `tests/app-stamp-redeem.test.ts` schlagen schon vor
+  Phase 0 fehl.
+- Offen für später: Foto-Upload der Person.
 
 ## 10. Datenschutz
 

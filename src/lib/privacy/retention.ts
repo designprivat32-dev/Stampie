@@ -17,6 +17,11 @@ import { prisma } from '@/lib/db'
  * löschen, die noch im Wallet eines Kunden liegt, macht sie dort kaputt — das ist eine
  * Entscheidung für den Betrieb, nicht für einen nächtlichen Cron. Einzelne Karten löscht
  * man über die Auskunfts- und Löschfunktion im Dashboard.
+ *
+ * Eine Ausnahme mit Absicht: Personen einer Visitenkarte, die im Dashboard gelöscht wurden.
+ * Ihre Pässe sind dann schon entwertet (Apple „ungültig", Google deaktiviert); die Zeile
+ * blieb nur, damit die Wallets diese Fassung abholen können. Nach der Frist geht sie samt
+ * Pässen, und mit ihr der letzte Rest der Kontaktdaten.
  */
 
 export interface RetentionPolicy {
@@ -26,18 +31,28 @@ export interface RetentionPolicy {
   sentMessageDays: number
   /** Testkarten-Token, gerechnet ab ihrem Ablauf. */
   expiredTokenDays: number
+  /** Zählungen der Visitenkarte (Aufrufe, ins Wallet gelegt, Kontakt gespeichert). */
+  businessCardEventDays: number
+  /** Gelöschte Personen einer Visitenkarte, gerechnet ab dem Löschen. */
+  deletedContactDays: number
 }
 
 export const DEFAULT_RETENTION: RetentionPolicy = {
   stampEventDays: 400,
   sentMessageDays: 400,
   expiredTokenDays: 30,
+  businessCardEventDays: 400,
+  // Lang genug, dass jedes Telefon den entwerteten Pass abgeholt hat, das tut es beim
+  // nächsten Öffnen von Wallet.
+  deletedContactDays: 90,
 }
 
 const ENV_KEYS: Record<keyof RetentionPolicy, string> = {
   stampEventDays: 'RETENTION_STAMP_EVENT_DAYS',
   sentMessageDays: 'RETENTION_SENT_MESSAGE_DAYS',
   expiredTokenDays: 'RETENTION_EXPIRED_TOKEN_DAYS',
+  businessCardEventDays: 'RETENTION_BUSINESS_CARD_EVENT_DAYS',
+  deletedContactDays: 'RETENTION_DELETED_CONTACT_DAYS',
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -65,6 +80,8 @@ export interface Cutoffs {
   stampEvents: Date
   sentMessages: Date
   expiredTokens: Date
+  businessCardEvents: Date
+  deletedContacts: Date
 }
 
 /** Pur, damit sich die Rechnung prüfen lässt, ohne eine Datenbank anzufassen. */
@@ -74,6 +91,8 @@ export function cutoffsFor(policy: RetentionPolicy, now: Date): Cutoffs {
     stampEvents: back(policy.stampEventDays),
     sentMessages: back(policy.sentMessageDays),
     expiredTokens: back(policy.expiredTokenDays),
+    businessCardEvents: back(policy.businessCardEventDays),
+    deletedContacts: back(policy.deletedContactDays),
   }
 }
 
@@ -82,6 +101,8 @@ export interface RetentionResult {
   sentMessages: number
   expiredTokens: number
   expiredSessions: number
+  businessCardEvents: number
+  deletedContacts: number
 }
 
 /** Räumt auf. Läuft im täglichen Cron mit; siehe `api/cron/messages`. */
@@ -89,7 +110,7 @@ export async function runRetention(now: Date = new Date()): Promise<RetentionRes
   const policy = readRetentionPolicy()
   const cut = cutoffsFor(policy, now)
 
-  const [stampEvents, sentMessages, expiredTokens, expiredSessions] =
+  const [stampEvents, sentMessages, expiredTokens, expiredSessions, businessCardEvents, deletedContacts] =
     await Promise.all([
       prisma.stampEvent.deleteMany({ where: { createdAt: { lt: cut.stampEvents } } }),
       // Nur Versendetes: geplante Nachrichten haben ihren Zweck noch vor sich.
@@ -97,6 +118,9 @@ export async function runRetention(now: Date = new Date()): Promise<RetentionRes
       prisma.testCardToken.deleteMany({ where: { expiresAt: { lt: cut.expiredTokens } } }),
       // Abgelaufene Sitzungen haben keine Frist — sie sind ab dem Ablauf wertlos.
       prisma.appSession.deleteMany({ where: { expiresAt: { lt: now } } }),
+      prisma.businessCardEvent.deleteMany({ where: { createdAt: { lt: cut.businessCardEvents } } }),
+      // Nur weich Gelöschte, und erst nach der Frist; die Pässe gehen per Fremdschlüssel mit.
+      prisma.businessContact.deleteMany({ where: { deletedAt: { lt: cut.deletedContacts } } }),
     ])
 
   return {
@@ -104,5 +128,7 @@ export async function runRetention(now: Date = new Date()): Promise<RetentionRes
     sentMessages: sentMessages.count,
     expiredTokens: expiredTokens.count,
     expiredSessions: expiredSessions.count,
+    businessCardEvents: businessCardEvents.count,
+    deletedContacts: deletedContacts.count,
   }
 }

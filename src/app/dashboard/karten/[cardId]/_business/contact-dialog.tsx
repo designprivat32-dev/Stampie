@@ -100,6 +100,8 @@ export function ContactDialog({
           <DialogDescription>
             Diese Angaben stehen auf der Visitenkarte und in „Kontakt speichern".
             {contactId ? ' Ausgegebene Karten aktualisieren sich von selbst.' : ''}
+            {' '}Die Daten werden für jeden sichtbar, der den QR-Code scannt — nur mit Einverständnis
+            der Person eintragen.
           </DialogDescription>
         </DialogHeader>
 

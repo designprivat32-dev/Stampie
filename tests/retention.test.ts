@@ -12,6 +12,8 @@ const delStampEvent = vi.fn()
 const delMessage = vi.fn()
 const delToken = vi.fn()
 const delSession = vi.fn()
+const delBusinessEvent = vi.fn()
+const delContact = vi.fn()
 
 // Die Fabrik wird an den Dateianfang gezogen: sie darf nur Funktionen benutzen, die den
 // Zugriff auf die Mocks verzoegern, keine bereits ausgewerteten Ausdruecke.
@@ -21,6 +23,8 @@ vi.mock('@/lib/db', () => ({
     cardMessage: { deleteMany: (...a: unknown[]) => delMessage(...a) },
     testCardToken: { deleteMany: (...a: unknown[]) => delToken(...a) },
     appSession: { deleteMany: (...a: unknown[]) => delSession(...a) },
+    businessCardEvent: { deleteMany: (...a: unknown[]) => delBusinessEvent(...a) },
+    businessContact: { deleteMany: (...a: unknown[]) => delContact(...a) },
   },
 }))
 
@@ -29,6 +33,8 @@ const deleteMany = {
   cardMessage: delMessage,
   testCardToken: delToken,
   appSession: delSession,
+  businessCardEvent: delBusinessEvent,
+  businessContact: delContact,
 }
 
 import {
@@ -73,7 +79,7 @@ describe('cutoffsFor', () => {
 
   it('gibt jeder Datenart ihre eigene Frist', () => {
     const cut = cutoffsFor(
-      { stampEventDays: 400, sentMessageDays: 400, expiredTokenDays: 30 },
+      { ...DEFAULT_RETENTION, stampEventDays: 400, sentMessageDays: 400, expiredTokenDays: 30 },
       JETZT,
     )
     expect(cut.expiredTokens.getTime()).toBeGreaterThan(cut.stampEvents.getTime())
@@ -107,6 +113,20 @@ describe('runRetention', () => {
     await runRetention(JETZT)
     const where = deleteMany.cardMessage.mock.calls[0]![0].where
     expect(where).toEqual({ sentAt: { lt: cutoffsFor(DEFAULT_RETENTION, JETZT).sentMessages } })
+  })
+
+  it('löscht nur weich gelöschte Personen, und erst nach der Frist', async () => {
+    await runRetention(JETZT)
+    expect(deleteMany.businessContact.mock.calls[0]![0].where).toEqual({
+      deletedAt: { lt: cutoffsFor(DEFAULT_RETENTION, JETZT).deletedContacts },
+    })
+  })
+
+  it('räumt alte Zählungen der Visitenkarte ab', async () => {
+    await runRetention(JETZT)
+    expect(deleteMany.businessCardEvent.mock.calls[0]![0].where).toEqual({
+      createdAt: { lt: cutoffsFor(DEFAULT_RETENTION, JETZT).businessCardEvents },
+    })
   })
 
   it('räumt abgelaufene Sitzungen ohne Schonfrist ab', async () => {

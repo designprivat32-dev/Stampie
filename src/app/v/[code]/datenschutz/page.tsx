@@ -1,4 +1,4 @@
-import { resolveScanCode } from '@/lib/business-cards/scan-service'
+import { resolveScanCodeForPrivacy } from '@/lib/business-cards/scan-service'
 import { BusinessCardPrivacyNotice } from '@/components/business-card-privacy-notice'
 import { PrivacyShell } from '@/components/privacy-notice'
 
@@ -11,7 +11,7 @@ export default async function BusinessCardPrivacyPage({
   params: Promise<{ code: string }>
 }) {
   const { code } = await params
-  const card = await resolveScanCode(code)
+  const card = await resolveScanCodeForPrivacy(code)
 
   if (!card) {
     return (

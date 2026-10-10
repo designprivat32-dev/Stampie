@@ -116,6 +116,19 @@ export async function resolveScanCode(code: string): Promise<ResolvedBusinessCar
   return resolve(row)
 }
 
+/**
+ * Für die Datenschutzseite: auch gelöschte Personen. Wer eine entwertete Karte im Wallet
+ * hat, muss trotzdem nachlesen können, was gespeichert war — der Link steht auf der Karte.
+ */
+export async function resolveScanCodeForPrivacy(code: string): Promise<ResolvedBusinessCard | null> {
+  if (!isPlausibleCode(code)) return null
+  const row = await prisma.businessContact.findFirst({
+    where: { scanCode: code, card: { kind: 'BUSINESS_CARD' } },
+    select: contactSelect,
+  })
+  return resolve(row)
+}
+
 /** Die Person hinter dem Einmal-Link des Ausstellers, oder null. */
 export async function resolveOwnerClaim(token: string): Promise<ResolvedBusinessCard | null> {
   if (!isPlausibleCode(token)) return null

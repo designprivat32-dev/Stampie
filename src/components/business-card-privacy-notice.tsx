@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { readProcessor } from '@/lib/legal/processor'
+import { readRetentionPolicy } from '@/lib/privacy/retention'
 import { PrivacyShell, PrivacySection } from './privacy-notice'
 
 /**
@@ -30,6 +31,7 @@ export function BusinessCardPrivacyNotice({
     .filter((part) => part && part.trim().length > 0)
     .join(', ')
   const { processor, missing } = readProcessor()
+  const { businessCardEventDays, deletedContactDays } = readRetentionPolicy()
 
   return (
     <PrivacyShell title="Datenschutz">
@@ -60,7 +62,8 @@ export function BusinessCardPrivacyNotice({
         <p>
           Wenn Sie die Visitenkarte in Ihr Wallet legen, entsteht eine Karte mit einer zufälligen
           Nummer. Dazu gespeichert werden der Zeitpunkt und technische Kennungen, damit sich die
-          Karte in Apple Wallet aktualisieren kann, wenn sich Kontaktdaten ändern.
+          Karte in Apple Wallet oder Google Wallet aktualisieren kann, wenn sich Kontaktdaten
+          ändern.
         </p>
         <p>
           <strong className="font-medium text-ink">
@@ -71,7 +74,7 @@ export function BusinessCardPrivacyNotice({
         <p>
           Gezählt wird außerdem, wie oft die Seite aufgerufen, die Karte hinzugefügt oder der
           Kontakt gespeichert wurde — mit Gerätetyp (iPhone, Android, sonstige), aber ohne Bezug
-          zu Ihnen.
+          zu Ihnen. Diese Zählungen werden nach {businessCardEventDays} Tagen gelöscht.
         </p>
       </PrivacySection>
 
@@ -87,7 +90,8 @@ export function BusinessCardPrivacyNotice({
       <PrivacySection title="Wie lange und Ihre Rechte">
         <p>
           Die Karte bleibt, bis Sie sie aus Ihrem Wallet löschen oder die Visitenkarte zurückgezogen
-          wird. Sie können Auskunft, Berichtigung oder Löschung verlangen und sich bei einer
+          wird. Wird sie zurückgezogen, erscheint sie in Ihrem Wallet als ungültig; die Daten dazu
+          werden {deletedContactDays} Tage später endgültig gelöscht. Sie können Auskunft, Berichtigung oder Löschung verlangen und sich bei einer
           Datenschutz-Aufsichtsbehörde beschweren. Nennen Sie dabei die Nummer Ihrer Karte — ohne
           sie lässt sie sich nicht zuordnen.
         </p>

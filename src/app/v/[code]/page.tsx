@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
+import { rateLimit } from '@/lib/rate-limit'
+import { clientIp } from '@/lib/business-cards/responses'
 import { AppleWalletButton, GoogleWalletButton } from '@/components/wallet-badges'
 import { detectPlatform } from '@/lib/cards/test-card-service'
 import { displayUrl } from '@/lib/business-cards/apple-pass-json'
@@ -34,8 +36,13 @@ export default async function BusinessCardScanPage({
     )
   }
 
-  const platform = detectPlatform((await headers()).get('user-agent'))
-  await recordBusinessCardEvent(card.contactId, 'VIEWED', platform)
+  const requestHeaders = await headers()
+  const platform = detectPlatform(requestHeaders.get('user-agent'))
+  // Neu laden zählt nicht jedes Mal: höchstens ein paar Aufrufe je Anschluss und Stunde,
+  // sonst wüchse die Tabelle mit jedem Skript, das die Seite abruft.
+  if (rateLimit(`bcard-view:${card.contactId}:${clientIp(requestHeaders)}`, 5, 60 * 60 * 1000).allowed) {
+    await recordBusinessCardEvent(card.contactId, 'VIEWED', platform)
+  }
 
   const { contact, company } = card
   const showApple = platform !== 'google'
