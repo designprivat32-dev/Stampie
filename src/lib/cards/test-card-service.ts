@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { loyaltyCardWhere } from './kind'
+import { assertLoyaltyKind, loyaltyCardWhere } from './kind'
 import { cardDesignDraftSchema, type CardDesignInput, type CardKind } from './schema'
 import { loadPassAssets } from './asset-service'
 import type { CardDesign } from '@/lib/pass/pass-builder'
@@ -42,7 +42,7 @@ export async function resolveTestCardToken(token: string): Promise<ResolvedTestC
 
   return {
     cardId: record.cardId,
-    kind: record.card.kind,
+    kind: assertLoyaltyKind(record.card.kind),
     organizationName: record.card.org?.name ?? record.card.name,
     design: parsed.data,
     currentStamps: Math.min(parsed.data.stampGoal, snapshot?.currentStamps ?? 0),

@@ -3,6 +3,7 @@ import { CardEditorShell } from './_components/card-editor-shell'
 import { CardEditorProvider } from '@/stores/card-editor-provider'
 import { assertCardAccess, CardAccessError, UnauthorizedError } from '@/lib/auth/session'
 import { prisma } from '@/lib/db'
+import { isLoyaltyKind } from '@/lib/cards/kind'
 import { loadOrCreateDraft } from '@/lib/cards/repository'
 import { isPristineDesign } from '@/lib/cards/defaults'
 import { getStorage, variantKey } from '@/lib/storage'
@@ -38,7 +39,8 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
     loadOrCreateDraft(access.cardId),
   ])
 
-  if (!card) notFound()
+  // Der Designer kennt nur Stempelkarte und Gutschein; Visitenkarten bekommen eigene Reiter.
+  if (!card || !isLoyaltyKind(card.kind)) notFound()
 
   const org = card.org
   const customer: CustomerSummary = {

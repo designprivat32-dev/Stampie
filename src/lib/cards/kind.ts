@@ -19,6 +19,16 @@ export function isLoyaltyKind(kind: string): kind is CardKind {
   return (CARD_KINDS as readonly string[]).includes(kind)
 }
 
+/**
+ * Für Werte aus Abfragen, die schon mit `loyaltyCardWhere`/`loyaltyPassWhere` eingegrenzt
+ * sind: macht aus dem breiten Datenbank-Typ den engen. Schlägt es fehl, fehlt der Filter
+ * in der Abfrage — dann lieber laut abbrechen als eine Visitenkarte als Stempelkarte bauen.
+ */
+export function assertLoyaltyKind(kind: string): CardKind {
+  if (!isLoyaltyKind(kind)) throw new Error(`Unerwartete Kartenart: ${kind}`)
+  return kind
+}
+
 /** `where`-Teil für `prisma.card`: nur Stempelkarten und Gutscheine. */
 export function loyaltyCardWhere(): Prisma.CardWhereInput {
   return { kind: { in: [...CARD_KINDS] } }

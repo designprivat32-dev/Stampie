@@ -226,7 +226,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 | Phase | Inhalt | Ergebnis |
 |---|---|---|
 | 0 ✅ | Snapshot-Tests für bestehende Pässe, `kind`-Weichen explizit machen (Abschnitt 8.1/8.2) | Absicherung, kein sichtbarer Unterschied |
-| 1 | Schema additiv, `lib/business-cards/schema.ts`, `vcard.ts` + Tests | Daten stehen |
+| 1 ✅ | Schema additiv, `lib/business-cards/schema.ts`, `vcard.ts` + Tests | Daten stehen |
 | 2 | Apple-`generic`-Pass OWNER/HOLDER + Tests | Pass auf iPhone testbar |
 | 3 | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
 | 4 | Google Generic Pass + Ausgabe | Android läuft |
@@ -246,6 +246,17 @@ und Gutschein jedes Mal mit testen).
   Ausgabe-Dialog, App-Kartenliste/Statistik/Erinnerungen/Ausgabe, Nachrichten, Erinnerungen, Testkarten,
   Pass-Neubau für Apple-Updates (muss in Phase 2 um den Visitenkarten-Zweig ergänzt werden).
 - `tests/card-kind-guard.test.ts`: Snapshots der heutigen Apple-/Google-Pässe für Stempelkarte und Gutschein.
+
+### Stand Phase 1
+
+- Schema additiv: `CardKind.BUSINESS_CARD`, `PassRole`, `IssuedPass.role/contactId`, `BusinessCardCompany`,
+  `BusinessContact`, `BusinessCardEvent`. Kein Feld entfernt oder umbenannt.
+- Typecheck hat genau die erwarteten 8 Stellen gemeldet, an denen der Datenbankwert in Stempel-/Gutschein-Code
+  floss; dort steht jetzt `assertLoyaltyKind` hinter einer gefilterten Abfrage. Designer-Seite zeigt für eine
+  Visitenkarte vorerst 404 (eigener Designer in Phase 5), `cardKind()` wirft (Veröffentlichen in Phase 5).
+- `src/lib/business-cards/schema.ts` (Zod, Normalisierung, nur http/https-Links) und `vcard.ts`
+  (vCard 3.0, Escaping, Faltung nach UTF-8-Bytes), Tests in `tests/business-card-vcard.test.ts`.
+- Kontaktfoto: `photoAssetId` ist vorbereitet, Upload und `AssetKind` folgen in Phase 5.
 
 ## 10. Datenschutz
 

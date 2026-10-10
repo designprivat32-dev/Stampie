@@ -1,7 +1,7 @@
 import 'server-only'
 import { randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/db'
-import { loyaltyCardWhere } from '@/lib/cards/kind'
+import { assertLoyaltyKind, loyaltyCardWhere } from '@/lib/cards/kind'
 import { loadPassAssets } from './asset-service'
 import { loadPublishedDesign } from './repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
@@ -100,7 +100,7 @@ export async function resolveHandoutCode(code: string): Promise<ResolvedHandout 
 
   return {
     cardId: card.id,
-    kind: card.kind,
+    kind: assertLoyaltyKind(card.kind),
     organizationName: card.org?.name ?? card.name,
     design,
     // Capped against *this* design's goal, not stored capped — the goal can change after

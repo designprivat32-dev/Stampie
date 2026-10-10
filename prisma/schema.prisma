@@ -118,6 +118,9 @@ model Membership {
 enum CardKind {
   STAMP
   COUPON
+  /// Digitale Visitenkarte (PLAN-VISITENKARTEN.md). Bewusst nicht in `CARD_KINDS` im Code:
+  /// Stempeln, Einlösen, `/k`-Ausgabe, Nachrichten und Erinnerungen kennen sie nicht.
+  BUSINESS_CARD
 }
 
 /// A stamp card programme. The unit the agency creates, hands to a customer and designs.
@@ -182,6 +185,10 @@ model Card {
   messages  CardMessage[]
   reminders CardReminder[]
   monthly   CardMonthlyMessage[]
+
+  /// Nur bei `BUSINESS_CARD`: Firmendaten und die Personen darunter.
+  businessCompany BusinessCardCompany?
+  contacts        BusinessContact[]
 
   @@index([orgId])
   @@index([nfcCode])
@@ -589,7 +596,15 @@ model IssuedPass {
   appleRegistrations AppleDeviceRegistration[]
   reminderDeliveries CardReminderDelivery[]
 
+  /// Visitenkarte: Aussteller-Pass (OWNER, mit QR) oder Empfänger-Pass (HOLDER).
+  /// Alles andere ist HOLDER — der Default lässt bestehende Pässe unverändert.
+  role      PassRole         @default(HOLDER)
+  /// Visitenkarte: die Person, deren Kontaktdaten dieser Pass zeigt. Sonst null.
+  contactId String?
+  contact   BusinessContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
   @@index([cardId, isTest])
+  @@index([contactId])
   @@index([claimToken])
   @@index([cardId, deviceKey])
 }
@@ -657,4 +672,91 @@ model TestCardToken {
 
   @@index([expiresAt])
   @@index([cardId])
+}
+
+// ---------------------------------------------------------------- business cards
+
+/// Welche Seite einer Visitenkarte ein Pass ist.
+enum PassRole {
+  /// Default für alle Pässe: Stempelkarte, Gutschein, und der Empfänger einer Visitenkarte.
+  HOLDER
+  /// Der Pass der Person selbst — trägt den QR-Code, über den andere die Karte bekommen.
+  OWNER
+}
+
+/// Firmendaten einer Visitenkarte; gelten für alle Personen darunter. 1:1 zur Card.
+///
+/// Liegt nicht im CardDesign: das Design ist das Aussehen und wird versioniert
+/// veröffentlicht, das hier ist Inhalt, der sich ohne neue Version ändern soll.
+model BusinessCardCompany {
+  cardId     String   @id
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  company    String
+  website    String?
+  /// Zentrale Rufnummer; die Person kann eine eigene haben.
+  phone      String?
+  street     String?
+  postalCode String?
+  city       String?
+  updatedAt  DateTime @updatedAt
+}
+
+/// Eine Person auf einer Visitenkarte. Jede hat ihren eigenen Scan-Code.
+model BusinessContact {
+  id           String  @id @default(cuid())
+  cardId       String
+  card         Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  firstName    String
+  lastName     String
+  jobTitle     String?
+  phone        String?
+  mobile       String?
+  email        String?
+  /// Foto der Person, sobald es hochgeladen werden kann (Phase 5).
+  photoAssetId String?
+  /// Weitere Links, z. B. LinkedIn: `[{ label, url }]`.
+  links        Json    @default("[]")
+
+  /// Code hinter `/v/<scanCode>` und dem QR auf dem Aussteller-Pass.
+  ///
+  /// Indexiert statt `@unique`, aus demselben Grund wie `Card.nfcCode`: die Eindeutigkeit
+  /// kommt aus 16 Zufallsbytes, nicht aus einer Einschränkung, die `prisma db push` nur mit
+  /// `--accept-data-loss` anlegen würde.
+  scanCode        String
+  /// Einmal-Link, mit dem die Person ihren Aussteller-Pass holt. Null, wenn keiner offen ist.
+  ownerClaimToken String?
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  passes IssuedPass[]
+  events BusinessCardEvent[]
+
+  @@index([cardId])
+  @@index([scanCode])
+  @@index([ownerClaimToken])
+}
+
+enum BusinessCardEventKind {
+  /// Scan-Seite aufgerufen.
+  VIEWED
+  /// Empfänger-Pass ausgestellt.
+  WALLET_ADDED
+  /// vCard heruntergeladen.
+  CONTACT_SAVED
+}
+
+/// Statistik einer Visitenkarte. Eigene Tabelle, damit `StampEvent` und alles, was darauf
+/// zählt, von Visitenkarten nichts mitbekommt.
+model BusinessCardEvent {
+  id        String                @id @default(cuid())
+  contactId String
+  contact   BusinessContact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  kind      BusinessCardEventKind
+  /// apple | google | other
+  platform  String?
+  createdAt DateTime              @default(now())
+
+  @@index([contactId, kind])
 }

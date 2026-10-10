@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { loyaltyPassWhere } from '@/lib/cards/kind'
+import { assertLoyaltyKind, loyaltyCardWhere, loyaltyPassWhere } from '@/lib/cards/kind'
 import { pushAppleWalletUpdateForPasses } from '@/lib/wallet/apple-sync'
 import { sendGoogleWalletMessageToPasses } from '@/lib/wallet/google-sync'
 import {
@@ -38,7 +38,7 @@ export interface MessageDeliveryResult {
 
 export async function deliverCardMessage(messageId: string): Promise<MessageDeliveryResult> {
   const message = await prisma.cardMessage.findFirst({
-    where: { id: messageId, sentAt: null },
+    where: { id: messageId, sentAt: null, card: loyaltyCardWhere() },
     select: {
       id: true,
       cardId: true,
@@ -56,7 +56,10 @@ export async function deliverCardMessage(messageId: string): Promise<MessageDeli
   // Auch "an alle" läuft über den Einzel-Pass-Weg. Der frühere Weg schrieb den Text auf
   // die *Karte*, und den erbt jeder Pass — eine Einwilligung, die sich so umgehen lässt,
   // wäre keine.
-  const result = await deliverToSegment(message, segment)
+  const result = await deliverToSegment(
+    { ...message, card: { kind: assertLoyaltyKind(message.card.kind) } },
+    segment,
+  )
 
   // Written even when something failed: a half-delivered message must not be sent again by
   // the next run, or the shops that did receive it get it twice.
