@@ -48,28 +48,28 @@ const ctx = (over: Partial<BuildBusinessPassContext> = {}): BuildBusinessPassCon
   ...over,
 })
 
-/** Der Stil ist je Rolle ein anderer; die Felder liegen unter dem jeweiligen Schlüssel. */
+/** Beide Rollen nutzen den Stil `generic`; die Felder liegen dort. */
 function structureOf(p: ReturnType<typeof buildBusinessPassJson>) {
-  const s = p.storeCard ?? p.generic
-  if (!s) throw new Error('pass has neither storeCard nor generic')
-  return s
+  return p.generic
 }
 
 describe('buildBusinessPassJson', () => {
-  it('gives the owner a store card, so the banner fills the card', () => {
-    const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER' }))
-    expect(p.storeCard).toBeDefined()
-    expect(p).not.toHaveProperty('generic')
+  it.each(['OWNER', 'HOLDER'] as const)('builds the %s card in the generic style', (role) => {
+    const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role }))
+    expect(p.generic).toBeDefined()
+    expect(p).not.toHaveProperty('storeCard')
+    expect(p).not.toHaveProperty('eventTicket')
     expect(p).not.toHaveProperty('coupon')
     expect(p.description).toBe('Visitenkarte Anna Schmidt')
     expect(p.organizationName).toBe('Nordlicht GmbH')
   })
 
-  it('puts the owner name over the banner, title and contact below', () => {
-    const s = structureOf(buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER' })))
-    expect(s.primaryFields).toEqual([{ key: 'name', value: 'Anna Schmidt' }])
-    expect(s.secondaryFields.map((f) => f.value)).toEqual(['Vertrieb', '+49 170 1234567', 'anna@example.de'])
-    expect(s.auxiliaryFields).toEqual([])
+  it('lays out the front the same way for both roles', () => {
+    const owner = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER' }))
+    const holder = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'HOLDER' }))
+    for (const key of ['headerFields', 'primaryFields', 'secondaryFields', 'auxiliaryFields'] as const) {
+      expect(owner.generic[key]).toEqual(holder.generic[key])
+    }
   })
 
   it('gives the owner pass a QR code pointing at the scan page', () => {
@@ -81,10 +81,8 @@ describe('buildBusinessPassJson', () => {
     expect(p.barcode!.messageEncoding).toBe('iso-8859-1')
   })
 
-  it('gives the recipient a generic card without any code', () => {
+  it('gives the recipient no code at all', () => {
     const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'HOLDER' }))
-    expect(p.generic).toBeDefined()
-    expect(p).not.toHaveProperty('storeCard')
     expect(p).not.toHaveProperty('barcode')
     expect(p).not.toHaveProperty('barcodes')
     expect(JSON.stringify(p)).not.toContain('PKBarcodeFormat')
@@ -288,21 +286,13 @@ describe('buildBusinessApplePass', () => {
   it('bundles pass.json, a fallback icon and the manifest', async () => {
     const zip = await buildBusinessApplePass(input('OWNER'), config)
     const pass = JSON.parse(readZipEntry(zip, 'pass.json')!.toString('utf8'))
-    expect(pass.storeCard.primaryFields[0].value).toBe('Anna Schmidt')
+    expect(pass.generic.primaryFields[0].value).toBe('Anna Schmidt')
     expect(pass.barcode.message).toBe('https://stampie.de/v/code123')
     expect(readZipEntry(zip, 'icon.png')).not.toBeNull()
-    expect(readZipEntry(zip, 'strip.png')).not.toBeNull()
+    expect(readZipEntry(zip, 'strip.png')).toBeNull()
 
     const manifest = JSON.parse(readZipEntry(zip, 'manifest.json')!.toString('utf8'))
-    expect(Object.keys(manifest).sort()).toEqual([
-      'icon.png',
-      'icon@2x.png',
-      'icon@3x.png',
-      'pass.json',
-      'strip.png',
-      'strip@2x.png',
-      'strip@3x.png',
-    ])
+    expect(Object.keys(manifest).sort()).toEqual(['icon.png', 'icon@2x.png', 'icon@3x.png', 'pass.json'])
   })
 
   it('leaves out the web service without a certificate', async () => {
@@ -314,21 +304,9 @@ describe('buildBusinessApplePass', () => {
     expect(readZipEntry(zip, 'signature')).toBeNull()
   })
 
-  it('puts the owner photo into the banner at the store card size (375×144)', async () => {
-    const sharp = (await import('sharp')).default
-    const png = await sharp({ create: { width: 60, height: 60, channels: 3, background: '#aa5500' } }).png().toBuffer()
-    const zip = await buildBusinessApplePass(
-      { ...input('OWNER'), assets: { icon: null, logo: null, photo: { '1x': png } } },
-      config,
-    )
-    expect(readZipEntry(zip, 'thumbnail.png')).toBeNull()
-    const meta = await sharp(readZipEntry(zip, 'strip@2x.png')!).metadata()
-    expect([meta.width, meta.height]).toEqual([750, 288])
-  })
-
-  it('shows the recipient photo next to the name, without a banner', async () => {
+  it.each(['OWNER', 'HOLDER'] as const)('shows the %s photo next to the name, without a banner', async (role) => {
     const photo = { '1x': Buffer.from('p1'), '2x': Buffer.from('p2') }
-    const zip = await buildBusinessApplePass({ ...input('HOLDER'), assets: { icon: null, logo: null, photo } }, config)
+    const zip = await buildBusinessApplePass({ ...input(role), assets: { icon: null, logo: null, photo } }, config)
     expect(readZipEntry(zip, 'thumbnail.png')!.toString()).toBe('p1')
     expect(readZipEntry(zip, 'thumbnail@2x.png')!.toString()).toBe('p2')
     expect(readZipEntry(zip, 'strip.png')).toBeNull()

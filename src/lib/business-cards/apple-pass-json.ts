@@ -10,18 +10,16 @@ import type { BusinessCompany, BusinessContact } from './schema'
  * und Gutschein-Pässe bleiben damit Byte für Byte, wie sie sind (siehe
  * `tests/card-kind-guard.test.ts`).
  *
- * Apple zeichnet jede Karte gleich hoch, und vorne ist die Zahl der Felder je Stil begrenzt.
- * Deshalb zwei Stile:
+ * Stil `generic` für beide Rollen, mit demselben Aufbau:
+ *   oben rechts der Ort, groß der Name mit der Position darüber und daneben das Foto
+ *   (`thumbnail.png`), darunter Firma/Telefon/Mobil und E-Mail/Web.
  *
- *   Aussteller (OWNER) — `storeCard`
- *     Banner oben (`strip.png`, siehe `render-strip.ts`) mit Name und Foto, darunter eine
- *     Zeile mit Position, Telefon, E-Mail (Store Card erlaubt höchstens vier Felder), unten
- *     der QR-Code zur Scan-Seite — wer ihn scannt, bekommt die Karte ins Wallet.
+ * Der einzige Unterschied ist unten:
+ *   Aussteller (OWNER)  QR-Code zur Scan-Seite — wer ihn scannt, bekommt die Karte ins Wallet.
+ *   Empfänger (HOLDER)  kein Code (ausdrücklich gewünscht).
  *
- *   Empfänger (HOLDER) — `generic`, **ohne Code** (ausdrücklich gewünscht)
- *     Foto als `thumbnail.png` neben dem Namen, darunter zwei Zeilen Kontaktdaten und oben
- *     rechts der Ort — so viele Felder, wie Apple vorne zulässt, damit die Karte voll wirkt.
- *     Ein Banner gibt es in diesem Stil nicht.
+ * Verworfen, am iPhone getestet: `storeCard` mit Banner (Name lief ins Foto, Logos wurden
+ * im Kreis beschnitten) und `eventTicket` mit dritter Zeile (Ticket-Ausschnitt oben).
  *
  * Auf der Rückseite stehen bei beiden alle Kontaktwege, Adresse, Links und der Datenschutz.
  */
@@ -54,9 +52,7 @@ export interface BusinessPassJson {
   backgroundColor: string
   foregroundColor: string
   labelColor: string
-  /** Genau einer von beiden ist gesetzt — der Schlüssel ist der Stil. */
-  storeCard?: PassStructure
-  generic?: PassStructure
+  generic: PassStructure
   logoText?: string
   /** Nur am Aussteller-Pass, und nicht nach dem Entwerten. */
   barcode?: BusinessBarcode
@@ -157,25 +153,8 @@ function backFields(
   return fields
 }
 
-/** Aussteller: Banner, eine Zeile Felder, unten der Code. */
-function ownerStructure(name: string, contact: BusinessContact, company: BusinessCompany | null): PassStructure {
-  const secondaryFields: PassField[] = []
-  if (contact.jobTitle) secondaryFields.push({ key: 'title', label: 'Position', value: contact.jobTitle })
-  const phone = contact.mobile ?? contact.phone ?? company?.phone ?? null
-  if (phone) secondaryFields.push({ key: 'front-phone', label: 'Telefon', value: phone })
-  if (contact.email) secondaryFields.push({ key: 'front-email', label: 'E-Mail', value: contact.email })
-  return {
-    headerFields: [],
-    primaryFields: [{ key: 'name', value: name }],
-    // Store Card erlaubt höchstens vier Felder in der Zeile unter dem Banner.
-    secondaryFields: secondaryFields.slice(0, 4),
-    auxiliaryFields: [],
-    backFields: [],
-  }
-}
-
-/** Empfänger: Name mit Foto, zwei Zeilen Kontaktdaten, Ort oben rechts — kein Code. */
-function holderStructure(name: string, contact: BusinessContact, company: BusinessCompany | null): PassStructure {
+/** Name mit Foto, zwei Zeilen Kontaktdaten, Ort oben rechts — für beide Rollen gleich. */
+function frontStructure(name: string, contact: BusinessContact, company: BusinessCompany | null): PassStructure {
   const headerFields: PassField[] = []
   if (company?.city) headerFields.push({ key: 'city', label: 'Ort', value: company.city })
 
@@ -205,8 +184,7 @@ export function buildBusinessPassJson(
   ctx: BuildBusinessPassContext,
 ): BusinessPassJson {
   const name = fullName(contact)
-  const structure =
-    ctx.role === 'OWNER' ? ownerStructure(name, contact, company) : holderStructure(name, contact, company)
+  const structure = frontStructure(name, contact, company)
   structure.backFields = backFields(contact, company, ctx)
 
   const pass: BusinessPassJson = {
@@ -220,7 +198,7 @@ export function buildBusinessPassJson(
     backgroundColor: toPassKitRgb(design.backgroundColor),
     foregroundColor: toPassKitRgb(design.foregroundColor),
     labelColor: toPassKitRgb(design.labelColor),
-    ...(ctx.role === 'OWNER' ? { storeCard: structure } : { generic: structure }),
+    generic: structure,
   }
 
   const title = design.cardTitle?.trim() || company?.company

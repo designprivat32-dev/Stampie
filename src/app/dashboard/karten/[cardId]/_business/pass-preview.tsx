@@ -9,8 +9,8 @@ import type { DraftCompany, DraftContact, DraftDesign } from './editor-state'
  * Live-Vorschau der Visitenkarte, wie sie im Wallet liegt — nachgebaut nach dem, was
  * `apple-pass-json.ts` und `google-generic.ts` ausliefern:
  *
- *   Apple, Aussteller  Banner (Name groß, Foto unten rechts), eine Zeile Felder, QR-Code
- *   Apple, Empfänger   Name mit Foto daneben, zwei Zeilen Kontaktdaten, Ort oben — kein Code
+ *   Apple              Name mit Foto daneben, zwei Zeilen Kontaktdaten, Ort oben;
+ *                      beim Aussteller unten der QR-Code, beim Empfänger kein Code
  *   Google             Titel, Name, Position; QR-Code nur beim Aussteller
  *
  * Eine Annäherung, kein Screenshot — Schriftgrößen und Abstände setzt Wallet selbst.
@@ -92,8 +92,7 @@ export function PassPreview({
   const photo = contact?.photoUrl ?? null
 
   if (platform === 'google') return <GooglePreview design={design} data={data} qr={qr} />
-  if (role === 'OWNER') return <AppleOwnerPreview design={design} data={data} qr={qr} photo={photo} companyPhone={companyPhone} />
-  return <AppleHolderPreview design={design} data={data} photo={photo} companyPhone={companyPhone} />
+  return <ApplePreview design={design} data={data} qr={qr} photo={photo} companyPhone={companyPhone} />
 }
 
 function Field({ label, value, color }: { label: string; value: string; color: string }) {
@@ -135,7 +134,7 @@ function AppleHeader({ design, title, right }: { design: DraftDesign; title: str
   )
 }
 
-function AppleOwnerPreview({
+function ApplePreview({
   design,
   data,
   qr,
@@ -144,60 +143,8 @@ function AppleOwnerPreview({
 }: {
   design: DraftDesign
   data: PreviewData
+  /** Nur beim Aussteller; der Empfänger bekommt keinen Code. */
   qr: string | null
-  photo: string | null
-  companyPhone: string | null
-}) {
-  const fg = design.foregroundColor
-  return (
-    <AppleShell design={design}>
-      <AppleHeader design={design} title={data.title} />
-      {/* Banner wie `render-strip.ts` (375×144): Name oben links, Foto unten rechts. */}
-      <div
-        className="relative aspect-[375/144] w-full shrink-0 overflow-hidden px-3 pt-[3%]"
-        style={{ backgroundImage: `linear-gradient(135deg, ${fg}1a, ${fg}00)` }}
-      >
-        <p className="relative z-10 truncate text-[29px] font-light leading-tight">{data.name}</p>
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={photo}
-            alt=""
-            className="absolute bottom-[7%] right-[4.5%] aspect-square h-[50%] rounded-full object-cover"
-            style={{ boxShadow: `0 0 0 2px ${fg}59` }}
-          />
-        ) : null}
-      </div>
-      <div className="grid shrink-0 grid-cols-3 gap-2 px-3 pt-2.5">
-        {fields([
-          ['Position', data.jobTitle],
-          ['Telefon', data.mobile ?? data.phone ?? companyPhone],
-          ['E-Mail', data.email],
-        ]).map(([l, v]) => (
-          <Field key={l} label={l} value={v} color={design.labelColor} />
-        ))}
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-end gap-1 pb-3">
-        {qr ? (
-          <div className="rounded-lg bg-white p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qr} alt="" className="size-[104px]" />
-          </div>
-        ) : null}
-        <span className="text-[10px] opacity-80">Scannen für meine Visitenkarte</span>
-      </div>
-    </AppleShell>
-  )
-}
-
-function AppleHolderPreview({
-  design,
-  data,
-  photo,
-  companyPhone,
-}: {
-  design: DraftDesign
-  data: PreviewData
   photo: string | null
   companyPhone: string | null
 }) {
@@ -219,7 +166,7 @@ function AppleHolderPreview({
         </div>
         {photo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="" className="size-[72px] shrink-0 rounded-md object-cover" />
+          <img src={photo} alt="" className="size-[72px] shrink-0 rounded-md object-contain" />
         ) : null}
       </div>
       <div className="grid shrink-0 grid-cols-3 gap-2 px-3 pt-5">
@@ -239,7 +186,17 @@ function AppleHolderPreview({
           <Field key={l} label={l} value={v} color={label} />
         ))}
       </div>
-      <div className="flex-1" />
+      <div className="flex flex-1 flex-col items-center justify-end gap-1 pb-3">
+        {qr ? (
+          <>
+            <div className="rounded-lg bg-white p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qr} alt="" className="size-[104px]" />
+            </div>
+            <span className="text-[10px] opacity-80">Scannen für meine Visitenkarte</span>
+          </>
+        ) : null}
+      </div>
     </AppleShell>
   )
 }
