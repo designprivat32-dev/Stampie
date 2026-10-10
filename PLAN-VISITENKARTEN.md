@@ -227,7 +227,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 |---|---|---|
 | 0 ✅ | Snapshot-Tests für bestehende Pässe, `kind`-Weichen explizit machen (Abschnitt 8.1/8.2) | Absicherung, kein sichtbarer Unterschied |
 | 1 ✅ | Schema additiv, `lib/business-cards/schema.ts`, `vcard.ts` + Tests | Daten stehen |
-| 2 | Apple-`generic`-Pass OWNER/HOLDER + Tests | Pass auf iPhone testbar |
+| 2 ✅ | Apple-`generic`-Pass OWNER/HOLDER + Tests | Pass auf iPhone testbar |
 | 3 | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
 | 4 | Google Generic Pass + Ausgabe | Android läuft |
 | 5 | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
@@ -257,6 +257,16 @@ und Gutschein jedes Mal mit testen).
 - `src/lib/business-cards/schema.ts` (Zod, Normalisierung, nur http/https-Links) und `vcard.ts`
   (vCard 3.0, Escaping, Faltung nach UTF-8-Bytes), Tests in `tests/business-card-vcard.test.ts`.
 - Kontaktfoto: `photoAssetId` ist vorbereitet, Upload und `AssetKind` folgen in Phase 5.
+
+### Stand Phase 2
+
+- `lib/business-cards/apple-pass-json.ts`: pass.json im Stil `generic`. Aussteller (OWNER) mit QR auf
+  `/v/<scanCode>`, Empfänger (HOLDER) ohne jeden Barcode. Weitergabe aus Wallet für beide gesperrt.
+- `lib/business-cards/apple-pass-builder.ts`: .pkpass mit Icon (Monogramm-Fallback), Logo, Foto als
+  `thumbnail.png`, Manifest, Signatur. Der Stempel-Builder ist unverändert.
+- Seriennummern `V-…`; `rebuildIssuedPass` gibt sie an `lib/business-cards/pass-rebuild.ts` weiter, damit
+  Apples Update-Abruf auch für Visitenkarten funktioniert.
+- Auf dem iPhone testbar erst mit Phase 3 — vorher stellt nichts einen Visitenkarten-Pass aus.
 
 ## 10. Datenschutz
 

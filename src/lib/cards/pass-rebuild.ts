@@ -5,6 +5,8 @@ import { getPassBuilder } from '@/lib/pass/mock-pass-builder'
 import { loadPassAssets } from './asset-service'
 import { loadOrCreateDraft, loadPublishedDesign } from './repository'
 import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
+import { isBusinessSerial } from '@/lib/business-cards/serial'
+import { rebuildBusinessPass } from '@/lib/business-cards/pass-rebuild'
 
 /**
  * Rebuilds an already-issued pass at its current stamp count.
@@ -18,10 +20,14 @@ import { ensureAppleAuthToken } from '@/lib/pass/apple-passkit-auth'
  * card still being set up — same rule the till uses, so a pass never shows a state the
  * counter disagrees with.
  *
- * Only stamp cards and coupons are built here; any other card kind resolves to null, the
- * same as an unknown serial, rather than being rendered as a stamp card.
+ * Only stamp cards and coupons are built here; business cards (`V-` serials) are handed to
+ * their own builder, and anything else resolves to null rather than being rendered as a
+ * stamp card.
  */
 export async function rebuildIssuedPass(serial: string): Promise<Buffer | null> {
+  // Visitenkarten haben ihren eigenen Bauweg; das Präfix der Seriennummer entscheidet.
+  if (isBusinessSerial(serial)) return rebuildBusinessPass(serial)
+
   const pass = await prisma.issuedPass.findFirst({
     where: { serial, ...loyaltyPassWhere() },
     select: {
