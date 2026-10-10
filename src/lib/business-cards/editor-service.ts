@@ -66,6 +66,7 @@ export async function loadBusinessEditor(cardId: string): Promise<BusinessEditor
         select: { company: true, website: true, phone: true, street: true, postalCode: true, city: true },
       },
       contacts: {
+        where: { deletedAt: null },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         select: {
           id: true,

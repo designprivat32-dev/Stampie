@@ -38,6 +38,7 @@ export interface BuildBusinessApplePassInput {
   assets: BusinessPassAssets
   /** Ohne Token kein `webServiceURL` — und damit keine Updates. */
   appleAuthToken?: string | null
+  voided?: boolean
 }
 
 function pushScaled(files: ZipEntry[], base: string, image: ScaledPng | null): void {
@@ -63,6 +64,7 @@ export async function buildBusinessApplePass(
     teamIdentifier: config.teamIdentifier,
     scanUrl: input.scanUrl,
     privacyUrl: input.privacyUrl,
+    voided: input.voided ?? false,
     webService: authenticationToken ? { url: applePassKitBaseUrl(), authenticationToken } : null,
   })
 

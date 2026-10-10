@@ -46,6 +46,8 @@ export interface BusinessPassJson {
   barcode?: PassBarcode
   barcodes?: PassBarcode[]
   sharingProhibited?: boolean
+  /** Person gelöscht: Wallet zeigt die Karte als ungültig an. */
+  voided?: boolean
   webServiceURL?: string
   authenticationToken?: string
 }
@@ -60,6 +62,8 @@ export interface BuildBusinessPassContext {
   /** Was der Pass speichert; steht auf jedem Pass. */
   privacyUrl: string
   webService?: { url: string; authenticationToken: string } | null
+  /** Die Person wurde gelöscht — Karte entwerten, Code entfernen. */
+  voided?: boolean
 }
 
 type DesignColors = Pick<
@@ -177,7 +181,14 @@ export function buildBusinessPassJson(
   const title = design.cardTitle?.trim() || company?.company
   if (title) pass.logoText = title
 
-  if (ctx.role === 'OWNER') {
+  if (ctx.voided) {
+    pass.voided = true
+    pass.generic.backFields.unshift({
+      key: 'voided',
+      label: 'Hinweis',
+      value: 'Diese Visitenkarte ist nicht mehr gültig.',
+    })
+  } else if (ctx.role === 'OWNER') {
     const barcode: PassBarcode = {
       format: 'PKBarcodeFormatQR',
       message: ctx.scanUrl,

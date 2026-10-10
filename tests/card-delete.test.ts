@@ -30,6 +30,10 @@ vi.mock('@/lib/auth/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/auth/session')>()),
   assertCardAccess: (...a: unknown[]) => assertCardAccess(...a),
 }))
+const deactivateBusinessCard = vi.fn()
+vi.mock('@/lib/business-cards/wallet-sync', () => ({
+  deactivateBusinessCard: (...a: unknown[]) => deactivateBusinessCard(...a),
+}))
 vi.mock('next/cache', () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }))
 vi.mock('@/lib/auth/reauth', () => ({
   assertPassword: (...a: unknown[]) => assertPassword(...a),
@@ -45,6 +49,7 @@ beforeEach(() => {
   assertCardAccess.mockResolvedValue({ cardId: CARD_ID })
   assertPassword.mockResolvedValue(undefined)
   cardDelete.mockResolvedValue({ id: CARD_ID })
+  deactivateBusinessCard.mockResolvedValue({})
 })
 
 describe('deleteCardAction', () => {
@@ -101,5 +106,27 @@ describe('deleteCardAction', () => {
     await deleteCardAction(CARD_ID, PASSWORT)
 
     expect(revalidatePath).toHaveBeenCalledWith('/dashboard/karten')
+  })
+
+  it('takes business card passes out of Google Wallet before deleting', async () => {
+    const order: string[] = []
+    deactivateBusinessCard.mockImplementation(async () => order.push('deactivate'))
+    cardDelete.mockImplementation(async () => order.push('delete'))
+
+    await deleteCardAction(CARD_ID, PASSWORT)
+
+    expect(deactivateBusinessCard).toHaveBeenCalledWith(CARD_ID)
+    expect(order).toEqual(['deactivate', 'delete'])
+  })
+
+  it('still deletes when the deactivation fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    deactivateBusinessCard.mockRejectedValue(new Error('google down'))
+
+    const result = await deleteCardAction(CARD_ID, PASSWORT)
+
+    expect(result.success).toBe(true)
+    expect(cardDelete).toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

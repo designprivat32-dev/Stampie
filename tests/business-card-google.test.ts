@@ -73,6 +73,12 @@ describe('buildBusinessGenericObject', () => {
     expect(holder).not.toHaveProperty('barcode')
   })
 
+  it('deactivates the object of a deleted person and drops the code', () => {
+    const o = buildBusinessGenericObject(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER', voided: true }))
+    expect(o.state).toBe('INACTIVE')
+    expect(o).not.toHaveProperty('barcode')
+  })
+
   it('makes phone, mail, web and links tappable', () => {
     const uris = buildBusinessGenericObject(DEFAULT_CARD_DESIGN, contact(), company(), ctx()).linksModuleData.uris
     const byId = Object.fromEntries(uris.map((u) => [u.id, u]))

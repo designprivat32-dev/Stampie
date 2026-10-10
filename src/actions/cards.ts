@@ -11,6 +11,7 @@ import { designToRow } from '@/lib/cards/repository'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import { getTemplate, templateAsDesign } from '@/lib/cards/templates'
 import { CREATABLE_CARD_KINDS } from '@/lib/cards/kind'
+import { deactivateBusinessCard } from '@/lib/business-cards/wallet-sync'
 
 /**
  * Card lifecycle: list, create, assign, delete.
@@ -176,6 +177,15 @@ export async function deleteCardAction(
     // After the tenancy check, so a wrong password never doubles as a way to probe which
     // card ids exist.
     await assertPassword(password, 'card-delete')
+
+    // Eine Visitenkarte nimmt ihre Google-Pässe vorher aus dem Verkehr; sonst stünden dort
+    // weiter gültig wirkende Kontaktdaten. Scheitert das, wird trotzdem gelöscht.
+    try {
+      await deactivateBusinessCard(parsed.data.cardId)
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[card-delete] business card deactivation failed', error)
+    }
 
     await prisma.card.delete({ where: { id: parsed.data.cardId } })
 

@@ -44,6 +44,7 @@ const businessPass = {
     email: null,
     links: [],
     scanCode: 'code123',
+    deletedAt: null,
   },
   card: { businessCompany: null },
 }
@@ -98,6 +99,15 @@ describe('rebuildIssuedPass dispatch', () => {
     passFindFirst.mockResolvedValue(null)
     expect(await rebuildIssuedPass('V-WEG')).toBeNull()
     expect(buildBusinessApplePass).not.toHaveBeenCalled()
+  })
+
+  it('builds a voided pass once the person is deleted', async () => {
+    passFindFirst.mockResolvedValue({
+      ...businessPass,
+      contact: { ...businessPass.contact, deletedAt: new Date() },
+    })
+    await rebuildIssuedPass('V-ABC')
+    expect(buildBusinessApplePass.mock.calls[0]![0].voided).toBe(true)
   })
 
   it('builds nothing for a business pass without a person', async () => {

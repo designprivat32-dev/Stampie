@@ -36,6 +36,7 @@ export interface BusinessGoogleInput {
   serial: string
   scanUrl: string
   privacyUrl: string
+  voided?: boolean
 }
 
 const FALLBACK_ISSUER_ID = '3388000000022000000'
@@ -118,6 +119,7 @@ export async function syncBusinessGoogleObjects(
           scanUrl: input.scanUrl,
           privacyUrl: input.privacyUrl,
           logoUrl: walletLogoUrl(base, input.cardId, input.design),
+          voided: input.voided ?? false,
         })
         const id = businessObjectId(credentials.issuerId, input.serial)
         try {

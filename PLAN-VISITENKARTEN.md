@@ -231,7 +231,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 | 3 ✅ | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
 | 4 ✅ | Google Generic Pass + Ausgabe | Android läuft |
 | 5 ✅ | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
-| 6 | Updates/Löschen an alle Pässe, Statistik im Dashboard | fertig |
+| 6 ✅ | Updates/Löschen an alle Pässe, Statistik im Dashboard | fertig |
 | 7 | Datenschutztext, Rate-Limits, Review, „Visitenkarte“ im Dialog freischalten | live |
 
 Jede Phase: `npm run typecheck`, `npm test`, nach `main` mergen, auf Vercel-Production prüfen (Stempelkarte
@@ -299,6 +299,16 @@ und Gutschein jedes Mal mit testen).
 - `lib/business-cards/wallet-sync.ts`: nach Speichern im Editor Apple-Push **und** Google-Objekte
   überschreiben (404 = nie bei Google gespeichert, kein Fehler).
 - Logo-Fallback ohne hochgeladenes Logo: neutraler Stern statt Kaffeebecher (wie beim Gutschein).
+
+### Stand Phase 6
+
+- Person löschen = weich (`BusinessContact.deletedAt`): Scan-Seite und Aussteller-Link sind sofort tot,
+  Apple-Pässe werden per Push als `voided` ausgeliefert (mit Hinweis), Google-Objekte `INACTIVE`, QR entfernt.
+- Karte löschen: vorher werden Google-Objekte der Visitenkarte deaktiviert; Apple-Pässe frieren ein wie bei
+  Stempelkarten (ein Push nach dem Löschen käme ins Leere). Fehler dabei verhindern das Löschen nicht.
+- „QR-Code der Karte erneuern" je Person: neuer Scan-Code, alte Links tot, Pässe ziehen nach.
+- Statistik je Person steht seit Phase 5 im Editor.
+- Offen: Aufräumen weich gelöschter Personen nach einer Frist; Foto-Upload.
 
 ## 10. Datenschutz
 

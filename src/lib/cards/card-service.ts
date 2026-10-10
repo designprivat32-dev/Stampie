@@ -91,7 +91,7 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
       id: true,
       name: true,
       kind: true,
-      _count: { select: { contacts: true } },
+      _count: { select: { contacts: { where: { deletedAt: null } } } },
       orgId: true,
       createdAt: true,
       org: { select: { name: true, latitude: true, longitude: true } },

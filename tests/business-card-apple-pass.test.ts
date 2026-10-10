@@ -146,6 +146,17 @@ describe('buildBusinessPassJson', () => {
     expect(p.authenticationToken).toBe('t')
   })
 
+  it('voids the pass of a deleted person and drops the code', () => {
+    const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER', voided: true }))
+    expect(p.voided).toBe(true)
+    expect(p).not.toHaveProperty('barcode')
+    expect(p.generic.backFields[0]).toMatchObject({ key: 'voided', value: 'Diese Visitenkarte ist nicht mehr gültig.' })
+  })
+
+  it('leaves live passes unvoided', () => {
+    expect(buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx())).not.toHaveProperty('voided')
+  })
+
   it('uses the card title as logo text, else the company', () => {
     expect(buildBusinessPassJson({ ...DEFAULT_CARD_DESIGN, cardTitle: 'NL' }, contact(), company(), ctx()).logoText).toBe('NL')
     expect(buildBusinessPassJson({ ...DEFAULT_CARD_DESIGN, cardTitle: '' }, contact(), company(), ctx()).logoText).toBe('Nordlicht GmbH')

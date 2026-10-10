@@ -35,7 +35,7 @@ async function assertBusinessCardAccess(cardId: string): Promise<CardAccess> {
 
 async function assertContactAccess(contactId: string): Promise<{ cardId: string; access: CardAccess }> {
   const contact = await prisma.businessContact.findFirst({
-    where: { id: contactId },
+    where: { id: contactId, deletedAt: null },
     select: { cardId: true },
   })
   if (!contact) throw new CardAccessError('Person nicht gefunden.')
@@ -175,10 +175,11 @@ export async function updateContactAction(input: unknown): Promise<ActionResult<
 }
 
 /**
- * Entfernt eine Person samt ihrer Pässe.
+ * Entfernt eine Person aus der Karte.
  *
- * Die Pässe in fremden Wallets bleiben dort liegen, bekommen aber keine Updates mehr —
- * sie sauber als ungültig zu markieren kommt mit Phase 6.
+ * Weich gelöscht: die Zeile bleibt mit `deletedAt`, damit die Pässe in fremden Wallets noch
+ * einmal abgerufen werden können — Apple zeigt sie dann als ungültig, Google deaktiviert
+ * sie. Scan-Seite und Aussteller-Link funktionieren ab sofort nicht mehr.
  */
 export async function deleteContactAction(contactId: string): Promise<ActionResult<null>> {
   return guarded(async () => {
@@ -186,7 +187,35 @@ export async function deleteContactAction(contactId: string): Promise<ActionResu
     if (!parsed.success) return fail('Ungültige Person.', 'validation')
     const { cardId } = await assertContactAccess(parsed.data)
 
-    await prisma.businessContact.delete({ where: { id: parsed.data } })
+    await prisma.businessContact.update({
+      where: { id: parsed.data },
+      data: { deletedAt: new Date(), ownerClaimToken: null },
+    })
+    await pushQuietly(() => syncBusinessContact(parsed.data))
+
+    revalidate(cardId)
+    return ok(null)
+  })
+}
+
+/**
+ * Neuer QR-Code für eine Person — etwa wenn der alte irgendwo kursiert, wo er nicht hin soll.
+ *
+ * Alte Links auf die Scan-Seite funktionieren danach nicht mehr. Die Pässe der Person
+ * werden nachgezogen: der Aussteller-Pass zeigt den neuen Code, und Empfänger behalten ihre
+ * Karte, nur der Datenschutz-Link darauf wandert mit.
+ */
+export async function renewScanCodeAction(contactId: string): Promise<ActionResult<null>> {
+  return guarded(async () => {
+    const parsed = z.string().cuid().safeParse(contactId)
+    if (!parsed.success) return fail('Ungültige Person.', 'validation')
+    const { cardId } = await assertContactAccess(parsed.data)
+
+    await prisma.businessContact.update({
+      where: { id: parsed.data },
+      data: { scanCode: newScanCode() },
+    })
+    await pushQuietly(() => syncBusinessContact(parsed.data))
 
     revalidate(cardId)
     return ok(null)

@@ -35,6 +35,7 @@ export async function rebuildBusinessPass(serial: string): Promise<Buffer | null
           email: true,
           links: true,
           scanCode: true,
+          deletedAt: true,
         },
       },
       card: {
@@ -73,5 +74,6 @@ export async function rebuildBusinessPass(serial: string): Promise<Buffer | null
     // Das Foto kommt mit dem Upload in Phase 5.
     assets: { icon: assets.icon, logo: assets.logo, photo: null },
     appleAuthToken,
+    voided: pass.contact.deletedAt !== null,
   })
 }

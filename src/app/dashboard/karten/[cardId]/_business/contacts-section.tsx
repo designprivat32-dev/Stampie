@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { deleteContactAction, renewOwnerLinkAction } from '@/actions/business-cards'
+import { deleteContactAction, renewOwnerLinkAction, renewScanCodeAction } from '@/actions/business-cards'
 import type { EditorContact } from '@/lib/business-cards/editor-service'
 import { ContactDialog } from './contact-dialog'
 import { EditorSection } from './editor-section'
@@ -109,8 +109,24 @@ function WalletLinkDialog({ contact, onClose }: { contact: EditorContact | null;
   const router = useRouter()
   const [copied, setCopied] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  const [confirmCode, setConfirmCode] = React.useState(false)
 
-  React.useEffect(() => setCopied(false), [contact])
+  React.useEffect(() => {
+    setCopied(false)
+    setConfirmCode(false)
+  }, [contact])
+
+  const renewCode = async () => {
+    if (!contact) return
+    setBusy(true)
+    try {
+      await renewScanCodeAction(contact.id)
+      router.refresh()
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const copy = async (url: string) => {
     try {
@@ -163,12 +179,29 @@ function WalletLinkDialog({ contact, onClose }: { contact: EditorContact | null;
         )}
 
         {contact ? (
-          <p className="text-[12px] text-ink-3">
-            Öffentliche Seite, die der QR-Code auf der Karte öffnet:{' '}
-            <a href={contact.scanUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">
-              ansehen <ExternalLink className="size-3" />
-            </a>
-          </p>
+          <div className="space-y-2 border-t border-line pt-3 text-[12px] text-ink-3">
+            <p>
+              Öffentliche Seite, die der QR-Code auf der Karte öffnet:{' '}
+              <a href={contact.scanUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">
+                ansehen <ExternalLink className="size-3" />
+              </a>
+            </p>
+            {confirmCode ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-md bg-warn-soft px-2.5 py-2 text-warn-ink">
+                <span className="flex-1">
+                  Der alte QR-Code funktioniert danach nicht mehr. Die Karte der Person zeigt den neuen von selbst.
+                </span>
+                <Button variant="danger" size="sm" disabled={busy} onClick={() => void renewCode()}>
+                  {busy ? <Spinner /> : null}
+                  Erneuern
+                </Button>
+              </div>
+            ) : (
+              <button type="button" className="underline" onClick={() => setConfirmCode(true)}>
+                QR-Code der Karte erneuern
+              </button>
+            )}
+          </div>
         ) : null}
 
         <DialogFooter>
@@ -219,7 +252,7 @@ function DeleteContactDialog({ contact, onClose }: { contact: EditorContact | nu
           <DialogDescription>
             Der QR-Code funktioniert danach nicht mehr.
             {holders > 0
-              ? ` ${holders} ${holders === 1 ? 'Karte liegt' : 'Karten liegen'} bereits in fremden Wallets und bekommen keine Updates mehr.`
+              ? ` ${holders} ${holders === 1 ? 'Karte in fremden Wallets wird' : 'Karten in fremden Wallets werden'} als ungültig markiert.`
               : ''}
           </DialogDescription>
         </DialogHeader>

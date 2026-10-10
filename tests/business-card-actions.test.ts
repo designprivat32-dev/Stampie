@@ -195,10 +195,28 @@ describe('contacts', () => {
     expect(contactUpdate.mock.calls[0]![0].data.ownerClaimToken).toMatch(/^[A-Za-z0-9_-]{32,}$/)
   })
 
-  it('deletes a person', async () => {
+  it('soft-deletes a person and voids their passes', async () => {
     const result = await deleteContactAction(CONTACT)
     expect(result.success).toBe(true)
-    expect(contactDelete).toHaveBeenCalledWith({ where: { id: CONTACT } })
+    expect(contactDelete).not.toHaveBeenCalled()
+    const update = contactUpdate.mock.calls[0]![0]
+    expect(update.where).toEqual({ id: CONTACT })
+    expect(update.data.deletedAt).toBeInstanceOf(Date)
+    expect(update.data.ownerClaimToken).toBeNull()
+    expect(pushForPasses).toHaveBeenCalledWith(CONTACT)
+  })
+
+  it('ignores people that are already deleted', async () => {
+    await deleteContactAction(CONTACT)
+    expect(contactFindFirst.mock.calls[0]![0].where).toEqual({ id: CONTACT, deletedAt: null })
+  })
+
+  it('renews the scan code and updates the passes', async () => {
+    const { renewScanCodeAction } = await import('@/actions/business-cards')
+    const result = await renewScanCodeAction(CONTACT)
+    expect(result.success).toBe(true)
+    expect(contactUpdate.mock.calls[0]![0].data.scanCode).toMatch(/^[A-Za-z0-9_-]{16,}$/)
+    expect(pushForPasses).toHaveBeenCalledWith(CONTACT)
   })
 
   it('reports a missing person as not found', async () => {

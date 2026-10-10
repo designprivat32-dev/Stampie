@@ -90,6 +90,7 @@ describe('resolveScanCode', () => {
     await resolveScanCode(CODE)
     expect(contactFindFirst.mock.calls[0]![0].where).toEqual({
       scanCode: CODE,
+      deletedAt: null,
       card: { kind: 'BUSINESS_CARD' },
     })
   })
@@ -115,6 +116,7 @@ describe('resolveOwnerClaim', () => {
     await resolveOwnerClaim(CODE)
     expect(contactFindFirst.mock.calls[0]![0].where).toEqual({
       ownerClaimToken: CODE,
+      deletedAt: null,
       card: { kind: 'BUSINESS_CARD' },
     })
   })

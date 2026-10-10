@@ -657,6 +657,11 @@ model BusinessContact {
   ownerClaimToken String?
 
   sortOrder Int      @default(0)
+  /// Gesetzt, wenn die Person im Dashboard gelöscht wurde. Die Zeile bleibt, damit ihre
+  /// Pässe in fremden Wallets noch einmal abgerufen werden können — als ungültig markiert.
+  /// Ein hartes Löschen hätte sie auf ihrem letzten Stand eingefroren, mit gültig wirkenden
+  /// Kontaktdaten.
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

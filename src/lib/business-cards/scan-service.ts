@@ -110,7 +110,7 @@ async function resolve(row: ContactWithCard | null): Promise<ResolvedBusinessCar
 export async function resolveScanCode(code: string): Promise<ResolvedBusinessCard | null> {
   if (!isPlausibleCode(code)) return null
   const row = await prisma.businessContact.findFirst({
-    where: { scanCode: code, card: { kind: 'BUSINESS_CARD' } },
+    where: { scanCode: code, deletedAt: null, card: { kind: 'BUSINESS_CARD' } },
     select: contactSelect,
   })
   return resolve(row)
@@ -120,7 +120,7 @@ export async function resolveScanCode(code: string): Promise<ResolvedBusinessCar
 export async function resolveOwnerClaim(token: string): Promise<ResolvedBusinessCard | null> {
   if (!isPlausibleCode(token)) return null
   const row = await prisma.businessContact.findFirst({
-    where: { ownerClaimToken: token, card: { kind: 'BUSINESS_CARD' } },
+    where: { ownerClaimToken: token, deletedAt: null, card: { kind: 'BUSINESS_CARD' } },
     select: contactSelect,
   })
   return resolve(row)

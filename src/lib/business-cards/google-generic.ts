@@ -47,6 +47,8 @@ export interface BusinessGoogleContext {
   scanUrl: string
   privacyUrl: string
   logoUrl: string
+  /** Die Person wurde gelöscht — Objekt deaktivieren, Code entfernen. */
+  voided?: boolean
 }
 
 function text(value: string): LocalizedString {
@@ -105,7 +107,7 @@ export function buildBusinessGenericObject(
   const object: GenericObject = {
     id: businessObjectId(ctx.issuerId, ctx.serial),
     classId: businessClassId(ctx.issuerId, ctx.cardId),
-    state: 'ACTIVE',
+    state: ctx.voided ? 'INACTIVE' : 'ACTIVE',
     cardTitle: text(title),
     header: text(name),
     logo: {
@@ -119,7 +121,7 @@ export function buildBusinessGenericObject(
 
   if (contact.jobTitle) object.subheader = text(contact.jobTitle)
 
-  if (ctx.role === 'OWNER') {
+  if (ctx.role === 'OWNER' && !ctx.voided) {
     object.barcode = {
       type: 'QR_CODE',
       value: ctx.scanUrl,
