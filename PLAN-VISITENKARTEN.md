@@ -228,7 +228,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 | 0 ✅ | Snapshot-Tests für bestehende Pässe, `kind`-Weichen explizit machen (Abschnitt 8.1/8.2) | Absicherung, kein sichtbarer Unterschied |
 | 1 ✅ | Schema additiv, `lib/business-cards/schema.ts`, `vcard.ts` + Tests | Daten stehen |
 | 2 ✅ | Apple-`generic`-Pass OWNER/HOLDER + Tests | Pass auf iPhone testbar |
-| 3 | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
+| 3 ✅ | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
 | 4 | Google Generic Pass + Ausgabe | Android läuft |
 | 5 | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
 | 6 | Updates/Löschen an alle Pässe, Statistik im Dashboard | fertig |
@@ -267,6 +267,18 @@ und Gutschein jedes Mal mit testen).
 - Seriennummern `V-…`; `rebuildIssuedPass` gibt sie an `lib/business-cards/pass-rebuild.ts` weiter, damit
   Apples Update-Abruf auch für Visitenkarten funktioniert.
 - Auf dem iPhone testbar erst mit Phase 3 — vorher stellt nichts einen Visitenkarten-Pass aus.
+
+### Stand Phase 3
+
+- `/v/<scanCode>`: Vorschau, „Zu Apple Wallet" (iPhone/unbekannt), „Kontakt speichern" (immer), direkte
+  Links zum Anrufen/Schreiben, Impressum, Datenschutz. Android bekommt Google Wallet in Phase 4.
+- `/v/claim/<token>`: Seite für die Person selbst; der Knopf holt den Aussteller-Pass. Wiederholbar —
+  derselbe Link liefert denselben Pass. Neuer Link im Dashboard macht den alten ungültig (Phase 5).
+- APIs: `/api/v/<code>/apple`, `/api/v/<code>/vcard`, `/api/v/claim/<token>`, alle mit Rate-Limit.
+- Abweichung vom Plan: **keine Wiedererkennung** des Empfänger-Geräts. Ein doppelter Empfänger-Pass ist
+  harmlos; dafür entfällt die Einwilligung nach § 25 TDDDG und es wird nichts auf dem Gerät abgelegt.
+- Eigene Datenschutzseite `/v/<code>/datenschutz` (`components/business-card-privacy-notice.tsx`).
+- Statistik: VIEWED beim Seitenaufruf, WALLET_ADDED, CONTACT_SAVED.
 
 ## 10. Datenschutz
 

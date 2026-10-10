@@ -195,3 +195,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </section>
   )
 }
+
+/** Derselbe Abschnitt für andere Datenschutzseiten, damit alle gleich aussehen. */
+export const PrivacySection = Section
