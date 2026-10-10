@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
+import { loyaltyCardWhere } from '@/lib/cards/kind'
 import { requireAppUser } from '@/lib/auth/app-session'
 import { deliverCardMessage, MESSAGE_MAX_LENGTH } from '@/lib/cards/message-service'
 import {
@@ -90,7 +91,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!appUser) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
 
   const cards = await prisma.card.findMany({
-    where: { orgId: appUser.orgId },
+    where: { orgId: appUser.orgId, ...loyaltyCardWhere() },
     select: { id: true, name: true },
   })
   const cardIds = cards.map((c) => c.id)
@@ -198,7 +199,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // Mandantentrennung: nur eigene Karten — sonst schriebe ein Betrieb fremde Kunden an.
   const card = await prisma.card.findFirst({
-    where: { id: parsed.data.cardId, orgId: appUser.orgId },
+    where: { id: parsed.data.cardId, orgId: appUser.orgId, ...loyaltyCardWhere() },
     select: { id: true },
   })
   if (!card) {
