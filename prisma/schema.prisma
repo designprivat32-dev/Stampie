@@ -181,6 +181,7 @@ model Card {
 
   messages  CardMessage[]
   reminders CardReminder[]
+  monthly   CardMonthlyMessage[]
 
   @@index([orgId])
   @@index([nfcCode])
@@ -227,9 +228,56 @@ model CardMessage {
   createdAt DateTime @default(now())
   createdBy String
 
+  /// Gesetzt, wenn diese Zeile vom monatlichen Automatismus erzeugt wurde.
+  ///
+  /// Trennt „der Betrieb hat selbst geschrieben" von „der Monatslauf hat geschickt". Ohne
+  /// das würde der automatische Versand das Monatskontingent für die spontane Nachricht
+  /// aufbrauchen — der Betrieb käme nie mehr dazu, selbst etwas zu schicken.
+  monthlyMessageId String?
+
   /// Der Lauf sucht genau danach: fällig und noch nicht raus.
   @@index([sentAt, scheduledFor])
   @@index([cardId, createdAt])
+}
+
+/// Die monatliche Nachricht an alle Karteninhaber — einmal eingerichtet, läuft von selbst.
+///
+/// Unterschied zu `CardReminder`: Die Erinnerung geht an den Einzelnen, der weggeblieben
+/// ist, und hört auf, sobald er wiederkommt. Diese hier geht jeden Monat an alle, die die
+/// Karte im Wallet haben, unabhängig davon, wann sie zuletzt da waren.
+///
+/// Je Karte höchstens eine. „Jeden Monat zweimal" ist keine Einstellung, die ein Betrieb
+/// treffen können soll: eine Stempelkarte, die zu oft meldet, fliegt aus dem Wallet.
+model CardMonthlyMessage {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  /// Nur Google zeigt eine Überschrift. Bei Apple ist der Text alles, was ankommt.
+  headline String?
+  body     String
+
+  /// Tag im Monat, an dem sie rausgeht.
+  ///
+  /// Höchstens 28, weil es nur diese Tage in jedem Monat gibt. Mit 31 wäre der Februar
+  /// eine stille Ausnahme, über die irgendwann jemand stolpert.
+  dayOfMonth Int @default(1)
+
+  enabled Boolean @default(true)
+
+  /// Wann sie das nächste Mal fällig ist. Der Lauf sucht genau danach.
+  ///
+  /// Eine Uhrzeit steht hier bewusst nicht: Der Versandlauf wird von außen angestoßen und
+  /// trifft die Stunde nicht zuverlässig — eine Uhrzeit anzubieten wäre ein Versprechen,
+  /// das der Zeitplan nicht halten kann. Fällig ist der Tag, nicht die Minute.
+  nextSendAt DateTime
+  lastSentAt DateTime?
+
+  createdAt DateTime @default(now())
+  createdBy String
+
+  @@index([enabled, nextSendAt])
+  @@index([cardId])
 }
 
 /// Wiederkehrende Inaktivitäts-Erinnerung — pro Kunde, nicht an alle.
