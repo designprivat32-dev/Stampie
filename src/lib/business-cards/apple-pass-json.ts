@@ -18,10 +18,12 @@ import type { BusinessCompany, BusinessContact } from './schema'
  *     Zeile mit Position, Telefon, E-Mail (Store Card erlaubt höchstens vier Felder), unten
  *     der QR-Code zur Scan-Seite — wer ihn scannt, bekommt die Karte ins Wallet.
  *
- *   Empfänger (HOLDER) — `generic`, **ohne Code** (ausdrücklich gewünscht)
- *     Foto als `thumbnail.png` neben dem Namen, darunter zwei Zeilen Kontaktdaten und oben
- *     rechts der Ort — so viele Felder, wie Apple vorne zulässt, damit die Karte voll wirkt.
- *     Ein Banner gibt es in diesem Stil nicht.
+ *   Empfänger (HOLDER) — `eventTicket`, **ohne Code** (ausdrücklich gewünscht)
+ *     Foto als `thumbnail.png` neben dem Namen, darunter drei Zeilen Kontaktdaten und oben
+ *     rechts der Ort. `eventTicket` ist der einzige Stil, in dem Apple eine zweite Zeile
+ *     Zusatzfelder erlaubt (`row: 1`, seit iOS 12) — `generic` hatte nur zwei Zeilen, und
+ *     unten blieb Platz frei. Preis dafür: der kleine Ticket-Ausschnitt oben, den Wallet bei
+ *     Eintrittskarten zeichnet. Ältere iOS-Versionen zeigen die Zusatzfelder in einer Zeile.
  *
  * Auf der Rückseite stehen bei beiden alle Kontaktwege, Adresse, Links und der Datenschutz.
  */
@@ -36,12 +38,15 @@ export interface BusinessBarcode {
   altText?: string
 }
 
+/** `row` gibt es nur bei Zusatzfeldern einer Eintrittskarte: 1 = zweite Zeile. */
+export type BusinessPassField = PassField & { row?: 0 | 1 }
+
 export interface PassStructure {
-  headerFields: PassField[]
-  primaryFields: PassField[]
-  secondaryFields: PassField[]
-  auxiliaryFields: PassField[]
-  backFields: PassField[]
+  headerFields: BusinessPassField[]
+  primaryFields: BusinessPassField[]
+  secondaryFields: BusinessPassField[]
+  auxiliaryFields: BusinessPassField[]
+  backFields: BusinessPassField[]
 }
 
 export interface BusinessPassJson {
@@ -56,7 +61,7 @@ export interface BusinessPassJson {
   labelColor: string
   /** Genau einer von beiden ist gesetzt — der Schlüssel ist der Stil. */
   storeCard?: PassStructure
-  generic?: PassStructure
+  eventTicket?: PassStructure
   logoText?: string
   /** Nur am Aussteller-Pass, und nicht nach dem Entwerten. */
   barcode?: BusinessBarcode
@@ -174,26 +179,42 @@ function ownerStructure(name: string, contact: BusinessContact, company: Busines
   }
 }
 
-/** Empfänger: Name mit Foto, zwei Zeilen Kontaktdaten, Ort oben rechts — kein Code. */
+/**
+ * Empfänger: Name mit Foto, drei Zeilen Kontaktdaten, Ort oben rechts — kein Code.
+ * Höchstens drei Felder je Zeile: bei vier werden E-Mail und Nummern abgeschnitten.
+ */
 function holderStructure(name: string, contact: BusinessContact, company: BusinessCompany | null): PassStructure {
-  const headerFields: PassField[] = []
+  const headerFields: BusinessPassField[] = []
   if (company?.city) headerFields.push({ key: 'city', label: 'Ort', value: company.city })
 
-  const secondaryFields: PassField[] = []
+  const secondaryFields: BusinessPassField[] = []
   if (company) secondaryFields.push({ key: 'company', label: 'Firma', value: company.company })
   const phone = contact.phone ?? company?.phone ?? null
   if (phone) secondaryFields.push({ key: 'front-phone', label: 'Telefon', value: phone })
   if (contact.mobile) secondaryFields.push({ key: 'front-mobile', label: 'Mobil', value: contact.mobile })
 
-  const auxiliaryFields: PassField[] = []
-  if (contact.email) auxiliaryFields.push({ key: 'front-email', label: 'E-Mail', value: contact.email })
-  if (company?.website) auxiliaryFields.push({ key: 'front-web', label: 'Web', value: displayUrl(company.website) })
+  // Zeile 1 der Zusatzfelder: die längeren Werte, nur zwei nebeneinander.
+  const firstRow: BusinessPassField[] = []
+  if (contact.email) firstRow.push({ key: 'front-email', label: 'E-Mail', value: contact.email, row: 0 })
+  if (company?.website) firstRow.push({ key: 'front-web', label: 'Web', value: displayUrl(company.website), row: 0 })
+
+  // Zeile 2: Anschrift, Zentrale (wenn es nicht die eigene Nummer ist), erster Link.
+  const secondRow: BusinessPassField[] = []
+  const street = company?.street ?? null
+  const postal = [company?.postalCode, company?.city].filter(Boolean).join(' ')
+  const address = [street, postal].filter(Boolean).join(', ')
+  if (street) secondRow.push({ key: 'front-address', label: 'Adresse', value: address, row: 1 })
+  if (company?.phone && company.phone !== phone) {
+    secondRow.push({ key: 'front-company-phone', label: 'Zentrale', value: company.phone, row: 1 })
+  }
+  const link = contact.links[0]
+  if (link) secondRow.push({ key: 'front-link', label: link.label, value: displayUrl(link.url), row: 1 })
 
   return {
     headerFields: headerFields.slice(0, 3),
     primaryFields: [{ key: 'name', label: contact.jobTitle ?? 'Visitenkarte', value: name }],
-    secondaryFields: secondaryFields.slice(0, 4),
-    auxiliaryFields: auxiliaryFields.slice(0, 4),
+    secondaryFields: secondaryFields.slice(0, 3),
+    auxiliaryFields: [...firstRow.slice(0, 3), ...secondRow.slice(0, 3)],
     backFields: [],
   }
 }
@@ -220,7 +241,7 @@ export function buildBusinessPassJson(
     backgroundColor: toPassKitRgb(design.backgroundColor),
     foregroundColor: toPassKitRgb(design.foregroundColor),
     labelColor: toPassKitRgb(design.labelColor),
-    ...(ctx.role === 'OWNER' ? { storeCard: structure } : { generic: structure }),
+    ...(ctx.role === 'OWNER' ? { storeCard: structure } : { eventTicket: structure }),
   }
 
   const title = design.cardTitle?.trim() || company?.company

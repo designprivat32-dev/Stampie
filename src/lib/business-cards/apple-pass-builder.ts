@@ -89,7 +89,7 @@ export async function buildBusinessApplePass(
     })
     pushScaled(files, 'strip', strip)
   } else {
-    // Generic: das Foto steht neben dem Namen; ein Banner gibt es in diesem Stil nicht.
+    // Eintrittskarte: das Foto steht neben dem Namen; ohne Banner, damit es angezeigt wird.
     pushScaled(files, 'thumbnail', photo)
   }
 

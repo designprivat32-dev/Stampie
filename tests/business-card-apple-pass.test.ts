@@ -50,8 +50,8 @@ const ctx = (over: Partial<BuildBusinessPassContext> = {}): BuildBusinessPassCon
 
 /** Der Stil ist je Rolle ein anderer; die Felder liegen unter dem jeweiligen Schlüssel. */
 function structureOf(p: ReturnType<typeof buildBusinessPassJson>) {
-  const s = p.storeCard ?? p.generic
-  if (!s) throw new Error('pass has neither storeCard nor generic')
+  const s = p.storeCard ?? p.eventTicket
+  if (!s) throw new Error('pass has neither storeCard nor eventTicket')
   return s
 }
 
@@ -59,7 +59,7 @@ describe('buildBusinessPassJson', () => {
   it('gives the owner a store card, so the banner fills the card', () => {
     const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'OWNER' }))
     expect(p.storeCard).toBeDefined()
-    expect(p).not.toHaveProperty('generic')
+    expect(p).not.toHaveProperty('eventTicket')
     expect(p).not.toHaveProperty('coupon')
     expect(p.description).toBe('Visitenkarte Anna Schmidt')
     expect(p.organizationName).toBe('Nordlicht GmbH')
@@ -81,9 +81,9 @@ describe('buildBusinessPassJson', () => {
     expect(p.barcode!.messageEncoding).toBe('iso-8859-1')
   })
 
-  it('gives the recipient a generic card without any code', () => {
+  it('gives the recipient an event ticket without any code', () => {
     const p = buildBusinessPassJson(DEFAULT_CARD_DESIGN, contact(), company(), ctx({ role: 'HOLDER' }))
-    expect(p.generic).toBeDefined()
+    expect(p.eventTicket).toBeDefined()
     expect(p).not.toHaveProperty('storeCard')
     expect(p).not.toHaveProperty('barcode')
     expect(p).not.toHaveProperty('barcodes')
@@ -99,9 +99,12 @@ describe('buildBusinessPassJson', () => {
       ['Telefon', '+49 40 123456'],
       ['Mobil', '+49 170 1234567'],
     ])
-    expect(s.auxiliaryFields.map((f) => [f.label, f.value])).toEqual([
-      ['E-Mail', 'anna@example.de'],
-      ['Web', 'nordlicht.example'],
+    expect(s.auxiliaryFields.map((f) => [f.row, f.label, f.value])).toEqual([
+      [0, 'E-Mail', 'anna@example.de'],
+      [0, 'Web', 'nordlicht.example'],
+      [1, 'Adresse', 'Hafenstraße 5, 20457 Hamburg'],
+      [1, 'Zentrale', '+49 40 100'],
+      [1, 'LinkedIn', 'linkedin.com/in/anna'],
     ])
   })
 
@@ -310,7 +313,7 @@ describe('buildBusinessApplePass', () => {
     const pass = JSON.parse(readZipEntry(zip, 'pass.json')!.toString('utf8'))
     expect(pass.webServiceURL).toBeUndefined()
     expect(pass.barcode).toBeUndefined()
-    expect(pass.generic).toBeDefined()
+    expect(pass.eventTicket).toBeDefined()
     expect(readZipEntry(zip, 'signature')).toBeNull()
   })
 

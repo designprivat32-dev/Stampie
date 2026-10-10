@@ -10,7 +10,8 @@ import type { DraftCompany, DraftContact, DraftDesign } from './editor-state'
  * `apple-pass-json.ts` und `google-generic.ts` ausliefern:
  *
  *   Apple, Aussteller  Banner (Name groß, Foto unten rechts), eine Zeile Felder, QR-Code
- *   Apple, Empfänger   Name mit Foto daneben, zwei Zeilen Kontaktdaten, Ort oben — kein Code
+ *   Apple, Empfänger   Eintrittskarte: Name mit Foto, drei Zeilen Kontaktdaten, Ort oben,
+ *                      oben der Ticket-Ausschnitt — kein Code
  *   Google             Titel, Name, Position; QR-Code nur beim Aussteller
  *
  * Eine Annäherung, kein Screenshot — Schriftgrößen und Abstände setzt Wallet selbst.
@@ -55,6 +56,8 @@ interface PreviewData {
   firm: string | null
   city: string | null
   website: string | null
+  address: string | null
+  link: { label: string; url: string } | null
   title: string
 }
 
@@ -85,6 +88,10 @@ export function PassPreview({
     firm,
     city: blank(company.city),
     website: blank(company.website),
+    address: blank(company.street)
+      ? [blank(company.street), [blank(company.postalCode), blank(company.city)].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+      : null,
+    link: contact?.links.find((l) => l.label.trim() && l.url.trim()) ?? null,
     title: blank(design.cardTitle) ?? firm ?? name,
   }
   const companyPhone = blank(company.phone)
@@ -111,12 +118,16 @@ function fields(entries: Array<[string, string | null]>): Array<[string, string]
   return entries.filter((e): e is [string, string] => Boolean(e[1]))
 }
 
-function AppleShell({ design, children }: { design: DraftDesign; children: React.ReactNode }) {
+function AppleShell({ design, ticket, children }: { design: DraftDesign; ticket?: boolean; children: React.ReactNode }) {
   return (
     <div
-      className="mx-auto flex aspect-[320/420] w-full max-w-[300px] flex-col overflow-hidden rounded-[14px] shadow-lg"
+      className="relative mx-auto flex aspect-[320/420] w-full max-w-[300px] flex-col overflow-hidden rounded-[14px] shadow-lg"
       style={{ backgroundColor: design.backgroundColor, color: design.foregroundColor }}
     >
+      {/* Eintrittskarten haben oben einen halbrunden Ausschnitt; Wallet zeichnet ihn immer. */}
+      {ticket ? (
+        <span className="absolute left-1/2 top-0 z-10 size-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-canvas" />
+      ) : null}
       {children}
     </div>
   )
@@ -203,13 +214,13 @@ function AppleHolderPreview({
 }) {
   const label = design.labelColor
   return (
-    <AppleShell design={design}>
+    <AppleShell design={design} ticket>
       <AppleHeader
         design={design}
         title={data.title}
         right={data.city ? <Field label="Ort" value={data.city} color={label} /> : null}
       />
-      {/* Generic: Name links, Foto rechts daneben — nichts überlappt. */}
+      {/* Name links, Foto rechts daneben — nichts überlappt. */}
       <div className="flex shrink-0 items-center gap-3 px-3 pt-3">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: label }}>
@@ -235,6 +246,15 @@ function AppleHolderPreview({
         {fields([
           ['E-Mail', data.email],
           ['Web', data.website ? displayUrl(data.website) : null],
+        ]).map(([l, v]) => (
+          <Field key={l} label={l} value={v} color={label} />
+        ))}
+      </div>
+      <div className="grid shrink-0 grid-cols-3 gap-2 px-3 pt-3">
+        {fields([
+          ['Adresse', data.address],
+          ['Zentrale', companyPhone && companyPhone !== data.phone ? companyPhone : null],
+          [data.link?.label ?? 'Link', data.link ? displayUrl(data.link.url) : null],
         ]).map(([l, v]) => (
           <Field key={l} label={l} value={v} color={label} />
         ))}
