@@ -1,17 +1,19 @@
 import sharp from 'sharp'
-import { APPLE_STRIP_CANVAS } from '@/lib/cards/stamp-layout'
 import type { ScaledPng } from '@/lib/pass/pass-builder'
 
 /**
  * Das Bannerbild (`strip.png`) der Visitenkarte in Apple Wallet.
  *
- * Es füllt den oberen Teil der Karte; Wallet legt den Namen groß darüber, linksbündig.
- * Deshalb sitzt das Foto der Person rechts, rund ausgeschnitten, und links bleibt die
- * Kartenfarbe frei für die Schrift. Ohne Foto ist das Banner einfach die Kartenfarbe mit
- * einem leichten Verlauf — die Fläche ist trotzdem gefüllt, und der Name steht groß darin.
+ * Es füllt den oberen Teil der Karte; Wallet schreibt den Namen groß darüber, oben links,
+ * und zwar über fast die ganze Breite. Das Foto sitzt deshalb **unten rechts**, unterhalb
+ * der Namenszeile — rechts mittig lief ein langer Name ins Foto hinein (am iPhone gesehen).
+ * Ohne Foto ist das Banner die Kartenfarbe mit einem leichten Verlauf.
  *
- * Apples Maße für storeCard: 375×123 pt, geliefert als @1x/@2x/@3x.
+ * Maße: 375×144 pt. Store Cards zeigen das Banner in diesem Format; ein 375×123-Bild wird
+ * von Wallet aufgezogen und an den Seiten abgeschnitten (ebenfalls am iPhone gesehen).
  */
+
+export const BUSINESS_STRIP_CANVAS = { width: 375, height: 144 } as const
 
 const HEX = /^#[0-9a-fA-F]{6}$/
 
@@ -27,8 +29,8 @@ export interface BusinessStripInput {
 }
 
 async function renderAt(input: BusinessStripInput, scale: 1 | 2 | 3): Promise<Buffer> {
-  const width = APPLE_STRIP_CANVAS.width * scale
-  const height = APPLE_STRIP_CANVAS.height * scale
+  const width = BUSINESS_STRIP_CANVAS.width * scale
+  const height = BUSINESS_STRIP_CANVAS.height * scale
   const bg = safeColor(input.backgroundColor, '#1a1a1a')
   const fg = safeColor(input.foregroundColor, '#ffffff')
 
@@ -45,8 +47,9 @@ async function renderAt(input: BusinessStripInput, scale: 1 | 2 | 3): Promise<Bu
 
   const layers: sharp.OverlayOptions[] = []
   if (input.photoPng) {
-    const diameter = Math.round(height * 0.8)
-    const inset = Math.round((height - diameter) / 2)
+    // Unteres gutes Drittel bis zur Hälfte: der Name steht in der oberen Hälfte.
+    const diameter = Math.round(height * 0.5)
+    const inset = Math.round(height * 0.07)
     const mask = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${diameter}" height="${diameter}"><circle cx="${diameter / 2}" cy="${diameter / 2}" r="${diameter / 2}" fill="#fff"/></svg>`,
     )
@@ -59,8 +62,9 @@ async function renderAt(input: BusinessStripInput, scale: 1 | 2 | 3): Promise<Bu
     const ring = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${diameter}" height="${diameter}"><circle cx="${diameter / 2}" cy="${diameter / 2}" r="${diameter / 2 - scale}" fill="none" stroke="${fg}" stroke-opacity="0.35" stroke-width="${2 * scale}"/></svg>`,
     )
-    const left = width - diameter - inset * 2
-    layers.push({ input: photo, top: inset, left }, { input: ring, top: inset, left })
+    const left = width - diameter - Math.round(width * 0.045)
+    const top = height - diameter - inset
+    layers.push({ input: photo, top, left }, { input: ring, top, left })
   }
 
   return sharp(Buffer.from(base)).composite(layers).png({ compressionLevel: 9 }).toBuffer()

@@ -126,18 +126,19 @@ export function PassPreview({
         <span className="truncate text-[13px] font-semibold">{title}</span>
       </div>
 
-      {/* Banner wie `render-strip.ts`: Kartenfarbe mit leichtem Verlauf, Foto rund rechts. */}
+      {/* Banner wie `render-strip.ts` (375×144): Wallet schreibt den Namen groß oben links
+          über die ganze Breite, das Foto sitzt unten rechts darunter. */}
       <div
-        className="relative flex aspect-[375/123] w-full shrink-0 items-end px-3 pb-2"
+        className="relative aspect-[375/144] w-full shrink-0 overflow-hidden px-3 pt-[3%]"
         style={{ backgroundImage: `linear-gradient(135deg, ${fg}1a, ${fg}00)` }}
       >
-        <p className="relative z-10 max-w-[62%] text-[22px] font-light leading-tight">{name}</p>
+        <p className="relative z-10 truncate text-[29px] font-light leading-tight">{name}</p>
         {contact?.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={contact.photoUrl}
             alt=""
-            className="absolute right-[5%] top-[10%] aspect-square h-[80%] rounded-full object-cover"
+            className="absolute bottom-[7%] right-[4.5%] aspect-square h-[50%] rounded-full object-cover"
             style={{ boxShadow: `0 0 0 2px ${fg}59` }}
           />
         ) : null}

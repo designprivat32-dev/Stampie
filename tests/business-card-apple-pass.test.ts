@@ -309,6 +309,6 @@ describe('buildBusinessApplePass', () => {
     )
     expect(readZipEntry(zip, 'thumbnail.png')).toBeNull()
     const meta = await sharp(readZipEntry(zip, 'strip@2x.png')!).metadata()
-    expect([meta.width, meta.height]).toEqual([750, 246])
+    expect([meta.width, meta.height]).toEqual([750, 288])
   })
 })
