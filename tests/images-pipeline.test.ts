@@ -188,3 +188,40 @@ describe('asset kinds stay in one place', () => {
     )
   })
 })
+
+describe('contact photo fit', () => {
+  it('fills a square-ish photo, as a portrait should', async () => {
+    const { fitFor } = await import('@/lib/images/pipeline')
+    expect(fitFor('CONTACT_PHOTO', 'cover', 'jpeg', { width: 800, height: 900, hasAlpha: false })).toBe('cover')
+  })
+
+  it.each([
+    ['a wide logo', 'png', { width: 600, height: 200, hasAlpha: false }],
+    ['a transparent logo', 'png', { width: 300, height: 300, hasAlpha: true }],
+    ['an SVG', 'svg', { width: 300, height: 300, hasAlpha: true }],
+    ['a very tall image', 'jpeg', { width: 200, height: 600, hasAlpha: false }],
+  ] as const)('keeps %s whole instead of cutting it', async (_, type, meta) => {
+    const { fitFor } = await import('@/lib/images/pipeline')
+    expect(fitFor('CONTACT_PHOTO', 'cover', type, meta)).toBe('contain')
+  })
+
+  it('leaves every other kind alone', async () => {
+    const { fitFor } = await import('@/lib/images/pipeline')
+    expect(fitFor('ICON', 'cover', 'png', { width: 600, height: 200, hasAlpha: true })).toBe('cover')
+    expect(fitFor('HERO', 'cover', 'svg', { width: 600, height: 200 })).toBe('cover')
+  })
+
+  it('keeps the whole of a wide logo in the processed photo', async () => {
+    const sharp = (await import('sharp')).default
+    const { processUpload } = await import('@/lib/images/pipeline')
+    const wide = await sharp({ create: { width: 600, height: 200, channels: 3, background: '#ff0000' } }).png().toBuffer()
+    const result = await processUpload(wide, 'CONTACT_PHOTO')
+    const one = result.variants.find((v) => v.scale === 1)!
+    const { data, info } = await sharp(one.data).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    const alphaAt = (x: number, y: number) => data[(y * info.width + x) * info.channels + 3]
+    // Oben und unten durchsichtiger Rand, links und rechts das Rot bis an die Kante.
+    expect(alphaAt(45, 2)).toBe(0)
+    expect(alphaAt(1, 45)).toBe(255)
+    expect(alphaAt(88, 45)).toBe(255)
+  })
+})

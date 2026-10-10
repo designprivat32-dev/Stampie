@@ -80,6 +80,8 @@ export async function processUpload(
     base = base.extract(crop)
   }
 
+  const fit = fitFor(kind, spec.fit, type, meta)
+
   const variants: ProcessedVariant[] = []
   for (const scale of spec.scales) {
     const width = spec.width * scale
@@ -92,7 +94,7 @@ export async function processUpload(
       .resize({
         width,
         height,
-        fit: spec.fit,
+        fit,
         position: 'centre',
         background: { r: 0, g: 0, b: 0, alpha: 0 },
         withoutEnlargement: false,
@@ -108,6 +110,24 @@ export async function processUpload(
     variants,
     bytes: variants.reduce((sum, v) => sum + v.data.length, 0),
   }
+}
+
+/**
+ * Das Foto einer Visitenkarte wird quadratisch gefüllt — für ein Porträt richtig, für ein
+ * breites Logo nicht: von „R+H" blieb nur die Mitte übrig (am iPhone gesehen). Ein Bild, das
+ * nach Logo aussieht — durchsichtiger Hintergrund, SVG oder deutlich nicht quadratisch —,
+ * wird deshalb ganz eingepasst statt beschnitten. Alle anderen Arten bleiben, wie sie sind.
+ */
+export function fitFor(
+  kind: AssetKind,
+  fit: 'contain' | 'cover',
+  type: DetectedImageType,
+  meta: { width?: number; height?: number; hasAlpha?: boolean },
+): 'contain' | 'cover' {
+  if (kind !== 'CONTACT_PHOTO') return fit
+  const ratio = meta.width && meta.height ? meta.width / meta.height : 1
+  const looksLikeLogo = type === 'svg' || meta.hasAlpha === true || ratio > 1.3 || ratio < 0.77
+  return looksLikeLogo ? 'contain' : fit
 }
 
 function clampCrop(crop: CropRect, imageWidth: number, imageHeight: number) {
