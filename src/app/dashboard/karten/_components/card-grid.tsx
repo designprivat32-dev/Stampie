@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { NewCardDialog } from './new-card-dialog'
+import { BusinessCardTile } from './business-card-tile'
 import { AssignCustomerDialog } from './assign-customer-dialog'
 import { MessageDialog } from './message-dialog'
 import { deleteCardAction } from '@/actions/cards'
@@ -101,7 +102,17 @@ export function CardGrid({
         </button>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((card) => (
+          {cards.map((card) =>
+            card.kind === 'BUSINESS_CARD' ? (
+              <BusinessCardTile
+                key={card.id}
+                card={card}
+                canAssign={canAssign}
+                busy={busyId === card.id}
+                onAssign={() => setAssigning(card)}
+                onDelete={() => setDeleting(card)}
+              />
+            ) : (
             <CardTile
               key={card.id}
               card={card}
@@ -112,7 +123,8 @@ export function CardGrid({
               onMessage={() => setMessaging(card)}
               onDelete={() => setDeleting(card)}
             />
-          ))}
+            ),
+          )}
 
           <button
             type="button"

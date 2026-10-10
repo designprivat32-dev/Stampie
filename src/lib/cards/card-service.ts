@@ -1,4 +1,5 @@
 import 'server-only'
+import type { CardKind as StoredCardKind } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { isAdminSession } from '@/lib/auth/session'
 import { newFieldId } from './defaults'
@@ -16,6 +17,10 @@ import { assertLoyaltyKind } from './kind'
 export interface CardSummary {
   id: string
   name: string
+  /** Die Übersicht zeichnet Visitenkarten anders: keine Stempel, kein Stempeln. */
+  kind: StoredCardKind
+  /** Nur bei Visitenkarten: wie viele Personen darunter stehen. */
+  contactCount: number
   orgId: string | null
   orgName: string | null
   createdAt: string
@@ -85,6 +90,8 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
     select: {
       id: true,
       name: true,
+      kind: true,
+      _count: { select: { contacts: true } },
       orgId: true,
       createdAt: true,
       org: { select: { name: true, latitude: true, longitude: true } },
@@ -134,6 +141,8 @@ export async function listCards(options: ListCardsOptions): Promise<CardSummary[
     return {
       id: row.id,
       name: row.name,
+      kind: row.kind,
+      contactCount: row._count.contacts,
       orgId: row.orgId,
       orgName: row.org?.name ?? null,
       createdAt: row.createdAt.toISOString(),

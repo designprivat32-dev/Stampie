@@ -230,7 +230,7 @@ Wert `BUSINESS_CARD` würde dort still als Stempelkarte durchlaufen. Deshalb:
 | 2 ✅ | Apple-`generic`-Pass OWNER/HOLDER + Tests | Pass auf iPhone testbar |
 | 3 ✅ | `/v/[code]`, Claim-Link, Apple-Ausgabe, vCard, Statistik-Events | **Ablauf läuft auf iPhone** |
 | 4 | Google Generic Pass + Ausgabe | Android läuft |
-| 5 | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
+| 5 ✅ | Dashboard: Firmendaten, Personen, Vorschau, Wallet-Link | selbst bedienbar |
 | 6 | Updates/Löschen an alle Pässe, Statistik im Dashboard | fertig |
 | 7 | Datenschutztext, Rate-Limits, Review, „Visitenkarte“ im Dialog freischalten | live |
 
@@ -279,6 +279,16 @@ und Gutschein jedes Mal mit testen).
   harmlos; dafür entfällt die Einwilligung nach § 25 TDDDG und es wird nichts auf dem Gerät abgelegt.
 - Eigene Datenschutzseite `/v/<code>/datenschutz` (`components/business-card-privacy-notice.tsx`).
 - Statistik: VIEWED beim Seitenaufruf, WALLET_ADDED, CONTACT_SAVED.
+
+### Stand Phase 5 (vor Phase 4 gezogen, damit auf dem iPhone getestet werden kann)
+
+- „Neue Karte" bietet **Visitenkarte** an (früher als geplant freigeschaltet — die Wege dahinter sind fertig).
+- Übersicht: eigene Kachel ohne Stempel/Stempeln/Nachrichten, mit Personen- und Pässe-Zahl.
+- Editor `/dashboard/karten/<id>` für Visitenkarten: Aussehen (Farben, Titel, Logo; Speichern veröffentlicht
+  sofort), Firmendaten, Personen (anlegen, bearbeiten, löschen), je Person „Karte ins Wallet" mit QR + Link
+  und „Neuen Link erzeugen", Zahlen je Person.
+- Speichern stößt Apple-Updates an (Firma/Design: alle Pässe der Karte, Person: nur ihre Pässe).
+- Offen: Foto-Upload der Person, Google Wallet (Phase 4), sauberes Entwerten gelöschter Pässe (Phase 6).
 
 ## 10. Datenschutz
 

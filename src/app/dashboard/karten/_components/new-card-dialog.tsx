@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Stamp, Ticket, type LucideIcon } from 'lucide-react'
+import { IdCard, Stamp, Ticket, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,14 +19,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createCardAction } from '@/actions/cards'
 import { CARD_TEMPLATES } from '@/lib/cards/templates'
 import { cn } from '@/lib/utils'
-import type { CardKind } from '@/lib/cards/schema'
+import type { CreatableCardKind } from '@/lib/cards/kind'
 import type { CustomerOption } from '@/lib/cards/card-service'
 
 const NO_CUSTOMER = '__none__'
 const NO_TEMPLATE = '__none__'
 
 const CARD_KIND_OPTIONS: ReadonlyArray<{
-  value: CardKind
+  value: CreatableCardKind
   label: string
   description: string
   icon: LucideIcon
@@ -42,6 +42,12 @@ const CARD_KIND_OPTIONS: ReadonlyArray<{
     label: 'Gutscheinkarte',
     description: 'Einmaliger Rabatt, wird an der Kasse eingelöst.',
     icon: Ticket,
+  },
+  {
+    value: 'BUSINESS_CARD',
+    label: 'Visitenkarte',
+    description: 'Kontaktdaten fürs Wallet, weitergegeben per QR-Code.',
+    icon: IdCard,
   },
 ]
 
@@ -63,7 +69,7 @@ export function NewCardDialog({
 }) {
   const router = useRouter()
   const [name, setName] = React.useState('')
-  const [kind, setKind] = React.useState<CardKind>('STAMP')
+  const [kind, setKind] = React.useState<CreatableCardKind>('STAMP')
   const [orgId, setOrgId] = React.useState<string>(NO_CUSTOMER)
   const [templateId, setTemplateId] = React.useState<string>(NO_TEMPLATE)
   const [busy, setBusy] = React.useState(false)
@@ -120,7 +126,7 @@ export function NewCardDialog({
           */}
           <fieldset>
             <legend className="mb-2 text-[13px] font-medium">Was für eine Karte?</legend>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {CARD_KIND_OPTIONS.map((option) => {
                 const selected = kind === option.value
                 return (
@@ -157,7 +163,13 @@ export function NewCardDialog({
               id="card-name"
               value={name}
               maxLength={60}
-              placeholder={kind === 'COUPON' ? 'Sommeraktion Café Nord' : 'Kaffeekarte Café Nord'}
+              placeholder={
+                kind === 'COUPON'
+                  ? 'Sommeraktion Café Nord'
+                  : kind === 'BUSINESS_CARD'
+                    ? 'Visitenkarten Café Nord'
+                    : 'Kaffeekarte Café Nord'
+              }
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && name.trim()) void submit()

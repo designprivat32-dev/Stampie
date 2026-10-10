@@ -15,6 +15,13 @@ import { CARD_KINDS, type CardKind } from './schema'
  * Objekt, das irgendwo doch verändert wird, wäre ein schwer zu findender Fehler.
  */
 
+/**
+ * Alles, was sich anlegen lässt: Stempelkarte, Gutschein und die Visitenkarte. Getrennt von
+ * `CARD_KINDS`, damit nur das Anlegen und die Übersicht die Visitenkarte kennen.
+ */
+export const CREATABLE_CARD_KINDS = [...CARD_KINDS, 'BUSINESS_CARD'] as const
+export type CreatableCardKind = (typeof CREATABLE_CARD_KINDS)[number]
+
 export function isLoyaltyKind(kind: string): kind is CardKind {
   return (CARD_KINDS as readonly string[]).includes(kind)
 }

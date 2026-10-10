@@ -10,7 +10,7 @@ import { accessibleOrgIds, listCards, listCustomers, type CardSummary } from '@/
 import { designToRow } from '@/lib/cards/repository'
 import { DEFAULT_CARD_DESIGN } from '@/lib/cards/defaults'
 import { getTemplate, templateAsDesign } from '@/lib/cards/templates'
-import { cardKindSchema } from '@/lib/cards/schema'
+import { CREATABLE_CARD_KINDS } from '@/lib/cards/kind'
 
 /**
  * Card lifecycle: list, create, assign, delete.
@@ -26,7 +26,7 @@ const createInputSchema = z.object({
    * Fixed here for good: the wallet pass type follows from it and is baked into every pass
    * handed out afterwards, so there is deliberately no action to change it later.
    */
-  kind: cardKindSchema.default('STAMP'),
+  kind: z.enum(CREATABLE_CARD_KINDS).default('STAMP'),
   orgId: z.string().cuid().nullable().default(null),
   /** Optional industry preset, so a new card is not born blank. */
   templateId: z.string().max(40).nullable().default(null),

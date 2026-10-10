@@ -4,6 +4,8 @@ import { CardEditorProvider } from '@/stores/card-editor-provider'
 import { assertCardAccess, CardAccessError, UnauthorizedError } from '@/lib/auth/session'
 import { prisma } from '@/lib/db'
 import { isLoyaltyKind } from '@/lib/cards/kind'
+import { loadBusinessEditor } from '@/lib/business-cards/editor-service'
+import { BusinessCardEditor } from './_business/business-card-editor'
 import { loadOrCreateDraft } from '@/lib/cards/repository'
 import { isPristineDesign } from '@/lib/cards/defaults'
 import { getStorage, variantKey } from '@/lib/storage'
@@ -39,8 +41,17 @@ export default async function KartePage({ params }: { params: Promise<{ cardId: 
     loadOrCreateDraft(access.cardId),
   ])
 
-  // Der Designer kennt nur Stempelkarte und Gutschein; Visitenkarten bekommen eigene Reiter.
-  if (!card || !isLoyaltyKind(card.kind)) notFound()
+  if (!card) notFound()
+
+  // Visitenkarten haben ihren eigenen, schlichteren Editor.
+  if (card.kind === 'BUSINESS_CARD') {
+    const data = await loadBusinessEditor(card.id)
+    if (!data) notFound()
+    return <BusinessCardEditor data={data} />
+  }
+
+  // Der Designer kennt nur Stempelkarte und Gutschein.
+  if (!isLoyaltyKind(card.kind)) notFound()
 
   const org = card.org
   const customer: CustomerSummary = {
